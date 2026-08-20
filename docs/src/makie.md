@@ -63,7 +63,7 @@ This is the same model as used on the Plots.jl documentation page.
 
 ```@example 1
 using FlexiChains, CairoMakie, Distributions, LinearAlgebra
-using DynamicPPL: @model
+using DynamicPPL: @model, @varname
 
 import FlexiChains.Makie as FM # For the plotting functions.
 
@@ -258,7 +258,7 @@ We'll concoct an example with the [Palmer penguins dataset](https://github.com/d
 
 ```@example pushforward
 using FlexiChains, Distributions, DataFrames, PalmerPenguins, CairoMakie
-using DynamicPPL: @model, filldist, predict, fix
+using DynamicPPL: @model, @varname, filldist, predict, fix
 import FlexiChains.Makie as FM
 using StatsBase: denserank, fit, ZScoreTransform, reconstruct
 

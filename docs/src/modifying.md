@@ -57,7 +57,8 @@ It is also possible to modify the *values* stored inside a `FlexiChain` (but not
 This is done with the `transform_values` function:
 
 ```@example modifications
-using FlexiChains: FlexiChain, VarName, @varname, Parameter, Extra, transform_values
+using FlexiChains: FlexiChain, VarName, Parameter, Extra, transform_values
+using DynamicPPL: @varname
 data = Dict(
     Parameter(@varname(x)) => randn(10, 3),
     Parameter(@varname(y)) => randn(10, 3),

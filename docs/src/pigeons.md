@@ -17,7 +17,7 @@ The following example uses a Turing model as the log-density function (the exact
 
 ```@example pigeons
 using Pigeons, FlexiChains, Distributions
-using DynamicPPL: @model, filldist
+using DynamicPPL: @model, @varname, filldist
 
 @model function my_turing_model(n_trials, n_successes)
     p ~ filldist(Uniform(0, 1), 1, 2)

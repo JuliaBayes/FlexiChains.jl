@@ -20,7 +20,7 @@ To give a flavour of how this works, here is an example of a model that generate
 
 ```@example stats
 using FlexiChains, Distributions, LinearAlgebra
-using DynamicPPL: @model
+using DynamicPPL: @model, @varname
 
 @model function f()
     f ~ Normal()               # float

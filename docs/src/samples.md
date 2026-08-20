@@ -7,7 +7,7 @@ Consider the following example:
 
 ```@example samples
 using FlexiChains, Distributions
-using DynamicPPL: @model
+using DynamicPPL: @model, @varname
 
 @model function f()
     x ~ Normal()

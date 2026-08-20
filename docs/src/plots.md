@@ -66,7 +66,7 @@ We'll make a model with different types of parameters (continuous, discrete, and
 
 ```@example plotsjl
 using FlexiChains, StatsPlots, Distributions, LinearAlgebra
-using DynamicPPL: @model
+using DynamicPPL: @model, @varname
 
 import FlexiChains.Plots as FP # For the plotting functions.
 
