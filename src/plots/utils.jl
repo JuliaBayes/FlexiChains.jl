@@ -26,8 +26,8 @@ const DEFAULT_HEIGHT = 250
 function get_hdi_intervals end  # Overloaded in PosteriorStatsExt
 const DEFAULT_INTERVALS = (0.66, 0.95) # for forestplot
 
-# for connquantile etc.
-const DEFAULT_QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+# for the pushforward plots
+const DEFAULT_LEVELS = [0.2, 0.4, 0.6, 0.8]
 
 using ..FlexiChains:
     FlexiChain,
@@ -100,6 +100,39 @@ function check_eltype_is_real(::AbstractArray{T}) where {T}
 end
 
 """
+Check that `level` is a valid interval mass, i.e. lies strictly between 0 and 1.
+"""
+function check_valid_level(level::Real)
+    return if !(0 < level < 1)
+        throw(ArgumentError("level must be in (0, 1), got $level"))
+    end
+end
+
+"""
+Convert an interval mass `level` (e.g. `0.95`) to the pair of quantile probabilities
+`(lower, upper)` bounding the central interval of that mass, e.g. `0.95` becomes
+`(0.025, 0.975)`.
+"""
+function level_to_quantile_bounds(level::Real)
+    check_valid_level(level)
+    lower = (1 - level) / 2
+    upper = 1 - lower
+    return lower, upper
+end
+
+"""
+Sort `levels` (interval masses) so that index 1 is the widest, and return the sorted levels
+together with the vector of quantile probabilities needed to compute every band boundary
+plus the median. That vector is sorted ascending and always contains `0.5`.
+"""
+function levels_to_quantile_probs(levels::AbstractVector{<:Real})
+    sorted_levels = sort(collect(Float64, levels); rev=true)
+    bounds = level_to_quantile_bounds.(sorted_levels)
+    probs = sort(vcat(0.5, first.(bounds), last.(bounds)))
+    return sorted_levels, probs
+end
+
+"""
 Compute nested-quantile band values.
 
 `quantile_levels` are in 0–1. For a matrix (`iter × chain`), each quantile is the *ensemble
@@ -116,6 +149,54 @@ function compute_quantile_bands(
         acc = acc .+ Statistics.quantile(view(data, :, c), quantile_levels)
     end
     return acc ./ nchains
+end
+
+"""
+Compute nested-quantile band values for every key in `chn`, via the package's public
+[`Statistics.quantile`](@ref): the empirical quantile is computed per chain (collapsing the
+iteration dimension) and then averaged across chains, so the values agree with `median` and
+`summarystats` on the same chain.
+
+`probs` are quantile probabilities in `[0, 1]`. Returns a matrix of size
+`(length(probs), length(keys(chn)))`, with columns in the same order as `keys(chn)`. `warn`
+is forwarded to `Statistics.quantile`: a key for which the quantiles cannot be computed is
+skipped, with a warning, rather than silently dropped from the output.
+"""
+function chain_quantile_bands(
+    chn::FlexiChain,
+    probs::AbstractVector{<:Real};
+    warn::Bool=true,
+)
+    fs = Statistics.quantile(chn, probs; dims=:iter, warn=warn, split_varnames=false)
+    ks = collect(keys(chn))
+    qs = Matrix{Float64}(undef, length(probs), length(ks))
+    for (j, k) in enumerate(ks)
+        raw = _get_raw_data(fs, k) # size (1, nchains, 1); each entry a length(probs) vector
+        nchains = size(raw, 2)
+        acc = zeros(length(probs))
+        for c in 1:nchains
+            acc = acc .+ raw[1, c, 1]
+        end
+        qs[:, j] = acc ./ nchains
+    end
+    return qs
+end
+
+"""
+Per-band alpha for `n_bands` nested uncertainty bands drawn outermost-first, where band
+`k=1` is the outermost and `k=n_bands` the innermost.
+
+Band `k` is drawn on top of bands `1:k-1`, so the *visible* (composite) opacity at depth
+`k` is `A(k) = 1 - prod(1 - alpha_j for j in 1:k)`. This targets a composite ramp that is
+linear in `k`, running from `0.15` at the outermost band to `0.85` at the innermost
+(including when `n_bands == 1`), and returns the per-band `alpha_k` that produces it.
+"""
+function band_alpha(k, n_bands)
+    a_min, a_max = 0.15, 0.85
+    composite(j) = a_min + (a_max - a_min) * (j - 1) / max(n_bands - 1, 1)
+    A_k = composite(k)
+    A_km1 = k == 1 ? 0.0 : composite(k - 1)
+    return 1 - (1 - A_k) / (1 - A_km1)
 end
 
 """
