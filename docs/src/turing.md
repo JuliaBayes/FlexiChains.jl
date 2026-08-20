@@ -40,8 +40,8 @@ chain = sample(model, Prior(), 5)
 ```
 
 ```@example 1
-using DynamicPPL, Distributions, LinearAlgebra # hide
-using FlexiChains # hide
+using FlexiChains, Distributions, LinearAlgebra # hide
+using DynamicPPL: @model # hide
 y = [28, 8, -3, 7, -1, 1, 18, 12] # hide
 sigma = [15, 10, 16, 11, 9, 11, 10, 18] # hide
 @model function eight_schools(y, sigma) # hide
@@ -212,8 +212,9 @@ pfx_chain = sample(outer(), Prior(), 5)
 ```
 
 ```@example pfx
-using DynamicPPL, Distributions, LinearAlgebra # hide
-using FlexiChains: Prefixed, VNChain # hide
+using FlexiChains: FlexiChains, Prefixed, VNChain # hide
+using DynamicPPL: @model, to_submodel # hide
+using Distributions, LinearAlgebra # hide
 @model inner() = x ~ MvNormal(zeros(2), I) # hide
 @model function outer() # hide
     a ~ to_submodel(inner()) # hide

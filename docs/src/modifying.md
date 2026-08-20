@@ -101,8 +101,8 @@ A common use case for `transform_values` is to attach labels to data, for exampl
 For example, consider our (now familiar) eight-schools model.
 
 ```@example modifications
-using DynamicPPL, Distributions, LinearAlgebra
-using FlexiChains
+using DynamicPPL: @model, filldist
+using Distributions, LinearAlgebra
 
 y = [28, 8, -3, 7, -1, 1, 18, 12]
 sigma = [15, 10, 16, 11, 9, 11, 10, 18]

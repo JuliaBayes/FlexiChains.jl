@@ -65,7 +65,8 @@ However, the general principles are applicable to any `FlexiChain` object.
 We'll make a model with different types of parameters (continuous, discrete, and vector-valued).
 
 ```@example plotsjl
-using FlexiChains, StatsPlots, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains, StatsPlots, Distributions, LinearAlgebra
+using DynamicPPL: @model
 
 import FlexiChains.Plots as FP # For the plotting functions.
 

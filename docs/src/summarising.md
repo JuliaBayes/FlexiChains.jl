@@ -19,7 +19,8 @@ If at least one statistic is successfully computed for a key, that key will be i
 To give a flavour of how this works, here is an example of a model that generates parameters of different types:
 
 ```@example stats
-using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains, Distributions, LinearAlgebra
+using DynamicPPL: @model
 
 @model function f()
     f ~ Normal()               # float

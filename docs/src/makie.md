@@ -62,7 +62,8 @@ Here, we create a model with different types of parameters (continuous, discrete
 This is the same model as used on the Plots.jl documentation page.
 
 ```@example 1
-using FlexiChains, CairoMakie, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains, CairoMakie, Distributions, LinearAlgebra
+using DynamicPPL: @model
 
 import FlexiChains.Makie as FM # For the plotting functions.
 
@@ -256,7 +257,8 @@ The pushforward plots in this section visualise that uncertainty as nested quant
 We'll concoct an example with the [Palmer penguins dataset](https://github.com/devmotion/PalmerPenguins.jl) to show how these plots can be used.
 
 ```@example pushforward
-using FlexiChains, DynamicPPL, Distributions, DataFrames, PalmerPenguins, CairoMakie
+using FlexiChains, Distributions, DataFrames, PalmerPenguins, CairoMakie
+using DynamicPPL: @model, filldist, predict, fix
 import FlexiChains.Makie as FM
 using StatsBase: denserank, fit, ZScoreTransform, reconstruct
 

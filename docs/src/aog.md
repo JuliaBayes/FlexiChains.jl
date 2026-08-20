@@ -11,7 +11,8 @@ This page provides a handful of examples.
 We begin by sampling our familiar eight-schools model.
 
 ```@example aog
-using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains, Distributions, LinearAlgebra
+using DynamicPPL: @model
 
 y = [28, 8, -3, 7, -1, 1, 18, 12]
 sigma = [15, 10, 16, 11, 9, 11, 10, 18]

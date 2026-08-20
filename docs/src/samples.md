@@ -6,7 +6,8 @@ This means that it is very easy to access all the data for a given variable, but
 Consider the following example:
 
 ```@example samples
-using FlexiChains, DynamicPPL, Distributions
+using FlexiChains, Distributions
+using DynamicPPL: @model
 
 @model function f()
     x ~ Normal()
