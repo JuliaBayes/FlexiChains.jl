@@ -151,35 +151,30 @@ end
 """
     AbstractMCMC.from_samples(
         ::Type{<:VNChain},
-        params_and_stats::AbstractMatrix{<:VarNames.Draw}
+        draws::AbstractMatrix{<:VarNames.Draw}
     )::OldVNChain
 
 Convert a matrix of [`VarNames.Draw`](@extref) to a `VNChain`.
 """
 function AbstractMCMC.from_samples(
     ::Type{<:FlexiChain{<:VarName}},
-    params_and_stats::AbstractMatrix{<:VarNames.Draw},
+    draws::AbstractMatrix{<:VarNames.Draw},
 )
-    # Just need to convert the `ParamsWithStats` to Dicts of ParameterOrExtra.
-    dicts = map(params_and_stats) do ps
+    # Just need to convert the `Draw`s to Dicts of ParameterOrExtra.
+    dicts = map(draws) do draw
         # Parameters
         d = OrderedDict{ParameterOrExtra{<:VarName},Any}(
-            Parameter(vn) => val for (vn, val) in pairs(ps.params)
+            Parameter(vn) => val for (vn, val) in pairs(parameters(draw))
         )
         # Stats
-        for (stat_vn, stat_val) in pairs(ps.stats)
+        for (stat_vn, stat_val) in pairs(extras(draw))
             d[Extra(stat_vn)] = stat_val
         end
         d
     end
     # And get the structures.
-    structures = map(ps -> VarNames.skeleton(ps.params), params_and_stats)
-    return FlexiChain{VarName}(
-        size(params_and_stats, 1),
-        size(params_and_stats, 2),
-        dicts;
-        structures=structures,
-    )
+    structures = map(draw -> VarNames.skeleton(parameters(draw)), draws)
+    return FlexiChain{VarName}(size(draws, 1), size(draws, 2), dicts; structures=structures)
 end
 
 """
@@ -226,7 +221,7 @@ function AbstractMCMC.to_samples(
                     vnt = VarNames.setindex!!(vnt, val, vn_param.name)
                 end
             end
-            # Stats
+            # Extras
             stats_nt = NamedTuple(
                 Symbol(extra_param.name) => val for
                 (extra_param, val) in dict_or_draw if extra_param isa Extra
@@ -250,5 +245,5 @@ function AbstractMCMC.to_samples(
     chain::FlexiChain{T},
 )::DD.DimMatrix{<:VarNamedTuple} where {T<:VarName}
     pwss = AbstractMCMC.to_samples(VarNames.Draw, chain)
-    return map(pws -> pws.params, pwss)
+    return map(parameters, pwss)
 end
