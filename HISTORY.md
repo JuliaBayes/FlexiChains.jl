@@ -1,3 +1,25 @@
+# 0.7
+
+v0.7 is a fairly large breaking change in FlexiChains.
+
+## New types
+
+FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
+This will (eventually) allow for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
+To use the new types, you will either need to make sure that you have imported the types from VarNames.jl.
+
+In order to not completely break Turing users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
+**However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.**
+For Turing users on FlexiChains 0.7, please update your code to use `OldVNChain`, which is aliased to `FlexiChain{AbstractPPL.VarName}`.
+Apart from this one change, everything else should still work seamlessly.
+
+If/when Turing migrates to using VarNames.jl (please see [this issue](https://github.com/JuliaBayes/FlexiChains.jl/issues/316)), then the two aliases can be unified.
+
+## Other non-breaking changes
+
+The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
+There is no difference in their behaviour.
+
 # 0.6.38
 
 `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (as well as the plain `Array` versions) now take an additional `split_varnames` keyword argument, which determines whether or not vector-valued parameters (or summary statistics) are broken up into scalar leaves.

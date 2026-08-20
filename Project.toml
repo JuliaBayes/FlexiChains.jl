@@ -1,6 +1,6 @@
 name = "FlexiChains"
 uuid = "4a37a8b9-6e57-4b92-8664-298d46e639f7"
-version = "0.6.38"
+version = "0.7.0"
 authors = ["Penelope Yong <penelopeysm@gmail.com> and contributors"]
 
 [deps]
@@ -88,4 +88,5 @@ Statistics = "1"
 StatsBase = "0.34.6"
 StatsPlots = "0.15"
 Tables = "1.12.1"
+VarNames = "0.1.1"
 julia = "1.10.8"
