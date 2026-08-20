@@ -8,20 +8,43 @@ using Distributions: Distributions
 using DynamicPPL: DynamicPPL, UnlinkAll, TransformedValue, NoTransform, VarNamedTuple
 using OrderedCollections: OrderedDict
 using Random: Random
+using VarNames: VarNames
 
 const OldVNChain = FlexiChain{AbstractPPL.VarName}
+
+### compatibility shim to allow Turing to sample into new VNChain if desired
+function _convert_vnt(vnt::DynamicPPL.VarNamedTuple)::VarNames.VarNamedTuple
+    new_vnt = VarNames.VarNamedTuple()
+    for (vn, val) in pairs(vnt)
+        new_vn = FlexiChains._internal_to_varname(vn)
+        top_sym = AbstractPPL.getsym(vn)
+        template = get(vnt.data, top_sym, VarNames.NoTemplate())
+        new_vnt = VarNames.templated_setindex!!(new_vnt, val, new_vn, template)
+    end
+    return new_vnt
+end
+function to_vnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
+    return _convert_vnt(vnt), (;)
+end
+function to_vnt_and_stats(pws::DynamicPPL.ParamsWithStats)
+    return _convert_vnt(pws.params), pws.stats
+end
 
 ##################
 # bundle_samples #
 ##################
+function to_oldvnt_and_stats(pws::DynamicPPL.ParamsWithStats)
+    return (pws.params, pws.stats)
+end
+function to_oldvnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
+    return (vnt, (;))
+end
 function AbstractMCMC.bundle_samples(
-    # TODO(penelopeysm): When VarNamedTuple is moved into AbstractPPL, this can go back
-    # into src/ rather than the extension.
     transitions::AbstractVector,
     @nospecialize(m::AbstractMCMC.AbstractModel),
     @nospecialize(s::AbstractMCMC.AbstractSampler),
     last_sampler_state::Any,
-    chain_type::Type{FlexiChain{VarName}};
+    chain_type::Type{OldVNChain};
     save_state=false,
     stats=missing,
     discard_initial::Int=0,
@@ -29,7 +52,7 @@ function AbstractMCMC.bundle_samples(
     _kwargs...,
 )::FlexiChain{VarName}
     niters = length(transitions)
-    vnts_and_stats = map(FlexiChains.to_vnt_and_stats, transitions)
+    vnts_and_stats = map(to_oldvnt_and_stats, transitions)
     dicts = map(vnts_and_stats) do (vnt, stat)
         d = OrderedDict{ParameterOrExtra{<:VarName},Any}(
             Parameter(vn) => val for (vn, val) in pairs(vnt)
@@ -97,13 +120,6 @@ function FlexiChains.reconstruct_parameters(chn::OldVNChain, i, j, structure::Va
     return vnt
 end
 
-# Overload so that you can construct a OldVNChain from a 3D array and have it include
-# structures, so that `rand(chn)` returns a more convenient ParamsWithStats rather than a
-# Dict.
-#
-# We only need a skeletal VarNamedTuple. Because all our variables will be top-level
-# symbols, the skeletal VarNamedTuple will be empty, so we don't need to actually construct
-# anything.
 function FlexiChains._make_structures_from_array(::Type{VarName}, niters::Int, nchains::Int)
     return fill(DynamicPPL.VarNamedTuple(), niters, nchains)
 end
@@ -257,14 +273,6 @@ function AbstractMCMC.to_samples(
 )::DD.DimMatrix{<:DynamicPPL.VarNamedTuple} where {T<:VarName}
     pwss = AbstractMCMC.to_samples(DynamicPPL.ParamsWithStats, chain)
     return map(pws -> pws.params, pwss)
-end
-
-# This method will make `bundle_samples` 'just work'
-function FlexiChains.to_vnt_and_stats(pws::DynamicPPL.ParamsWithStats)
-    return (pws.params, pws.stats)
-end
-function FlexiChains.to_vnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
-    return (vnt, (;))
 end
 
 ############################
@@ -783,7 +791,7 @@ struct NotASampler <: AbstractMCMC.AbstractSampler end
             nothing,
             FlexiChains.FlexiChain{VarName},
         )
-        summarystats(chn; split_varnames=false)
+        summarystats(chn)
     end
 end
 
