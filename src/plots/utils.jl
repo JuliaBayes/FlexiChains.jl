@@ -126,7 +126,7 @@ together with the vector of quantile probabilities needed to compute every band 
 plus the median. That vector is sorted ascending and always contains `0.5`.
 """
 function levels_to_quantile_probs(levels::AbstractVector{<:Real})
-    sorted_levels = sort(collect(Float64, levels); rev=true)
+    sorted_levels = sort(levels; rev=true)
     bounds = level_to_quantile_bounds.(sorted_levels)
     probs = sort(vcat(0.5, first.(bounds), last.(bounds)))
     return sorted_levels, probs
