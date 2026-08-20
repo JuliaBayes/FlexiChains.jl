@@ -1,6 +1,6 @@
 module FlexiChainsMCMCChainsExt
 
-using FlexiChains: FlexiChains, FlexiChain, VarName, AbstractPPL, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, VarName, VarNames, Parameter, Extra
 using MCMCChains: MCMCChains
 using OrderedCollections: OrderedDict, OrderedSet
 
@@ -161,8 +161,8 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         else
             # Force conversion of keys to VarNames, so that we can split them up with
             # varname_and_value_leaves.
-            keys_as_vns = map(_to_varname, collect(Base.keys(d)))
-            iters = map(AbstractPPL.varname_and_value_leaves, keys_as_vns, Base.values(d))
+            keys_as_vns = map(FlexiChains._internal_to_varname, collect(Base.keys(d)))
+            iters = map(VarNames.varname_and_value_leaves, keys_as_vns, Base.values(d))
             mapreduce(collect, vcat, iters)
         end
         nms = map(first, nms_and_vs)
@@ -233,8 +233,5 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         iterations=parent(FlexiChains.iter_indices(fchain)),
     )
 end
-
-_to_varname(vn::VarName) = vn
-_to_varname(t) = VarName{Symbol(t)}()
 
 end # module

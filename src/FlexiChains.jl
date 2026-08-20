@@ -56,6 +56,9 @@ include("plots/plots.jl")
 include("plots/makie.jl")
 include("plots/shims.jl")
 
+# Extended in AbstractPPL extension and used in MCMCChains extension
+function _internal_to_varname end
+
 # Extended in MCMCChains extension
 function from_mcmcchains end
 @public from_mcmcchains
@@ -92,7 +95,7 @@ Alias for `FlexiChain{Symbol}`.
 """
 const SymChain = FlexiChain{Symbol}
 
-export VarName, @varname, VNChain, SymChain
+export VarName, @vn, @varname, VNChain, SymChain
 
 # Test utils, overloaded in DynamicPPLExt.
 function _make_prior_chain end

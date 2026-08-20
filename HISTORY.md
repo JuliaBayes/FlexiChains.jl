@@ -10,7 +10,7 @@ To use the new types, you will either need to make sure that you have imported t
 
 In order to not completely break Turing users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
 **However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.**
-For Turing users on FlexiChains 0.7, please update your code to use `OldVNChain`, which is aliased to `FlexiChain{AbstractPPL.VarName}`.
+For Turing users on FlexiChains 0.7, please update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`.
 Apart from this one change, everything else should still work seamlessly.
 
 If/when Turing migrates to using VarNames.jl (please see [this issue](https://github.com/JuliaBayes/FlexiChains.jl/issues/316)), then the two aliases can be unified.
