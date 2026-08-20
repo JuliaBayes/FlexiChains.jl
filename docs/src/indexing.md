@@ -12,32 +12,28 @@ If you prefer reading a fuller specification, the sections below that describe t
 
 ## Examples: chains
 
-Let's first set up a chain:
+Let's first set up a chain.
+We'll use a chain sampled from the prior, but to make it look more interesting we'll drop the first 100 iterations (mimicking MCMC warmup).
 
 ```@example 1
-using FlexiChains, Turing
+using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
+
 @model function f()
     x ~ MvNormal(zeros(2), I)
 end
-chn = sample(
-    f(),
-    MH(),
-    MCMCThreads(),
-    5,
-    2;
-    discard_initial=100,
-    chain_type=VNChain,
-    progress=false,
-    verbose=false,
-)
+
+chn = FlexiChains._make_prior_chain(f(), 105, 2)
+chn = chn[iter=At(101):End]  # drop the first 100 iterations
 ```
 
-Notice how the iteration numbers here start from 101: that is because of the `discard_initial` argument.
+Notice how the iteration numbers in the resulting chain start from 101, not 1.
 
 ```@example 1
 # Picking out a single parameter; this returns a `DimMatrix`.
 chn[@varname(x)]
 ```
+
+When indexing with plain integer indices, these refer to the _entries_ in the chain, not the iteration numbers.
 
 ```@example 1
 # This picks out the first of the iterations (note: this has iteration number 101)

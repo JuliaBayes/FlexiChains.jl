@@ -101,7 +101,8 @@ A common use case for `transform_values` is to attach labels to data, for exampl
 For example, consider our (now familiar) eight-schools model.
 
 ```@example modifications
-using Turing, FlexiChains
+using DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains
 
 y = [28, 8, -3, 7, -1, 1, 18, 12]
 sigma = [15, 10, 16, 11, 9, 11, 10, 18]
@@ -115,7 +116,7 @@ sigma = [15, 10, 16, 11, 9, 11, 10, 18]
     return (mu=mu, tau=tau)
 end
 model = eight_schools(y, sigma)
-chain = sample(model, NUTS(), 3; chain_type=VNChain)
+chain = FlexiChains._make_prior_chain(model, 3, 1)
 ```
 
 In this chain, `theta` has one entry per school, but is stored as a plain `Vector`.
@@ -193,7 +194,7 @@ mean(y_scaled), std(y_scaled)  # ≈ 0 and 1
 end
 model = linear_regression(X) | (; y=y_scaled)
 
-chain = sample(model, NUTS(), 1000; chain_type=VNChain)
+chain = FlexiChains._make_prior_chain(model, 1000, 1)
 ```
 
 In the resulting chain, we have values of `mu` but these are standardised according to the same ZScoreTransform we fitted to `y`.

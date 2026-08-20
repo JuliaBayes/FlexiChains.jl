@@ -16,7 +16,7 @@ This works with any model that Pigeons supports, including DynamicPPL models and
 The following example uses a Turing model as the log-density function (the exact model is modified slightly from the [Pigeons docs](https://pigeons.run/stable/input-turing/)):
 
 ```@example pigeons
-using Pigeons, FlexiChains, Turing
+using Pigeons, FlexiChains, DynamicPPL, Distributions
 
 @model function my_turing_model(n_trials, n_successes)
     p ~ filldist(Uniform(0, 1), 1, 2)
