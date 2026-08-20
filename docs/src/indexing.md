@@ -23,7 +23,7 @@ using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
 end
 
 chn = FlexiChains._make_prior_chain(f(), 105, 2)
-chn = chn[iter=At(101):End]  # drop the first 100 iterations
+chn = chn[iter=101:End]  # drop the first 100 iterations
 ```
 
 Notice how the iteration numbers in the resulting chain start from 101, not 1.

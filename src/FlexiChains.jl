@@ -97,7 +97,8 @@ Alias for `FlexiChain{Symbol}`.
 """
 const SymChain = FlexiChain{Symbol}
 
-export VarName, @vn, @varname, VNChain, SymChain
+# Don't export @varname to avoid clashes with Turing
+export VarName, @vn, VNChain, SymChain
 
 # Test utils, overloaded in DynamicPPLExt.
 function _make_prior_chain end
