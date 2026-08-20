@@ -281,4 +281,6 @@ function FC._internal_to_varname(vn::AbstractPPL.VarName{sym}) where {sym}
     return FC.VarName{sym}(_internal_to_optic(AbstractPPL.getoptic(vn)))
 end
 
+FC._maybe_promote_key(::Type{<:AbstractPPL.VarName}) = AbstractPPL.VarName
+
 end # module FlexiChainsAbstractPPLExt

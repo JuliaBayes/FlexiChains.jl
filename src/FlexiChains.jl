@@ -58,6 +58,8 @@ include("plots/shims.jl")
 
 # Extended in AbstractPPL extension and used in MCMCChains extension
 _internal_to_varname(sym::Symbol) = VarName{sym}()
+_maybe_promote_key(::Type{Tnew}) where {Tnew} = Tnew
+_maybe_promote_key(::Type{<:VarName}) = VarName
 
 # Extended in MCMCChains extension
 function from_mcmcchains end
