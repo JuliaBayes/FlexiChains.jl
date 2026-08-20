@@ -17,7 +17,7 @@ All of these functions return a new chain (or summary) and avoid mutating the or
 Let's set up a chain first:
 
 ```@example modifications
-using FlexiChains: FlexiChain, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
 
 data = Dict(
     Parameter(:x) => randn(10, 3),
@@ -57,43 +57,39 @@ It is also possible to modify the *values* stored inside a `FlexiChain` (but not
 This is done with the `transform_values` function:
 
 ```@example modifications
-using FlexiChains: FlexiChain, VarName, Parameter, Extra, transform_values
-using DynamicPPL: @varname
+using FlexiChains: FlexiChain, VarName, Parameter, Extra, transform_values, @vn
 data = Dict(
-    Parameter(@varname(x)) => randn(10, 3),
-    Parameter(@varname(y)) => randn(10, 3),
+    Parameter(@vn(x)) => randn(10, 3),
+    Parameter(@vn(y)) => randn(10, 3),
     Extra(:a) => randn(10, 3),
 )
 chain = FlexiChain{VarName}(10, 3, data)
 
-chain2 = transform_values(
-    chain,
-    @varname(x) => (i -> i + 1),
-    @varname(y) => (i -> i * 2) => @varname(new_y),
-)
+chain2 =
+    transform_values(chain, @vn(x) => (i -> i + 1), @vn(y) => (i -> i * 2) => @vn(new_y))
 ```
 
 The above example:
 
-  - adds 1 to each element of `chain[@varname(x)]`; and
-  - multiplies each element of `chain[@varname(y)]` by 2, and stores the result in a new key `@varname(new_y)`.
+  - adds 1 to each element of `chain[@vn(x)]`; and
+  - multiplies each element of `chain[@vn(y)]` by 2, and stores the result in a new key `@vn(new_y)`.
 
 ```@example modifications
-chain2[@varname(x)] .- chain[@varname(x)]   # Should be all 1.
+chain2[@vn(x)] .- chain[@vn(x)]   # Should be all 1.
 ```
 
 You can pass as many transformations as you like.
-The syntax is designed to be similar to that of `DataFrames.transform`, but has some slight differences: notably, the function being applied acts on *individual draws* from `chain[@varname(x)]` rather than the matrix as a whole.
+The syntax is designed to be similar to that of `DataFrames.transform`, but has some slight differences: notably, the function being applied acts on *individual draws* from `chain[@vn(x)]` rather than the matrix as a whole.
 
 You can also pass binary (or *n*-ary) functions to `transform_values` to combine multiple keys.
-Again, this is similar to `DataFrames.transform`, but the function combines individual draws from `chain[@varname(x)]` and `chain[@varname(y)]` rather than the matrices themselves.
+Again, this is similar to `DataFrames.transform`, but the function combines individual draws from `chain[@vn(x)]` and `chain[@vn(y)]` rather than the matrices themselves.
 
 ```@example modifications
-chain3 = transform_values(chain, [@varname(x), @varname(y)] => (+) => @varname(sum_xy))
+chain3 = transform_values(chain, [@vn(x), @vn(y)] => (+) => @vn(sum_xy))
 ```
 
 ```@example modifications
-chain3[@varname(sum_xy)] == chain[@varname(x)] .+ chain[@varname(y)]
+chain3[@vn(sum_xy)] == chain[@vn(x)] .+ chain[@vn(y)]
 ```
 
 ### Attaching labels to data
@@ -146,7 +142,7 @@ For example, `DimVector` parameters get special labels when plotting:
 ```@example modifications
 using CairoMakie
 
-FlexiChains.Makie.traceplot(chain, @varname(theta); layout=(4, 2))
+FlexiChains.Makie.traceplot(chain, :theta; layout=(4, 2))
 ```
 
 Having the labels also benefits downstream analysis of any data extracted from the chain.

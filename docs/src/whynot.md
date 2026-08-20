@@ -22,7 +22,7 @@ In contrast, MCMCChains immediately flattens everything into a 3D array.
 
 If you feed a chain back into a Turing model, e.g. with `predict`, Turing is actually much happier with the high-level, original data representation.
 With MCMCChains you have to pay the cost of 'unflattening'.
-That's why [FlexiChains is typically faster when interfacing with Turing models](@ref why-perf).
+That's why [FlexiChains is typically faster when interfacing with Turing models](@ref why).
 
 Now, flattening is actually quite an expensive operation since it involves essentially reshuffling the entire chain's data in memory and is therefore `O(niters * nchains * nparams)`.
 Generally the means that things that involve flat representations of data (a simple example being conversion to DataFrame) are faster with MCMCChains, because this cost has already been paid upfront.

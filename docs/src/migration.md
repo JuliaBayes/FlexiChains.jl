@@ -8,7 +8,7 @@ I will be more than happy to add more examples here.
 
 ## Setup
 
-For the purposes of these docs, we will have to write a function, `prior_chain`, that creates a chain without using Turing explicitly.
+For the purposes of these docs, we will have to write a function, `prior_chains`, that creates a chain without using Turing explicitly.
 This is because Turing depends on FlexiChains, and if we make a breaking release of FlexiChains, then the docs will break as there will not yet be a version of Turing that is compatible.
 
 The code is shown here for demonstration purposes, but don't worry about the implementation of this too much!
@@ -19,12 +19,11 @@ It is really the same as calling `sample(model, Prior(), MCMCSerial(), n_iters, 
     ```@example migration
     using DynamicPPL, AbstractMCMC, MCMCChains, FlexiChains, Random, Distributions
     
-    function prior_chain(
+    function prior_chains(
         rng::Random.AbstractRNG,
         model::DynamicPPL.Model,
         niters::Int,
         nchains::Int,
-        ::Type{Tchn},
     ) where {Tchn}
         vi = DynamicPPL.OnlyAccsVarInfo()
         vi = DynamicPPL.setacc!!(vi, DynamicPPL.RawValueAccumulator(true))
@@ -33,7 +32,10 @@ It is really the same as calling `sample(model, Prior(), MCMCSerial(), n_iters, 
                 last(DynamicPPL.init!!(rng, model, vi, InitFromPrior(), UnlinkAll())),
             ) for _ in 1:niters, _ in 1:nchains
         ]
-        return AbstractMCMC.from_samples(Tchn, ps)
+    
+        mcmcchain = AbstractMCMC.from_samples(MCMCChains.Chains, ps)
+        flexichain = AbstractMCMC.from_samples(FlexiChains.FlexiChain{DynamicPPL.VarName}, ps)
+        return mcmcchain, flexichain
     end
     ```
 
@@ -42,8 +44,7 @@ It is really the same as calling `sample(model, Prior(), MCMCSerial(), n_iters, 
 ```@example migration
 @model f() = x ~ Normal()
 model = f()
-mchain = prior_chain(Xoshiro(468), model, 5, 2, MCMCChains.Chains)
-fchain = prior_chain(Xoshiro(468), model, 5, 2, FlexiChains.VNChain)
+mchain, fchain = prior_chains(Xoshiro(468), model, 5, 2)
 nothing # hide
 ```
 
@@ -72,8 +73,7 @@ You can also use `fchain[:x]` as long as the Symbol can be [unambiguously resolv
 ```@example migration
 @model g() = x ~ filldist(Normal(), 2, 3)
 model = g()
-mchain = prior_chain(Xoshiro(468), model, 5, 2, MCMCChains.Chains)
-fchain = prior_chain(Xoshiro(468), model, 5, 2, FlexiChains.VNChain)
+mchain, fchain = prior_chains(Xoshiro(468), model, 5, 2)
 nothing # hide
 ```
 
@@ -98,7 +98,7 @@ However, you can still access the element `x[1, 2]` using `VarName`s.
 fchain[@varname(x[1, 2])]
 ```
 
-(In fact you can also [use other indexing patterns](@ref why-varnames-as-keys), such as `fchain[@varname(x[end])]` to get the last element of `x`.)
+(In fact you can also [use other indexing patterns](@ref why), such as `fchain[@varname(x[end])]` to get the last element of `x`.)
 
 ## A3. Extracting array-valued samples
 
@@ -164,8 +164,7 @@ to get a `DimArray` of dimensions `niters × nchains × 2 × 3`, where the last 
     z ~ Normal()
 end
 model = h()
-mchain = prior_chain(Xoshiro(468), model, 5, 2, MCMCChains.Chains)
-fchain = prior_chain(Xoshiro(468), model, 5, 2, FlexiChains.VNChain)
+mchain, fchain = prior_chains(Xoshiro(468), model, 5, 2)
 nothing # hide
 ```
 
@@ -237,8 +236,7 @@ using LinearAlgebra
     y ~ MvNormal(zeros(2), I)
 end
 model = k()
-mchain = prior_chain(Xoshiro(468), model, 5, 2, MCMCChains.Chains)
-fchain = prior_chain(Xoshiro(468), model, 5, 2, FlexiChains.VNChain)
+mchain, fchain = prior_chains(Xoshiro(468), model, 5, 2)
 nothing # hide
 ```
 
@@ -465,8 +463,7 @@ Please see the [plotting docs](@ref plotting) for information on what plotting f
     z ~ Normal()
 end
 model = q()
-mchain = prior_chain(Xoshiro(468), model, 5, 2, MCMCChains.Chains)
-fchain = prior_chain(Xoshiro(468), model, 5, 2, FlexiChains.VNChain)
+mchain, fchain = prior_chains(Xoshiro(468), model, 5, 2)
 nothing # hide
 ```
 

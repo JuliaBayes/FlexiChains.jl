@@ -146,7 +146,7 @@ chain[@varname(mu), iter=2:4, chain=1]
 You can also use selectors from DimensionalData.jl to specify which iterations or chains you want.
 
 ```@example 1
-chain[@varname(mu), iter=Not(At(7)), chain=At(1)]
+chain[@varname(mu), iter=Not(3), chain=At(1)]
 ```
 
 The indexing behaviour of FlexiChains is described fully on [the Indexing page](@ref indexing).
@@ -361,6 +361,7 @@ Since this only uses the parameters which are already part of the chain, this do
 The functions `predict`, `returned`, `logjoint`, `loglikelihood`, and `logprior` all work 'as expected' using FlexiChains with exactly the same signatures that you are used to.
 
 ```@example 1
+using DynamicPPL: returned # hide
 returned(model, chain)
 ```
 
