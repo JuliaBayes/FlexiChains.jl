@@ -5,13 +5,7 @@ using DimensionalData: DimensionalData as DD
 using Distributions
 using DynamicPPL
 using FlexiChains:
-    FlexiChains,
-    FlexiChain,
-    VNChain,
-    Parameter,
-    Extra,
-    _make_prior_chain,
-    _make_posterior_chain
+    FlexiChains, FlexiChain, Parameter, Extra, _make_prior_chain, _make_posterior_chain
 using LinearAlgebra: I
 using OffsetArrays: OffsetArray
 using PosteriorStats: PosteriorStats
@@ -19,11 +13,12 @@ using Random: Random, Xoshiro
 using StableRNGs: StableRNG
 using Test
 
+const OldVNChain = FlexiChains.FlexiChain{DynamicPPL.VarName}
 _LOGPRIOR_KEY = Extra(:logprior)
 _LOGLIKELIHOOD_KEY = Extra(:loglikelihood)
 _LOGJOINT_KEY = Extra(:logjoint)
 
-@testset "FlexiChainsExt" begin
+@testset "FlexiChainsDynamicPPLExt" begin
     @testset "InitFromParams(chain, i, j)" begin
         @model function f()
             x ~ Normal()
@@ -61,8 +56,8 @@ _LOGJOINT_KEY = Extra(:logjoint)
 
         # test with VarNamedTuple
         vnts = [rand(model) for _ in 1:100, _ in 1:3]
-        c2 = AbstractMCMC.from_samples(VNChain, vnts)
-        @test c2 isa VNChain
+        c2 = AbstractMCMC.from_samples(OldVNChain, vnts)
+        @test c2 isa OldVNChain
         @test size(c2) == (100, 3)
         @test Set(FlexiChains.parameters(c2)) == Set(keys(rand(model)))
         @test c2[@varname(x)] == map(vnt -> vnt[@varname(x)], vnts)
@@ -79,7 +74,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
         Ni, Nc = 10, 2
 
         # These should give the same results, but chn is just the ParamsWithStats
-        # bundled into a VNChain.
+        # bundled into a OldVNChain.
         chn = _make_prior_chain(Xoshiro(468), f(), Ni, Nc; make_chain=true)
         pwss = _make_prior_chain(Xoshiro(468), f(), Ni, Nc; make_chain=false)
 
@@ -216,7 +211,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
 
         @testset "logdensities" begin
             pld = DynamicPPL.pointwise_logdensities(model, chn)
-            @test pld isa VNChain
+            @test pld isa OldVNChain
             @test FlexiChains.iter_indices(pld) == FlexiChains.iter_indices(chn)
             @test FlexiChains.chain_indices(pld) == FlexiChains.chain_indices(chn)
             @test length(keys(pld)) == 2
@@ -226,7 +221,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
 
         @testset "loglikelihoods" begin
             pld = DynamicPPL.pointwise_loglikelihoods(model, chn)
-            @test pld isa VNChain
+            @test pld isa OldVNChain
             @test FlexiChains.iter_indices(pld) == FlexiChains.iter_indices(chn)
             @test FlexiChains.chain_indices(pld) == FlexiChains.chain_indices(chn)
             @test length(keys(pld)) == 1
@@ -235,7 +230,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
 
         @testset "logpriors" begin
             pld = DynamicPPL.pointwise_prior_logdensities(model, chn)
-            @test pld isa VNChain
+            @test pld isa OldVNChain
             @test FlexiChains.iter_indices(pld) == FlexiChains.iter_indices(chn)
             @test FlexiChains.chain_indices(pld) == FlexiChains.chain_indices(chn)
             @test length(keys(pld)) == 1
@@ -520,7 +515,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
             # check correctness, but for predict we just check that it runs.
             @test isapprox(returned(cond_model, chn), prod.(chn[@varname(x)]))
             pdns = predict(varlen_single(), chn)
-            @test pdns isa VNChain
+            @test pdns isa OldVNChain
             for vn in FlexiChains.parameters(chn)
                 @test pdns[vn] == chn[vn]
             end
@@ -545,7 +540,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
             # check correctness, but for predict we just check that it runs.
             @test isapprox(returned(cond_model, chn), prod.(chn[@varname(x)]))
             pdns = predict(varlen_dense(), chn)
-            @test pdns isa VNChain
+            @test pdns isa OldVNChain
             for vn in FlexiChains.parameters(chn)
                 @test pdns[vn] == chn[vn]
             end
@@ -569,7 +564,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
             # Check that returned and predict both work.
             @test returned(cond_model, chn) isa DD.DimArray
             pdns = predict(varlen_nondense(), chn)
-            @test pdns isa VNChain
+            @test pdns isa OldVNChain
             for vn in FlexiChains.parameters(chn)
                 @test isequal(pdns[vn], chn[vn]) # might have missing so need isequal
             end
@@ -616,7 +611,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
             (@varname(x1), @varname(x2) => (2,)),
             (@varname(x1), @varname(x2), Extra(:logp)),
         )
-            chn = FlexiChains.VNChain(arr, @varname(x))
+            chn = OldVNChain(arr, @varname(x))
             # Note: this behaviour only works when DynamicPPL is loaded -- be careful about
             # moving this test to anywhere else
             @test rand(chn) isa DynamicPPL.ParamsWithStats

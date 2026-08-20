@@ -5,11 +5,13 @@ using DimensionalData: DimArray, Dim
 using Distributions
 using DynamicPPL
 using FlexiChains:
-    FlexiChains, FlexiChain, VNChain, Parameter, Extra, ParameterOrExtra, _make_prior_chain
+    FlexiChains, FlexiChain, Parameter, Extra, ParameterOrExtra, _make_prior_chain
 using LinearAlgebra: I
 using MCMCChains: MCMCChains
 using Random: Xoshiro
 using Test
+
+const OldVNChain = FlexiChains.FlexiChain{DynamicPPL.VarName}
 
 """
 Build an `MCMCChains.Chains` from a DynamicPPL model, mimicking what Turing's
@@ -57,7 +59,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
         end
 
         @testset "sampling time is preserved" begin
-            flexic_with_time = VNChain(20, 1, flexic._data; sampling_time=[3.14])
+            flexic_with_time = OldVNChain(20, 1, flexic._data; sampling_time=[3.14])
             mc = MCMCChains.Chains(flexic_with_time)
             @test hasproperty(mc.info, :start_time)
             @test hasproperty(mc.info, :stop_time)
@@ -67,7 +69,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
 
         @testset "sampler state is preserved" begin
             flexic_with_state =
-                VNChain(20, 1, flexic._data; last_sampler_state=["some_state"])
+                OldVNChain(20, 1, flexic._data; last_sampler_state=["some_state"])
             mc = MCMCChains.Chains(flexic_with_state)
             @test hasproperty(mc.info, :samplerstate)
             @test mc.info.samplerstate == FlexiChains.last_sampler_state(flexic_with_state)
@@ -170,7 +172,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
                 Parameter(@varname(z)),
             )
             fc = FlexiChains.from_mcmcchains(chn, ks)
-            @test fc isa FlexiChain{VarName}
+            @test fc isa OldVNChain
             @test size(fc) == (size(chn, 1), size(chn, 3))
             @test collect(FlexiChains.parameters(fc)) ==
                   [@varname(x), @varname(y), @varname(z)]

@@ -57,7 +57,7 @@ include("plots/makie.jl")
 include("plots/shims.jl")
 
 # Extended in AbstractPPL extension and used in MCMCChains extension
-function _internal_to_varname end
+_internal_to_varname(sym::Symbol) = VarName{sym}()
 
 # Extended in MCMCChains extension
 function from_mcmcchains end

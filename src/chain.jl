@@ -555,9 +555,13 @@ struct FlexiChain{TKey,TMetadata<:FlexiChainMetadata} <: AbstractMCMC.AbstractCh
     end
 end
 
-# Default is to not make any structures, but this can be overloaded for TKey = VarName so
-# that you can construct a VNChain from a 3D array and have it include structures, so that
-# `rand(chn)` returns a more convenient ParamsWithStats rather than a Dict.
+# Default is to not make any structures
+function _make_structures_from_array(::Type, niters::Int, nchains::Int)
+    return fill(nothing, niters, nchains)
+end
+# but this can be overloaded for TKey = VarName so that you can construct a VNChain from a
+# 3D array and have it include structures, so that `rand(chn)` returns a more convenient
+# ParamsWithStats rather than a Dict.
 #
 # We only need a skeletal VarNamedTuple. Because all our variables will be top-level
 # symbols, the skeletal VarNamedTuple will be empty, so we don't need to actually construct
