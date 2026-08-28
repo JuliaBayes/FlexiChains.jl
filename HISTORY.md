@@ -5,15 +5,20 @@ v0.7 is a fairly large breaking change in FlexiChains.
 ## New types
 
 FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
-This will (eventually) allow for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
-To use the new types, you will either need to make sure that you have imported the types from VarNames.jl.
+This allows for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
 
-In order to not completely break Turing users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
-**However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.**
-For Turing users on FlexiChains 0.7, please update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`.
-Apart from this one change, everything else should still work seamlessly.
+In order to not completely break users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
+**However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.
+Until & unless Turing itself updates its codebase (please see [this issue](https://github.com/TuringLang/Turing.jl/issues/2856)), Turing users should stick to FlexiChains 0.6 where possible (this will be enforced by compatibility bounds).**
 
-If/when Turing migrates to using VarNames.jl (please see [this issue](https://github.com/JuliaBayes/FlexiChains.jl/issues/316)), then the two aliases can be unified.
+If you are only using Turing, it is unlikely that you will have FlexiChains v0.7 in your environment.
+However, if for some reason you *need* to use FlexiChains 0.7, please:
+
+  - update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`
+  - if you need to convert to/from the new VNChain, you can use the `to_new_vnchain` and `to_old_vnchain` conversion functions
+
+apart from this one change, everything else should still work seamlessly.
+If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
 
 ## Other non-breaking changes
 
