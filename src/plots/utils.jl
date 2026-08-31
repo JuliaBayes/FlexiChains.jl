@@ -154,7 +154,7 @@ function chain_quantile_bands(
 )
     fs = Statistics.quantile(chn, probs; dims=:iter, warn=warn, split_varnames=false)
     da = DD.DimArray(fs)
-    return mean(da, dims=:chain)
+    return Statistics.mean(da, dims=:chain)
 end
 
 """
