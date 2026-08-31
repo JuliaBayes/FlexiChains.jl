@@ -14,8 +14,10 @@ This is a port of [Michael Betancourt's
 # Keyword arguments
 - `x_grid`: the x-values to plot against. Defaults to `1:N`, where `N` is the number of
   components being plotted.
-- `levels`: vector of interval masses in `(0, 1)`, e.g. `0.95` for the central 95% interval.
+- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `alpha_limits`: a tuple or vector two values specifying the lower and upper limit of
+  alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_continuous(
@@ -38,6 +40,7 @@ function FC.Makie.pushforward_continuous!(
     x_grid,
     levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
@@ -59,6 +62,7 @@ function FC.Makie.pushforward_continuous!(
     end
 
     qs = FC.PlotUtils.chain_quantile_bands(sub, probs)
+    alphas = FC.PlotUtils.band_alpha(n_bands; alpha_limits)
 
     for i in 1:n_bands
         Makie.band!(
@@ -66,7 +70,7 @@ function FC.Makie.pushforward_continuous!(
             x_grid,
             qs[i, :],
             qs[end+1-i, :];
-            alpha=FC.PlotUtils.band_alpha(i, n_bands),
+            alpha=alphas[i],
             color=color,
             kwargs...,
         )

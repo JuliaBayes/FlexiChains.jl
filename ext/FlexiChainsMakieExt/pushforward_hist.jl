@@ -7,6 +7,7 @@ function _plot_pushforward_hist!(
     nbins::Integer=25,
     levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
@@ -16,6 +17,7 @@ function _plot_pushforward_hist!(
     counts = FC.PlotUtils.bin_count_matrices(stacked_data, edges)
 
     qs = Matrix{Float64}(undef, length(probs), nbins)
+    alphas = FC.PlotUtils.band_alpha(n_bands; alpha_limits)
 
     for b in 1:nbins
         qs[:, b] = FC.PlotUtils.compute_quantile_bands(view(counts, :, :, b), probs)
@@ -32,7 +34,7 @@ function _plot_pushforward_hist!(
             xs,
             rep2(qs[i, :]),
             rep2(qs[end+1-i, :]);
-            alpha=FC.PlotUtils.band_alpha(i, n_bands),
+            alpha=alphas[i],
             color=color,
             label="predicted",
             kwargs...,
@@ -78,8 +80,10 @@ This function is a port of [Michael Betancourt's
 # Keyword arguments
 - `observed`: vector of observed values; its histogram (same bins) is overlaid as a line.
 - `nbins`: number of equal-width bins. Defaults to `25`.
-- `levels`: vector of interval masses in `(0, 1)`, e.g. `0.95` for the central 95% interval.
+- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `alpha_limits`: a tuple or vector two values specifying the lower and upper limit of
+  alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_hist(

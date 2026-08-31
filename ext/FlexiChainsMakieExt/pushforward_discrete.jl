@@ -12,6 +12,7 @@ function _plot_pushforward_discrete!(
     levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
     vertical::Bool=true,
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
@@ -19,6 +20,7 @@ function _plot_pushforward_discrete!(
     n = length(keys(sub))
     qs = FC.PlotUtils.chain_quantile_bands(sub, probs)
     positions = collect(1:n)
+    alphas = FC.PlotUtils.band_alpha(n_bands; alpha_limits)
 
     p = nothing
     for i in 1:n_bands
@@ -27,7 +29,7 @@ function _plot_pushforward_discrete!(
             positions,
             qs[end+1-i, :];
             fillto=qs[i, :],
-            alpha=FC.PlotUtils.band_alpha(i, n_bands),
+            alpha=alphas[i],
             color=color,
             strokewidth=0,
             direction=vertical ? :y : :x,
@@ -54,8 +56,10 @@ This function is a port of [Michael Betancourt's
 
 # Keyword arguments
 - `vertical`: if `true`, bars are vertical; otherwise horizontal. Defaults to `true`.
-- `levels`: vector of interval masses in `(0, 1)`, e.g. `0.95` for the central 95% interval.
+- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `alpha_limits`: a tuple or vector two values specifying the lower and upper limit of
+  alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_discrete(
@@ -64,6 +68,7 @@ function FC.Makie.pushforward_discrete(
     figure=(;),
     axis=(;),
     vertical::Bool=true,
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     fig = isempty(figure) ? Figure() : Figure(; figure...)
@@ -77,6 +82,7 @@ function FC.Makie.pushforward_discrete!(
     chn::FC.FlexiChain,
     param;
     vertical::Bool=true,
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     sub, plot_names = FC.PlotUtils.subset_and_split_chain(chn, param)

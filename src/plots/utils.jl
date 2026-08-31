@@ -100,21 +100,14 @@ function check_eltype_is_real(::AbstractArray{T}) where {T}
 end
 
 """
-Check that `level` is a valid interval mass, i.e. lies strictly between 0 and 1.
-"""
-function check_valid_level(level::Real)
-    return if !(0 < level < 1)
-        throw(ArgumentError("level must be in (0, 1), got $level"))
-    end
-end
-
-"""
 Convert an interval mass `level` (e.g. `0.95`) to the pair of quantile probabilities
 `(lower, upper)` bounding the central interval of that mass, e.g. `0.95` becomes
 `(0.025, 0.975)`.
 """
 function level_to_quantile_bounds(level::Real)
-    check_valid_level(level)
+    if !(0 < level < 1)
+        throw(ArgumentError("level must be in (0, 1), got $level"))
+    end
     lower = (1 - level) / 2
     upper = 1 - lower
     return lower, upper
@@ -152,15 +145,7 @@ function compute_quantile_bands(
 end
 
 """
-Compute nested-quantile band values for every key in `chn`, via the package's public
-[`Statistics.quantile`](@ref): the empirical quantile is computed per chain (collapsing the
-iteration dimension) and then averaged across chains, so the values agree with `median` and
-`summarystats` on the same chain.
-
-`probs` are quantile probabilities in `[0, 1]`. Returns a matrix of size
-`(length(probs), length(keys(chn)))`, with columns in the same order as `keys(chn)`. `warn`
-is forwarded to `Statistics.quantile`: a key for which the quantiles cannot be computed is
-skipped, with a warning, rather than silently dropped from the output.
+Compute nested-quantile band values for every key in `chn`.
 """
 function chain_quantile_bands(
     chn::FlexiChain,
@@ -168,35 +153,29 @@ function chain_quantile_bands(
     warn::Bool=true,
 )
     fs = Statistics.quantile(chn, probs; dims=:iter, warn=warn, split_varnames=false)
-    ks = collect(keys(chn))
-    qs = Matrix{Float64}(undef, length(probs), length(ks))
-    for (j, k) in enumerate(ks)
-        raw = _get_raw_data(fs, k) # size (1, nchains, 1); each entry a length(probs) vector
-        nchains = size(raw, 2)
-        acc = zeros(length(probs))
-        for c in 1:nchains
-            acc = acc .+ raw[1, c, 1]
-        end
-        qs[:, j] = acc ./ nchains
-    end
-    return qs
+    da = DD.DimArray(fs)
+    return mean(da, dims=:chain)
 end
 
 """
-Per-band alpha for `n_bands` nested uncertainty bands drawn outermost-first, where band
-`k=1` is the outermost and `k=n_bands` the innermost.
+Per-band alpha for `n_bands` nested uncertainty bands drawn outermost-first.
 
-Band `k` is drawn on top of bands `1:k-1`, so the *visible* (composite) opacity at depth
-`k` is `A(k) = 1 - prod(1 - alpha_j for j in 1:k)`. This targets a composite ramp that is
-linear in `k`, running from `0.15` at the outermost band to `0.85` at the innermost
-(including when `n_bands == 1`), and returns the per-band `alpha_k` that produces it.
+Band `k` is drawn on top of bands `1:k-1`, so the visible (composite) opacity at depth `k`
+is `A(k) = 1 - prod(1 - alpha_j for j in 1:k)`. This targets a composite ramp that is
+linear in `k`, running from `alpha_limits[1]` at the outermost band to `alpha_limits[2]` at
+the innermost.
 """
-function band_alpha(k, n_bands)
-    a_min, a_max = 0.15, 0.85
-    composite(j) = a_min + (a_max - a_min) * (j - 1) / max(n_bands - 1, 1)
-    A_k = composite(k)
-    A_km1 = k == 1 ? 0.0 : composite(k - 1)
-    return 1 - (1 - A_k) / (1 - A_km1)
+function band_alpha(n_bands; alpha_limits::NTuple{2,AbstractFloat}=(0.15, 0.85))
+    issorted(alpha_limits) || throw(ArgumentError("`alpha_limits` must be sorted"))
+    a_min, a_max = alpha_limits
+    0 <= a_min && a_max <= 1 || throw(
+        ArgumentError("values in `alpha_limits` must be in [0, 1], got $alpha_limits"),
+    )
+    composite(i) = a_min + (a_max - a_min) * (i - 1) / max(n_bands - 1, 1)
+    return map(1:n_bands) do i
+        i == 1 && return a_min
+        return 1 - (1 - composite(i)) / (1 - composite(i - 1))
+    end
 end
 
 """
