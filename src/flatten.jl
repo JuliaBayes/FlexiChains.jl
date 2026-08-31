@@ -180,7 +180,7 @@ function DD.DimArray(
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : nothing
+    chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : chain
     kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
     ni, nc = size(chain)
     kept_matrices = Matrix[]
