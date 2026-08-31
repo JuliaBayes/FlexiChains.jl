@@ -187,21 +187,20 @@ using FlexiChains: Tables
         end
 
         @testset "VarName-keyed summary with array-valued param" begin
-            N_iters, N_chains = 8, 1
             d = OrderedDict(
                 Parameter(@varname(a)) => 1.0,
                 Parameter(@varname(b)) => [2.0, 3.0],
             )
-            chain = FlexiChain{VarName}(N_iters, N_chains, fill(d, N_iters))
-            summary = mean(chain; split_varnames=false)
+            vn_chain = FlexiChain{VarName}(8, 1, fill(d, 8))
+            vn_summary = mean(vn_chain; split_varnames=false)
 
-            da = DD.DimArray(summary; warn=false)
+            da = DD.DimArray(vn_summary; warn=false)
             @test size(da) == (3,)  # stat only
             param_keys = collect(val(DD.dims(da, :param)))
             @test param_keys == [@varname(a), @varname(b[1]), @varname(b[2])]
 
             @testset "split_varnames=false" begin
-                da2 = DD.DimArray(summary; split_varnames=false, warn=false)
+                da2 = DD.DimArray(vn_summary; split_varnames=false, warn=false)
                 @test size(da2) == (2,) # stat only
                 param_keys2 = collect(val(DD.dims(da2, :param)))
                 @test param_keys2 == [@varname(a), @varname(b)]
