@@ -151,17 +151,18 @@ end
         warn::Bool=true,
         eltype_filter=Any,
         parameters_only::Bool=true,
+        split_varnames::Bool=true,
     ) where {TKey}
 
 Convert a FlexiChain into a 3-dimensional `DimArray` with dimensions `(:iter, :chain,
 :param)`.
 
-This proceeds by first splitting array-valued parameters into scalar leaves, then extracting
-all scalar parameters whose element type subtypes `eltype_filter` and stacking them into a
-3D array.
+This proceeds by first splitting array-valued parameters into scalar leaves (if
+`split_varnames` is `true`), then extracting all parameters whose element type subtypes
+`eltype_filter` and stacking them into a 3D array.
 
-Keys whose values do not subtype `eltype_filter` after splitting are skipped (with a warning
-if `warn=true`).
+Keys whose values do not subtype `eltype_filter` are skipped (with a warning if
+`warn=true`).
 
 If `parameters_only=true` (the default), then two things happen:
 
@@ -177,13 +178,10 @@ function DD.DimArray(
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
+    split_varnames::Bool=true,
 ) where {TKey,T}
-    chain, _ = FlexiChains._split_varnames(chain)
-    kept_keys = if parameters_only
-        TKey[]
-    else
-        ParameterOrExtra{<:TKey}[]
-    end
+    chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : nothing
+    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
     ni, nc = size(chain)
     kept_matrices = Matrix[]
     skipped_keys = ParameterOrExtra{<:TKey}[]
@@ -244,8 +242,9 @@ function Base.Array(
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
+    split_varnames::Bool=true,
 ) where {TKey,T}
-    da = DD.DimArray(chain; warn, eltype_filter, parameters_only)
+    da = DD.DimArray(chain; warn, eltype_filter, parameters_only, split_varnames)
     return parent(da)
 end
 
@@ -255,6 +254,7 @@ end
         warn::Bool=true,
         eltype_filter=Any,
         parameters_only::Bool=true,
+        split_varnames::Bool=true,
     ) where {TKey}
 
 Convert a `FlexiSummary` into a `DimArray` with a `:param` dimension appended after the
@@ -270,6 +270,18 @@ non-collapsed dimensions of the summary. For example:
 
 ## Keyword arguments
 
+- `split_varnames::Bool=true`: whether to split array-valued statistics into scalar leaves.
+  If `true`, then array-valued parameters are split into scalar leaves, e.g. a vector-valued
+  statistic for `x` would be split into `x[1]`, `x[2]`, etc.
+
+  **Note:** FlexiChains has no way of knowing whether the vector elements correspond to
+  different parts of the _parameter_ (e.g., the mean of `x[i]` for a vector-valued parameter
+  `x`) or whether they correspond to different parts of the same _statistic_ (e.g., when
+  calculating `quantile` with multiple probabilities, for a scalar parameter `x` the
+  result will be a vector). When `split_varnames=true` FlexiChains will always assume the
+  former. If you need the latter behaviour you should set `split_varnames=false` and then
+  manually perform any data processing you need to do.
+
 - `eltype_filter::Any`: retain only parameters whose values subtype `eltype_filter`.
   For example, if `eltype_filter=Float64`, then integer-valued parameters are dropped.
 
@@ -284,13 +296,11 @@ function DD.DimArray(
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
+    split_varnames::Bool=true,
 ) where {TKey,T}
-    summary, _ = FlexiChains._split_varnames(summary)
-    kept_keys = if parameters_only
-        TKey[]
-    else
-        ParameterOrExtra{<:TKey}[]
-    end
+    summary::FlexiSummary =
+        split_varnames ? first(FlexiChains._split_varnames(summary)) : summary
+    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
     new_dims, dim_indices_to_drop = _get_summary_dims(summary)
     kept_arrays = AbstractArray[]
     skipped_keys = ParameterOrExtra{<:TKey}[]
@@ -348,8 +358,9 @@ function Base.Array(
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
+    split_varnames::Bool=true,
 ) where {TKey,T}
-    da = DD.DimArray(summary; warn, eltype_filter, parameters_only)
+    da = DD.DimArray(summary; warn, eltype_filter, parameters_only, split_varnames)
     return parent(da)
 end
 
