@@ -1,3 +1,8 @@
+# 0.6.38
+
+`DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (as well as the plain `Array` versions) now take an additional `split_varnames` keyword argument, which determines whether or not vector-valued parameters (or summary statistics) are broken up into scalar leaves.
+The default is `true` which retains the existing behaviour.
+
 # 0.6.37
 
 Fixed a bug where `pairplot(chn)` would fail if `chn` had chains that were not 1-indexed.
