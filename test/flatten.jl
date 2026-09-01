@@ -85,6 +85,15 @@ using FlexiChains: Tables
             @test size(da) == (N_iters, N_chains, 3)
             param_keys = collect(val(DD.dims(da, :param)))
             @test param_keys == [@varname(a), @varname(b[1]), @varname(b[2])]
+
+            @testset "split_varnames=false" begin
+                da2 = DD.DimArray(chain; split_varnames=false, warn=false)
+                @test size(da2) == (N_iters, N_chains, 2)
+                param_keys2 = collect(val(DD.dims(da2, :param)))
+                @test param_keys2 == [@varname(a), @varname(b)]
+                @test all(x -> x == 1.0, da2[:, :, At(@varname(a))])
+                @test all(x -> x == [2.0, 3.0], da2[:, :, At(@varname(b))])
+            end
         end
 
         @testset "eltype_filter" begin
@@ -174,6 +183,29 @@ using FlexiChains: Tables
                 @test collect(val(DD.dims(da2, :param))) == [:a]
                 @test_logs (:warn, r"skipping.*b") DD.DimArray(fs2; eltype_filter=Float64)
                 @test_logs DD.DimArray(fs2; eltype_filter=Float64, warn=false)
+            end
+        end
+
+        @testset "VarName-keyed summary with array-valued param" begin
+            d = OrderedDict(
+                Parameter(@varname(a)) => 1.0,
+                Parameter(@varname(b)) => [2.0, 3.0],
+            )
+            vn_chain = FlexiChain{VarName}(8, 1, fill(d, 8))
+            vn_summary = mean(vn_chain; split_varnames=false)
+
+            da = DD.DimArray(vn_summary; warn=false)
+            @test size(da) == (3,)  # stat only
+            param_keys = collect(val(DD.dims(da, :param)))
+            @test param_keys == [@varname(a), @varname(b[1]), @varname(b[2])]
+
+            @testset "split_varnames=false" begin
+                da2 = DD.DimArray(vn_summary; split_varnames=false, warn=false)
+                @test size(da2) == (2,) # stat only
+                param_keys2 = collect(val(DD.dims(da2, :param)))
+                @test param_keys2 == [@varname(a), @varname(b)]
+                @test da2[At(@varname(a))] ≈ 1.0
+                @test da2[At(@varname(b))] ≈ [2.0, 3.0]
             end
         end
 
