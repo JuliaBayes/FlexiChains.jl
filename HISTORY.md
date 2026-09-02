@@ -22,16 +22,11 @@ If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
 
 ## Pushforward plot functions
 
-### Deleted keyword arguments
-
 The keyword arguments of the plotting functions to create pushforward visualisations (`pushforward_hist`, `pushforward_continuous`, `pushforward_discrete`) have been changed:
 
   - the `baseline` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `lines!` or `scatter!` to overlay baseline values on the pushforward plot.
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
-
-### Renamed keyword arguments
-
-The `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
+  - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
   
 ## Other non-breaking changes
 
