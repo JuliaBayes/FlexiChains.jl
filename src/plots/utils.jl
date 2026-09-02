@@ -144,17 +144,17 @@ function compute_quantile_bands(
     return acc ./ nchains
 end
 
-"""
-Compute nested-quantile band values for every key in `chn`.
-"""
+"Compute nested-quantile band values for every key in `chn`."
 function chain_quantile_bands(
     chn::FlexiChain,
     probs::AbstractVector{<:Real};
     warn::Bool=true,
 )
     fs = Statistics.quantile(chn, probs; dims=:iter, warn=warn, split_varnames=false)
-    da = DD.DimArray(fs)
-    return Statistics.mean(da, dims=:chain)
+    da = DD.DimArray(fs; split_varnames=false)
+    mu = Statistics.mean(da, dims=:chain)
+    mu_1d = dropdims(mu, dims=:chain) # (nparams,) vector of (nquantiles,)
+    return stack(mu_1d) # size (nquantiles, nparams)
 end
 
 """
