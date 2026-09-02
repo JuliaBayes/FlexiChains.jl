@@ -209,6 +209,22 @@ Makie.save("violin_makie.png", ans.figure); # hide
 
 ![Violin plots of the sampled chain](violin_makie.png)
 
+## Dot plots
+
+Quantile dot plots may make it easier for non-technical audiences to interpret uncertainty (further reading [here](https://idl.uw.edu/papers/when-ish-is-my-bus)).
+
+```@docs
+FlexiChains.Makie.dotplot
+FlexiChains.Makie.dotplot!
+```
+
+```@example 1
+FM.dotplot(chn)
+Makie.save("dotplot_makie.png", ans.figure); # hide
+```
+
+![Dot plots of the sampled chain](dotplot_makie.png)
+
 ## Forest plots
 
 !!! info "Half-eye plots"

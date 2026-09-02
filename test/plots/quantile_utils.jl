@@ -90,6 +90,78 @@ end
     end
 end
 
+@testset "dot plot utilities" begin
+    @testset "quantile_dots sits at equal-probability midpoints" begin
+        values = collect(1.0:100.0)
+        dots = PU.quantile_dots(values, 4)
+        @test length(dots) == 4
+        @test dots ≈ Statistics.quantile(values, [0.125, 0.375, 0.625, 0.875])
+        @test issorted(dots)
+    end
+
+    @testset "quantile_dots pools a matrix and rejects non-positive counts" begin
+        data = hcat(collect(1.0:10.0), collect(11.0:20.0))
+        @test PU.quantile_dots(data, 3) ≈ PU.quantile_dots(vec(data), 3)
+        @test_throws ArgumentError PU.quantile_dots(data, 0)
+    end
+
+    @testset "quantile_dots keeps integer samples on the support" begin
+        # The continuous method interpolates between order statistics, which for integer
+        # samples yields values the parameter cannot take.
+        @test PU.quantile_dots([1.0, 2.0], 2) == [1.25, 1.75]
+        @test PU.quantile_dots([1, 2], 2) == [1, 2]
+
+        values = [1, 1, 4, 9]
+        dots = PU.quantile_dots(values, 4)
+        @test eltype(dots) <: Integer
+        @test all(in(values), dots)
+        @test issorted(dots)
+    end
+
+    @testset "quantile_dots on integers is the inverse empirical CDF" begin
+        # Each dot is the smallest observation whose empirical cumulative probability
+        # reaches that dot's probability.
+        values = [3, 1, 1, 1]
+        @test PU.quantile_dots(values, 4) == [1, 1, 1, 3]
+        @test PU.quantile_dots(reshape(values, 2, 2), 4) == PU.quantile_dots(values, 4)
+        @test_throws ArgumentError PU.quantile_dots(values, 0)
+    end
+
+    @testset "default_binwidth" begin
+        values = collect(0.0:1.0:9.0)
+        @test PU.default_binwidth(values) ≈ 9.0 / sqrt(2 * pi * 10)
+        @test PU.default_binwidth(fill(3.0, 5)) == 1.0   # single stack
+    end
+
+    @testset "wilkinson_stacks groups and centres each stack" begin
+        values = [0.0, 0.1, 0.2, 1.0, 1.05]
+        locations, counts = PU.wilkinson_stacks(values, 0.5)
+        @test counts == [3, 2]
+        @test locations ≈ [0.1, 1.025]
+        @test sum(counts) == length(values)
+    end
+
+    @testset "wilkinson_stacks stack width is left-closed" begin
+        # 1.0 is exactly `binwidth` above the stack's first value, so it opens a new stack.
+        locations, counts = PU.wilkinson_stacks([0.0, 0.999, 1.0], 1.0)
+        @test counts == [2, 1]
+        @test locations ≈ [0.4995, 1.0]
+    end
+
+    @testset "wilkinson_stacks rejects unsorted values and non-positive widths" begin
+        @test_throws ArgumentError PU.wilkinson_stacks([1.0, 0.0], 1.0)
+        @test_throws ArgumentError PU.wilkinson_stacks([0.0, 1.0], 0.0)
+    end
+
+    @testset "dot_coordinates places one dot per value" begin
+        values = [0.0, 0.1, 0.2, 1.0, 1.05]
+        locations, levels = PU.dot_coordinates(values, 0.5)
+        @test length(locations) == length(values)
+        @test levels == [1, 2, 3, 1, 2]
+        @test locations ≈ [0.1, 0.1, 0.1, 1.025, 1.025]
+    end
+end
+
 @testset "subset_and_split_chain leaf extraction" begin
     rng = StableRNG(1)
     # array-valued variable `v` stored whole: each draw is a length-3 vector

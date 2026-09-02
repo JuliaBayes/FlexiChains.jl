@@ -23,7 +23,9 @@ export traceplot,
     ridgeline,
     ridgeline!,
     forestplot,
-    forestplot!
+    forestplot!,
+    dotplot,
+    dotplot!
 
 # The non-mutating versions have docstrings in the extension.
 
@@ -110,5 +112,15 @@ Mutating version of [`FlexiChains.Makie.forestplot`](@ref), for use with existin
 `Makie.Axis` objects.
 """
 function forestplot! end
+
+function dotplot end
+
+"""
+    FlexiChains.Makie.dotplot!
+
+Mutating version of [`FlexiChains.Makie.dotplot`](@ref), for use with existing `Makie.Axis`
+objects.
+"""
+function dotplot! end
 
 end # module

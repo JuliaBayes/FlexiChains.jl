@@ -175,6 +175,17 @@ const REFTEST_SPECS = [
     ),
     RefTestSpec(MakieBE(), "mviolinplot", () -> Makie.violin(chn)),
     RefTestSpec(MakieBE(), "mviolinplotwbox", () -> Makie.violin(chn; with_box=true)),
+    RefTestSpec(MakieBE(), "mdotplot", () -> FC.Makie.dotplot(chn)),
+    RefTestSpec(
+        MakieBE(),
+        "mdotplot_pooled",
+        () -> FC.Makie.dotplot(chn; pool_chains=true),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "mdotplot_options",
+        () -> FC.Makie.dotplot(chn, [Parameter(:a)]; nquantiles=20),
+    ),
 
     # PlotsExt
     RefTestSpec(PlotsBE(), "traceplot", () -> FC.Plots.traceplot(chn)),
