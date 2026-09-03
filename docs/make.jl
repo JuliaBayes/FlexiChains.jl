@@ -28,7 +28,7 @@ using PosteriorStats: PosteriorStats
 using Statistics: Statistics
 using StatsBase: StatsBase
 using StatsPlots: StatsPlots
-using Turing: Turing
+using VarNames: VarNames
 
 links = InterLinks(
     "AdvancedHMC" => "https://turinglang.org/AdvancedHMC.jl/stable/",
@@ -40,6 +40,7 @@ links = InterLinks(
     "Plots" => "https://docs.juliaplots.org/stable/",
     "StatsBase" => "https://juliastats.org/StatsBase.jl/stable/",
     "Julia" => "https://docs.julialang.org/en/v1/",
+    "VarNames" => "https://juliabayes.org/VarNames.jl/stable/",
 )
 
 modules = [

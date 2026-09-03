@@ -1,7 +1,7 @@
 module FlexiChainsPigeonsDynamicPPLExt
 
 using Pigeons: Pigeons
-using DynamicPPL: LogDensityFunction, UnlinkAll, ParamsWithStats, Model
+using DynamicPPL: DynamicPPL, LogDensityFunction, UnlinkAll, ParamsWithStats, Model
 
 using FlexiChains: FlexiChains
 using AbstractMCMC
@@ -23,7 +23,7 @@ function FlexiChains._internal_from_pigeons(pt::Pigeons.PT, lp::Pigeons.TuringLo
     ldf = LogDensityFunction(lp.model, UnlinkAll())
     # Then the usual stuff, reevaluate and make a chain.
     pwss = [ParamsWithStats(s, ldf) for s in eachslice(sarr, dims=(1, 2))]
-    chn = AbstractMCMC.from_samples(FlexiChains.VNChain, pwss)
+    chn = AbstractMCMC.from_samples(FlexiChains.FlexiChain{DynamicPPL.VarName}, pwss)
 end
 
 end # module

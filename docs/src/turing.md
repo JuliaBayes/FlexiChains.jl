@@ -21,7 +21,7 @@ Since Turing.jl v0.45, FlexiChains is the default chain type returned by MCMC sa
 
 Let's use a non-trivial model so that we can illustrate some features of FlexiChains.
 
-```@example 1
+```julia
 using Turing, FlexiChains
 
 y = [28, 8, -3, 7, -1, 1, 18, 12]
@@ -36,7 +36,25 @@ sigma = [15, 10, 16, 11, 9, 11, 10, 18]
     return (mu=mu, tau=tau)
 end
 model = eight_schools(y, sigma)
-chain = sample(model, NUTS(), 5)
+chain = sample(model, Prior(), 5)
+```
+
+```@example 1
+using FlexiChains, Distributions, LinearAlgebra # hide
+using DynamicPPL: @model, @varname # hide
+y = [28, 8, -3, 7, -1, 1, 18, 12] # hide
+sigma = [15, 10, 16, 11, 9, 11, 10, 18] # hide
+@model function eight_schools(y, sigma) # hide
+    mu ~ Normal(0, 5) # hide
+    tau ~ truncated(Cauchy(0, 5); lower=0) # hide
+    theta ~ MvNormal(fill(mu, length(y)), tau^2 * I) # hide
+    for i in eachindex(y) # hide
+        y[i] ~ Normal(theta[i], sigma[i]) # hide
+    end # hide
+    return (mu=mu, tau=tau) # hide
+end # hide
+model = eight_schools(y, sigma) # hide
+chain = FlexiChains._make_prior_chain(model, 5, 1) # hide
 ```
 
 !!! note
@@ -128,7 +146,7 @@ chain[@varname(mu), iter=2:4, chain=1]
 You can also use selectors from DimensionalData.jl to specify which iterations or chains you want.
 
 ```@example 1
-chain[@varname(mu), iter=Not(At(7)), chain=At(1)]
+chain[@varname(mu), iter=Not(3), chain=At(1)]
 ```
 
 The indexing behaviour of FlexiChains is described fully on [the Indexing page](@ref indexing).
@@ -179,7 +197,7 @@ chain[:logjoint] # other key
 
 If you want to access a variable that has been prefixed (e.g. because it is part of a submodel) but you don't want to specify the full prefix, you can use [`FlexiChains.Prefixed`](@ref):
 
-```@example pfx
+```julia
 using Turing
 using FlexiChains: Prefixed, VNChain
 
@@ -190,7 +208,19 @@ using FlexiChains: Prefixed, VNChain
     return nothing
 end
 
-pfx_chain = sample(outer(), MH(), 5)
+pfx_chain = sample(outer(), Prior(), 5)
+```
+
+```@example pfx
+using FlexiChains: FlexiChains, Prefixed, VNChain # hide
+using DynamicPPL: @model, @varname, to_submodel # hide
+using Distributions, LinearAlgebra # hide
+@model inner() = x ~ MvNormal(zeros(2), I) # hide
+@model function outer() # hide
+    a ~ to_submodel(inner()) # hide
+    return nothing # hide
+end # hide
+pfx_chain = FlexiChains._make_prior_chain(outer(), 5, 1) # hide
 
 # Inside the chain, the actual key is `@varname(a.x)`;
 # this will pick out that key.
@@ -291,14 +321,14 @@ or `dims=:chain` (although that is probably less useful).
 
 If you want to sample a fewer number of iterations first and then resume it later, you can use the following:
 
-```@example 1
+```julia
 chn1 = sample(model, NUTS(), 10; save_state=true)
 chn2 = sample(model, NUTS(), 10; initial_state=only(FlexiChains.last_sampler_state(chn1)))
 ```
 
 The chains can be combined using `vcat`:
 
-```@example 1
+```julia
 combined_chn = vcat(chn1, chn2)
 ```
 
@@ -320,7 +350,7 @@ Note that this is different from _resuming sampling_ from a saved sampler state,
 
 For example, to start a new chain from the fifth iteration and first chain contained inside `chain`, you can do
 
-```@example 1
+```julia
 chn3 = sample(model, MH(), 5; initial_params=InitFromParams(chain, 5, 1))
 ```
 
@@ -331,6 +361,7 @@ Since this only uses the parameters which are already part of the chain, this do
 The functions `predict`, `returned`, `logjoint`, `loglikelihood`, and `logprior` all work 'as expected' using FlexiChains with exactly the same signatures that you are used to.
 
 ```@example 1
+using DynamicPPL: returned # hide
 returned(model, chain)
 ```
 
