@@ -5,22 +5,22 @@ function _plot_pushforward_hist!(
     stacked_data;  # niters x nchains x nparams
     observed=nothing,
     nbins::Integer=25,
-    quantiles=FC.PlotUtils.DEFAULT_QUANTILE_LEVELS,
+    levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
-    isodd(length(quantiles)) || throw(ArgumentError("`quantiles` must have odd length"))
+    sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
+    n_bands = length(sorted_levels)
     edges = FC.PlotUtils.get_bin_edges(stacked_data, nbins)
     # counts is iter × chain × nbins
     counts = FC.PlotUtils.bin_count_matrices(stacked_data, edges)
 
-    nq = length(quantiles)
-    n_bands = div(nq, 2)
-    median_idx = div(nq + 1, 2)
-    qs = Matrix{Float64}(undef, nq, nbins)
+    qs = Matrix{Float64}(undef, length(probs), nbins)
+    alphas = FC.PlotUtils.band_alpha(n_bands; alpha_limits)
 
     for b in 1:nbins
-        qs[:, b] = FC.PlotUtils.compute_quantile_bands(view(counts, :, :, b), quantiles)
+        qs[:, b] = FC.PlotUtils.compute_quantile_bands(view(counts, :, :, b), probs)
     end
 
     xs = Float64[]
@@ -33,8 +33,8 @@ function _plot_pushforward_hist!(
             ax,
             xs,
             rep2(qs[i, :]),
-            rep2(qs[nq+1-i, :]);
-            alpha=_band_alpha(i, n_bands),
+            rep2(qs[end+1-i, :]);
+            alpha=alphas[i],
             color=color,
             label="predicted",
             kwargs...,
@@ -44,7 +44,7 @@ function _plot_pushforward_hist!(
     p = Makie.lines!(
         ax,
         xs,
-        rep2(qs[median_idx, :]);
+        rep2(qs[n_bands+1, :]);
         color=color,
         label="predicted",
         linewidth=2,
@@ -70,10 +70,9 @@ end
 """
     FlexiChains.Makie.pushforward_hist(chn, param_or_params; observed=nothing, nbins=25, kwargs...)
 
-Posterior predictive check via histograms. For each posterior draw, the predictive values
-are binned into a histogram; the resulting per-bin count distributions are summarised as
-nested quantile ribbons. Overlaying `observed` data shows whether the model's predictive
-distribution is consistent with the observations.
+Plot a histogram of binned predictions with nested quantiles for posterior predictive checking.
+Optionally overlay `observed` data to show to what degree the predictive distribution agrees
+with the observations.
 
 This function is a port of [Michael Betancourt's
 `plot_hist_quantiles`](https://github.com/betanalpha/mcmc_visualization_tools).
@@ -81,7 +80,10 @@ This function is a port of [Michael Betancourt's
 # Keyword arguments
 - `observed`: vector of observed values; its histogram (same bins) is overlaid as a line.
 - `nbins`: number of equal-width bins. Defaults to `25`.
-- `quantiles`: odd-length vector of levels in 0–1. Defaults to `[0.1, 0.2, ..., 0.9]`.
+- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
+  One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `alpha_limits`: a tuple two values specifying the lower and upper limit of
+  alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_hist(

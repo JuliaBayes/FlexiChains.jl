@@ -20,10 +20,22 @@ However, if for some reason you *need* to use FlexiChains 0.7, please:
 apart from this one change, everything else should still work seamlessly.
 If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
 
+## Pushforward plot functions
+
+The keyword arguments of the plotting functions to create pushforward visualisations (`pushforward_hist`, `pushforward_continuous`, `pushforward_discrete`) have been changed:
+
+  - the `baseline` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `lines!` or `scatter!` to overlay baseline values on the pushforward plot.
+  - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
+  - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
 There is no difference in their behaviour.
+
+A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforward_continuous`, and `pushforward_discrete`. It sets the alpha values of the outer- and innermost quantile bands drawn by these functions.
+
+The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
 
 # 0.6.38
 

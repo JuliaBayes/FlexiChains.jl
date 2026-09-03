@@ -14,9 +14,10 @@ This is a port of [Michael Betancourt's
 # Keyword arguments
 - `x_grid`: the x-values to plot against. Defaults to `1:N`, where `N` is the number of
   components being plotted.
-- `quantiles`: odd-length vector of levels in 0–1. Defaults to `[0.1, 0.2, ..., 0.9]`.
-- `baseline`: length-N vector overlaid as a reference line.
-- `residual`: if `true`, subtract `baseline` before banding (requires `baseline`).
+- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
+  One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `alpha_limits`: a tuple of two values specifying the lower and upper limit of
+  alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_continuous(
@@ -36,80 +37,45 @@ function FC.Makie.pushforward_continuous!(
     ax::Makie.Axis,
     chn::FC.FlexiChain,
     param;
-    x_grid=nothing,
-    quantiles=FC.PlotUtils.DEFAULT_QUANTILE_LEVELS,
-    baseline=nothing,
-    residual=false,
+    x_grid,
+    levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
+    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
-    isodd(length(quantiles)) || throw(ArgumentError("`quantiles` must have odd length"))
+    sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
+    n_bands = length(sorted_levels)
     sub, _ = FC.PlotUtils.subset_and_split_chain(chn, param)
     ks = collect(keys(sub))
     isempty(ks) && throw(ArgumentError("no parameters to plot"))
-    data = map(ks) do k
-        d = FC.PlotUtils._get_raw_data(sub, k)
-        FC.PlotUtils.check_eltype_is_real(d)
-        d
+    for k in ks
+        FC.PlotUtils.check_eltype_is_real(FC.PlotUtils._get_raw_data(sub, k))
     end
 
     n = length(ks)
-    xs = x_grid === nothing ? collect(Float64, 1:n) : collect(Float64, x_grid)
-    if length(xs) != n
+    if length(x_grid) != n
         throw(
             ArgumentError(
-                "connquantile: length of `x_grid` ($(length(xs))) must match number of components ($n)",
+                "connquantile: length of `x_grid` ($(length(x_grid))) must match number of components ($n)",
             ),
         )
     end
 
-    if residual && baseline === nothing
-        throw(ArgumentError("connquantile: `residual=true` requires `baseline`"))
-    end
-
-    if baseline !== nothing && length(baseline) != n
-        throw(
-            ArgumentError(
-                "length of `baseline` ($(length(baseline))) must match number of components ($n)",
-            ),
-        )
-    end
-
-    nq = length(quantiles)
-    n_bands = div(nq, 2)
-    median_idx = div(nq + 1, 2)
-    qs = Matrix{Float64}(undef, nq, n)
-
-    for j in 1:n
-        d = residual ? (data[j] .- baseline[j]) : data[j]
-        qs[:, j] = FC.PlotUtils.compute_quantile_bands(d, quantiles)
-    end
+    qs = FC.PlotUtils.chain_quantile_bands(sub, probs)
+    alphas = FC.PlotUtils.band_alpha(n_bands; alpha_limits)
 
     for i in 1:n_bands
         Makie.band!(
             ax,
-            xs,
+            x_grid,
             qs[i, :],
-            qs[nq+1-i, :];
-            alpha=_band_alpha(i, n_bands),
+            qs[end+1-i, :];
+            alpha=alphas[i],
             color=color,
             kwargs...,
         )
     end
-    p = Makie.lines!(ax, xs, qs[median_idx, :]; color=color, linewidth=2)
-
-    if residual
-        Makie.hlines!(ax, [0.0]; color=:black, linestyle=:dash, linewidth=1)
-    elseif baseline !== nothing
-        Makie.lines!(
-            ax,
-            xs,
-            collect(Float64, baseline);
-            color=:black,
-            linestyle=:dash,
-            linewidth=2,
-        )
-    end
+    p = Makie.lines!(ax, x_grid, qs[n_bands+1, :]; color=color, linewidth=2)
 
     return Makie.AxisPlot(ax, p)
 end
