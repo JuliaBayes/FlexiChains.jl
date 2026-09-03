@@ -94,15 +94,9 @@ struct NameWithSize{T<:Union{Nothing,Tuple}}
     name::String
     size::T # nothing to indicate mixed size / non-array
 end
-Base.textwidth(nws::NameWithSize{Nothing}) = textwidth(nws.name)
-Base.textwidth(nws::NameWithSize{<:Tuple}) =
-    textwidth(nws.name) + 1 + textwidth("$(nws.size)")
-Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{Nothing}) = print(io, nws.name)
-function Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{<:Tuple})
-    print(io, nws.name)
-    print(io, " ")
-    printstyled(io, "$(nws.size)"; color=:white)
-end
+_name_text(nws::NameWithSize{Nothing}) = nws.name
+_name_text(nws::NameWithSize{<:Tuple}) = "$(nws.name) $(nws.size)"
+Base.textwidth(nws::NameWithSize) = textwidth(_name_text(nws))
 
 function _wrap_items(
     items::Vector{NameWithSize},
@@ -121,11 +115,8 @@ function _wrap_items(
     # (a greedy algorithm). This could in principle be more fancy (e.g. Knuth-Plass)...
     current_line = NameWithSize[]
     remaining = available
-    n = length(items)
-    i = 1
-    while i <= n
-        next_item = items[i]
-        tw = textwidth(next_item)
+    for item in items
+        tw = textwidth(item)
         if tw + 1 > remaining && !isempty(current_line)
             # Can't fit the next one on this line, so push the current line and start a new
             # one. But if the current line is empty, we have to put it on this line anyway.
@@ -133,12 +124,19 @@ function _wrap_items(
             current_line = NameWithSize[]
             remaining = available
         end
-        push!(current_line, next_item)
+        push!(current_line, item)
         remaining -= (tw + 2)
-        i += 1
     end
     push!(lines, current_line)
     return lines
+end
+
+# Choose which lines to print - for horizontal printing of long vectors of parameters
+function _elided_line_indices(n::Int; max_lines = 4)
+    n <= max_lines && return Union{Int,Nothing}[1:n;]
+    n_head = max_lines ÷ 2
+    n_tail = div(max_lines - 1, 2)
+    return Union{Int,Nothing}[1:n_head; nothing; (n - n_tail + 1):n]
 end
 
 _maybe_s(x) = x == 1 ? "" : "s"
@@ -214,7 +212,17 @@ function _print_eltype_groups(
         end
         wrapped = _wrap_items(names, names_width)
         nlines = length(wrapped)
-        for (li, nwss) in enumerate(wrapped)
+        for li in _elided_line_indices(nlines)
+            if isnothing(li)
+                _box_content(io, width) do io
+                    print(io, " "^prefix_width)
+                    printstyled(io, "⋮"; color=_BOX_COLOR)
+                    return prefix_width + 1
+                end
+                println(io)
+                continue
+            end
+            nwss = wrapped[li]
             trailing = li < nlines ? "," : ""
             _box_content(io, width) do io
                 if li == 1
@@ -227,7 +235,7 @@ function _print_eltype_groups(
                 tw = prefix_width
                 n_nws = length(nwss)
                 for (i, nws) in enumerate(nwss)
-                    Base.show(io, MIME"text/plain"(), nws)
+                    print(io, _name_text(nws))
                     tw += textwidth(nws)
                     if i < n_nws
                         print(io, ", ")
@@ -359,16 +367,22 @@ function _print_summary_table(
     inner_width = width - 4
     colpadding = 2
 
-    # For things like `mean(chain, dims=:chain)`, there could be a huge number of columns,
-    # very few of which will actually be displayed. To avoid performing unnecessary
-    # formatting work we cap the number of columns to be formatted.
+    # Limit the number of rows and columns printed
+    screen_rows = displaysize(io)[1]
+    max_formatted_rows = max(4 * screen_rows, 100)
     max_formatted_columns = max(div(inner_width, colpadding + 1), 1)
-    columns_were_skipped =
-        !isnothing(column_indices) && length(column_indices) > max_formatted_columns
 
-    header_col =
-        ["param", map(p -> _truncate(_pretty_value(p), MAX_COL_WIDTH), param_names)...]
-    param_values = map(pn -> summary[pn], param_names)
+    shown_param_names = if length(param_names) <= max_formatted_rows
+        param_names
+    else
+        half = max_formatted_rows ÷ 2
+        vcat(first(param_names, half), last(param_names, max_formatted_rows - half))
+    end
+    header_col = [
+        "param",
+        map(p -> _truncate(_pretty_value(p), MAX_COL_WIDTH), shown_param_names)...,
+    ]
+    param_values = map(pn -> summary[pn], shown_param_names)
 
     value_cols = if isnothing(column_indices)
         [["", [_truncate(_pretty_value(value), MAX_COL_WIDTH) for value in param_values]...],]
@@ -390,44 +404,14 @@ function _print_summary_table(
     end
 
     rows = hcat(header_col, value_cols...)
-    colwidths = map(maximum, eachcol(map(length, rows)))
 
-    total = sum(cw + colpadding for cw in colwidths)
-    truncated = columns_were_skipped || total > inner_width
-    available = inner_width - (truncated ? 3 : 0)
-    if total <= available
-        max_cols = length(colwidths)
-    else
-        cumwidth = colwidths[1] + colpadding
-        max_cols = 1
-        for j in 2:length(colwidths)
-            needed = colwidths[j] + colpadding
-            if cumwidth + needed <= available
-                cumwidth += needed
-                max_cols = j
-            else
-                break
-            end
-        end
-    end
-
-    for (i, row) in enumerate(eachrow(rows))
+    buf = IOBuffer()
+    ctx = IOContext(buf, :limit => true, :displaysize => (screen_rows, inner_width))
+    Base.print_matrix(ctx, Text.(rows), " ", "  ", " ")
+    for line in split(String(take!(buf)), '\n')
         _box_content(io, width) do io
-            visible = 0
-            for j in 1:max_cols
-                s = lpad(row[j], colwidths[j] + colpadding)
-                if i == 1 || j == 1
-                    printstyled(io, s; bold=true)
-                else
-                    print(io, s)
-                end
-                visible += textwidth(s)
-            end
-            if truncated
-                printstyled(io, "  …"; color=:light_black)
-                visible += 3
-            end
-            return visible
+            print(io, line)
+            return textwidth(line)
         end
         println(io)
     end
