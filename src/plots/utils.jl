@@ -166,10 +166,9 @@ linear in `k`, running from `alpha_limits[1]` at the outermost band to `alpha_li
 the innermost.
 """
 function band_alpha(n_bands; alpha_limits::NTuple{2,AbstractFloat}=(0.15, 0.85))
-    issorted(alpha_limits) || throw(ArgumentError("`alpha_limits` must be sorted"))
     a_min, a_max = alpha_limits
-    0 <= a_min && a_max <= 1 || throw(
-        ArgumentError("values in `alpha_limits` must be in [0, 1], got $alpha_limits"),
+    0 <= a_min <= a_max <= 1 || throw(
+        ArgumentError("`alpha_limits` must be sorted and in [0, 1], got $alpha_limits"),
     )
     composite(i) = a_min + (a_max - a_min) * (i - 1) / max(n_bands - 1, 1)
     return map(1:n_bands) do i

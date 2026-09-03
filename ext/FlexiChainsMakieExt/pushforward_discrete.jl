@@ -58,7 +58,7 @@ This function is a port of [Michael Betancourt's
 - `vertical`: if `true`, bars are vertical; otherwise horizontal. Defaults to `true`.
 - `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
-- `alpha_limits`: a tuple or vector two values specifying the lower and upper limit of
+- `alpha_limits`: a tuple of two values specifying the lower and upper limit of
   alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
