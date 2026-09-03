@@ -5,7 +5,6 @@ using Makie
 using Makie: ColorTypes
 using StatsBase: StatsBase
 using KernelDensity: KernelDensity
-using Statistics: Statistics
 
 const FC = FlexiChains
 const MakieGrids = Union{Makie.GridPosition,Makie.GridSubposition}
@@ -137,6 +136,5 @@ include("FlexiChainsMakieExt/rankplot.jl")
 include("FlexiChainsMakieExt/forestplot.jl")
 include("FlexiChainsMakieExt/ridgeline.jl")
 include("FlexiChainsMakieExt/violin.jl")
-include("FlexiChainsMakieExt/dotplot.jl")
 
 end

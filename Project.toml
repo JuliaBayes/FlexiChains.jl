@@ -37,6 +37,7 @@ PosteriorStats = "7f36be82-ad55-44ba-a5c0-b8b5480d7aa5"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 StanSample = "c1514b29-d3a0-5178-b312-660c88baa699"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 
 [extensions]
 FlexiChainsAdvancedHMCExt = ["AdvancedHMC", "DimensionalData"]
@@ -55,6 +56,7 @@ FlexiChainsPosteriorStatsExt = ["PosteriorStats", "DimensionalData", "IntervalSe
 FlexiChainsRecipesBaseExt = ["RecipesBase", "StatsBase"]
 FlexiChainsStanSampleExt = ["StanSample"]
 FlexiChainsStatsPlotsExt = ["StatsPlots", "DimensionalData"]
+FlexiChainsSwarmMakieExt = ["Makie", "SwarmMakie", "StatsBase", "KernelDensity"]
 
 [compat]
 AbstractMCMC = "5.10"
@@ -87,5 +89,6 @@ StanSample = "7"
 Statistics = "1"
 StatsBase = "0.34.6"
 StatsPlots = "0.15"
+SwarmMakie = "0.2.1"
 Tables = "1.12.1"
 julia = "1.10.8"

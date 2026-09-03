@@ -1,6 +1,7 @@
 module RefTests
 
 using CairoMakie: CairoMakie, Makie
+using SwarmMakie
 using PairPlots
 using Plots
 using StatsPlots
@@ -184,7 +185,7 @@ const REFTEST_SPECS = [
     RefTestSpec(
         MakieBE(),
         "mdotplot_options",
-        () -> FC.Makie.dotplot(chn, [Parameter(:a)]; nquantiles=20),
+        () -> FC.Makie.dotplot(chn, [Parameter(:a)]; nquantiles=20, nbins=12),
     ),
 
     # PlotsExt

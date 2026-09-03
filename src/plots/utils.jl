@@ -332,48 +332,6 @@ function quantile_dots(values::AbstractArray{<:Integer}, nquantiles::Integer)
     return [sorted[clamp(ceil(Int, p * n), 1, n)] for p in dot_probabilities(nquantiles)]
 end
 
-"""
-Calculates the bin width spanning the range of `values` with about `sqrt(2π * length(values))`
-stacks.
-"""
-function default_binwidth(values::AbstractVector{<:Real})
-    lo, hi = extrema(values)
-    span = float(hi - lo)
-    iszero(span) && return one(span)
-    return span / sqrt(2 * pi * length(values))
-end
-
-"""
-Group sorted `values` into dot stacks using Wilkinson's dot plot algorithm.
-Returns `(locations, counts)`, both of length equal to the number of stacks.
-"""
-function wilkinson_stacks(values::AbstractVector{<:Real}, binwidth::Real)
-    binwidth > 0 || throw(ArgumentError("binwidth must be positive; got $binwidth"))
-    issorted(values) || throw(ArgumentError("values must be sorted"))
-    locations = Float64[]
-    counts = Int[]
-    i = firstindex(values)
-    while i <= lastindex(values)
-        stack_start = values[i]
-        j = i
-        while j <= lastindex(values) && values[j] < stack_start + binwidth
-            j += 1
-        end
-        push!(locations, Statistics.middle(stack_start, values[j-1]))
-        push!(counts, j - i)
-        i = j
-    end
-    return locations, counts
-end
-
-"Dot coordinates for sorted `values`."
-function dot_coordinates(values::AbstractVector{<:Real}, binwidth::Real)
-    stack_locations, stack_counts = wilkinson_stacks(values, binwidth)
-    locations = StatsBase.inverse_rle(stack_locations, stack_counts)
-    levels = reduce(vcat, (1:count for count in stack_counts); init=Int[])
-    return locations, levels
-end
-
 struct FlexiChainDotplot{TKey,Tp<:ParameterOrExtra{<:TKey}}
     chn::FlexiChain{TKey}
     param::Tp

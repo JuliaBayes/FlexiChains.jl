@@ -126,40 +126,6 @@ end
         @test PU.quantile_dots(reshape(values, 2, 2), 4) == PU.quantile_dots(values, 4)
         @test_throws ArgumentError PU.quantile_dots(values, 0)
     end
-
-    @testset "default_binwidth" begin
-        values = collect(0.0:1.0:9.0)
-        @test PU.default_binwidth(values) ≈ 9.0 / sqrt(2 * pi * 10)
-        @test PU.default_binwidth(fill(3.0, 5)) == 1.0   # single stack
-    end
-
-    @testset "wilkinson_stacks groups and centres each stack" begin
-        values = [0.0, 0.1, 0.2, 1.0, 1.05]
-        locations, counts = PU.wilkinson_stacks(values, 0.5)
-        @test counts == [3, 2]
-        @test locations ≈ [0.1, 1.025]
-        @test sum(counts) == length(values)
-    end
-
-    @testset "wilkinson_stacks stack width is left-closed" begin
-        # 1.0 is exactly `binwidth` above the stack's first value, so it opens a new stack.
-        locations, counts = PU.wilkinson_stacks([0.0, 0.999, 1.0], 1.0)
-        @test counts == [2, 1]
-        @test locations ≈ [0.4995, 1.0]
-    end
-
-    @testset "wilkinson_stacks rejects unsorted values and non-positive widths" begin
-        @test_throws ArgumentError PU.wilkinson_stacks([1.0, 0.0], 1.0)
-        @test_throws ArgumentError PU.wilkinson_stacks([0.0, 1.0], 0.0)
-    end
-
-    @testset "dot_coordinates places one dot per value" begin
-        values = [0.0, 0.1, 0.2, 1.0, 1.05]
-        locations, levels = PU.dot_coordinates(values, 0.5)
-        @test length(locations) == length(values)
-        @test levels == [1, 2, 3, 1, 2]
-        @test locations ≈ [0.1, 0.1, 0.1, 1.025, 1.025]
-    end
 end
 
 @testset "subset_and_split_chain leaf extraction" begin

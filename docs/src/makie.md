@@ -213,6 +213,14 @@ Makie.save("violin_makie.png", ans.figure); # hide
 
 Quantile dot plots may make it easier for non-technical audiences to interpret uncertainty (further reading [here](https://idl.uw.edu/papers/when-ish-is-my-bus)).
 
+Dot plots are laid out by [SwarmMakie.jl](https://github.com/MakieOrg/SwarmMakie.jl), which you have to load alongside a Makie backend for `dotplot` to be defined:
+
+```@example 1
+using SwarmMakie
+```
+
+The count axis is not drawn. The dots are placed in pixel rather than data coordinates, which is what keeps them round whatever shape the axis has, but it also means that a stack level is not a coordinate the axis could report. Read the plot by counting dots instead: each one stands for `1 / nquantiles` of the posterior probability mass.
+
 ```@docs
 FlexiChains.Makie.dotplot
 FlexiChains.Makie.dotplot!
