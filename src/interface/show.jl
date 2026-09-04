@@ -319,6 +319,36 @@ function _print_summary_dims(io::IO, summary::FlexiSummary, width::Int)
     return
 end
 
+# A lazy view over a `FlexiSummary`'s raw data
+struct LazySummaryArray <: AbstractArray{Text,2}
+    data::AbstractDict
+    rownames::Vector
+    colnames::Union{Nothing,DD.Lookup}
+    first_column_prefix::String
+    max_col_width::Int
+end
+
+function Base.size(a::LazySummaryArray)
+    ncols = isnothing(a.colnames) ? 1 : length(a.colnames)
+    return (length(a.rownames) + 1, ncols + 1)
+end
+
+function Base.getindex(a::LazySummaryArray, i::Int, j::Int)
+    if i == 1
+        j == 1 && return Text("param")
+        isnothing(a.colnames) && return Text("")
+        header = _pretty_value(a.colnames[j-1])
+        j == 2 && (header = a.first_column_prefix * header)
+        return Text(_truncate(header, a.max_col_width))
+    end
+
+    j == 1 && return Text(_truncate(_pretty_value(a.rownames[i-1]), a.max_col_width))
+
+    raw = a.data[Parameter(a.rownames[i-1])]
+    value = isnothing(a.colnames) ? only(raw) : raw[j-1]
+    return Text(_truncate(_pretty_value(value), a.max_col_width))
+end
+
 function _print_summary_table(
     io::IO,
     summary::FlexiSummary,
@@ -326,58 +356,24 @@ function _print_summary_table(
     column_indices,
     first_column_prefix::String,
     width::Int,
+    max_col_width = 12
 )
     _box_empty(io, width)
     println(io)
     _box_content(io, width, [_Segment("Summary"; bold=true)])
     println(io)
 
-    MAX_COL_WIDTH = 12
     inner_width = width - 4
-    colpadding = 2
-
-    # Limit the number of rows and columns printed
     screen_rows = displaysize(io)[1]
-    max_formatted_rows = max(4 * screen_rows, 100)
-    max_formatted_columns = max(div(inner_width, colpadding + 1), 1)
 
-    shown_param_names = if length(param_names) <= max_formatted_rows
-        param_names
-    else
-        half = max_formatted_rows ÷ 2
-        vcat(first(param_names, half), last(param_names, max_formatted_rows - half))
-    end
-    header_col = [
-        "param",
-        map(p -> _truncate(_pretty_value(p), MAX_COL_WIDTH), shown_param_names)...,
-    ]
-    param_values = map(pn -> summary[pn], shown_param_names)
+    mat = LazySummaryArray(
+        summary._data, param_names, column_indices, first_column_prefix, max_col_width
+    )
 
-    value_cols = if isnothing(column_indices)
-        [["", [_truncate(_pretty_value(value), MAX_COL_WIDTH) for value in param_values]...],]
-    else
-        column_names = Iterators.take(parent(column_indices), max_formatted_columns)
-        map(enumerate(column_names)) do (column_i, column_name)
-            column_header = _pretty_value(column_name)
-            if column_i == 1
-                column_header = first_column_prefix * column_header
-            end
-            [
-                _truncate(column_header, MAX_COL_WIDTH)
-                [
-                    _truncate(_pretty_value(value[column_i]), MAX_COL_WIDTH) for
-                    value in param_values
-                ]...
-            ]
-        end
-    end
-
-    rows = hcat(header_col, value_cols...)
-
-    buf = IOBuffer()
-    ctx = IOContext(buf, :limit => true, :displaysize => (screen_rows, inner_width))
-    Base.print_matrix(ctx, Text.(rows), " ", "  ", " ")
-    for line in split(String(take!(buf)), '\n')
+    full = sprint(
+        show, MIME"text/plain"(), mat; context=(:limit => true, :displaysize => (screen_rows, inner_width))
+    )
+    for line in Iterators.drop(split(full, '\n'), 1)
         _box_content(io, width) do io
             print(io, line)
             return textwidth(line)
