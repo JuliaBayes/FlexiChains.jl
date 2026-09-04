@@ -1,5 +1,6 @@
 module FlexiChainsSwarmMakieExt
 
+using Base: _stack
 using FlexiChains: FlexiChains
 using Makie
 using StatsBase: StatsBase
@@ -12,10 +13,7 @@ const MakieGrids = Union{Makie.GridPosition,Makie.GridSubposition}
 _default_dotplot_axis() = (xlabel="value",)
 
 """
-The quantile dots of a `FlexiChainDotplot`, and the chain each dot came from.
-
-Each chain contributes its own set of dots, but all of them are laid out together, so a
-single stack can hold dots from several chains.
+Returns the dots to be plotted passed to `FlexiChainDotplot` and the chain index.
 """
 function _dotplot_dots(d::FC.PlotUtils.FlexiChainDotplot)
     data = FC._get_raw_data(d.chn, d.param)
@@ -36,13 +34,7 @@ function _dotplot_dots(d::FC.PlotUtils.FlexiChainDotplot)
     return values, chains
 end
 
-"""
-One concrete colour per chain, resolving any `Makie.Cycled` against `ax`'s palette.
-
-The colours are needed as values rather than as placeholders: every dot is drawn by a
-single `beeswarm!` call carrying one colour per point, and the legend is built from the
-same vector.
-"""
+"Returns the colors to be used for the chains by `beeswarm!`"
 function _chain_colors(ax::Makie.Axis, nchains::Int, kwargs::NamedTuple)
     palette = Makie.to_value(Makie.theme(ax.scene, :palette)[:color])
     return map(MakieExt.determine_chain_colors(nchains, kwargs)) do c
@@ -50,14 +42,9 @@ function _chain_colors(ax::Makie.Axis, nchains::Int, kwargs::NamedTuple)
     end
 end
 
-"""
-Number of dots in the tallest stack that `WilkinsonBeeswarm` produces over `values` when the
-value axis is divided into `nbins` stacking pitches.
-
-This mirrors the binning `WilkinsonBeeswarm` performs, but in data units rather than pixels.
-The two agree because the bins depend on the pitch only as a fraction of the value span,
-which `nbins` fixes in either space.
-"""
+# TODO only used once, so we might want to inline this into _fitting_nbins
+# would be a bit awkward though since it's used as part of a while loop?
+"Number of dots in the tallest stack that `WilkinsonBeeswarm` produces given `nbins`."
 function _tallest_stack(values::AbstractVector{<:Real}, nbins::Int)
     lo, hi = extrema(values)
     pitch = (hi - lo) / nbins
@@ -69,6 +56,7 @@ function _tallest_stack(values::AbstractVector{<:Real}, nbins::Int)
     return maximum(counts)
 end
 
+# TODO declaude this docstring
 """
 The coarsest binning at which every panel's tallest stack still fits its axis.
 
@@ -83,20 +71,22 @@ drawn with, so a plot with room to spare is left at that shape.
 function _fitting_nbins(values_per_panel, aspect::Real)
     ndots = maximum(length, values_per_panel)
     nbins = round(Int, sqrt(2 * pi * ndots))
-    # An axis with no height has room for nothing, and no binning would change that.
-    aspect > 0 || return nbins
-    # A stack is at most `ndots` tall, so this many bins always fit and bounds the search.
+    # A stack is at most `ndots` tall
     limit = ceil(Int, ndots / aspect)
-    while nbins < limit &&
-          maximum(v -> _tallest_stack(v, nbins), values_per_panel) / nbins > aspect
+
+    function _maxstack_nbins_ratio(values_per_panel, nbins)
+        maximum(v -> _tallest_stack(v, nbins), values_per_panel) / nbins
+    end
+
+    while nbins < limit && aspect < _maxstack_nbins_ratio(values_per_panel, nbins)
         nbins += 1
     end
     return nbins
 end
 
 """
-The binning to draw `values_per_panel` with, shared by every panel so that all of them get
-the same dot size. Follows the axes' shape as they are resized, unless `nbins` is given.
+Returns the number of bins to draw `values_per_panel` with.
+It follows the axes' shape unless `nbins` is given.
 """
 function _dotplot_nbins(axes, values_per_panel, nbins::Union{Nothing,Int})
     isnothing(nbins) || return Makie.Observable(nbins)
@@ -106,10 +96,7 @@ function _dotplot_nbins(axes, values_per_panel, nbins::Union{Nothing,Int})
     end
 end
 
-"""
-One stacking pitch of `values` in pixels, which `WilkinsonBeeswarm` takes as its bin width
-and Makie as the diameter of a dot. Follows `ax` as it is resized or its limits change.
-"""
+"Determines the diameter of a dot. Follows `ax` as it is resized or its limits change."
 function _dotplot_markersize(
     ax::Makie.Axis,
     values::AbstractVector{<:Real},
@@ -121,14 +108,7 @@ function _dotplot_markersize(
     end
 end
 
-"""
-Draw `values` into `ax`, coloured by the chain each dot came from, and return the plot
-together with the colour of each chain.
-
-The layout runs in pixel space, so the category axis carries no data: it is fixed to `0..1`
-with the category line on `0`, which puts the foot of every stack on the bottom of the
-axis, and its decorations are hidden.
-"""
+"Draws `values` into `ax` coloured by chain, then returns the plot and chain colors."
 function _draw_dotplot!(
     ax::Makie.Axis,
     values::AbstractVector{<:Real},
@@ -140,8 +120,7 @@ function _draw_dotplot!(
     colors = _chain_colors(ax, nchains, NamedTuple(kwargs))
     Makie.ylims!(ax, 0, 1)
     Makie.hideydecorations!(ax)
-    # The outermost dots reach exactly to the extreme values, so half a pitch of margin —
-    # `0.5/nbins` of the value span — leaves half a dot of air on either side.
+    # Leave half a dot of space on both edges of the dotplot
     Makie.on(nbins; update=true) do n
         ax.xautolimitmargin = (0.5 / n, 0.5 / n)
     end
@@ -171,15 +150,7 @@ end
 Create quantile dot plots for the specified parameters in the chain.
 
 Each parameter is summarised by `nquantiles` dots placed at evenly spaced quantiles of the
-posterior, so that every dot stands for the same amount of probability mass (`1 /
-nquantiles`).
-
-The dots are laid out by SwarmMakie's `WilkinsonBeeswarm`, so loading SwarmMakie.jl is
-required. The bins are fixed and equally wide, so stacks line up with one another. The
-count axis is not drawn: the layout happens in pixel space, where a stack level is not a
-data coordinate. Read the plot by counting dots instead.
-
-The default for several chains is that the quantile dots are coloured to indicate the chain.
+posterior. Every dot stands for the same amount of probability mass (defaults to 2%).
 
 $(FC.PlotUtils._PARAM_DOCSTRING("FlexiChains.Makie.dotplot"))
 
@@ -187,14 +158,10 @@ $(FC.PlotUtils._PARAM_DOCSTRING("FlexiChains.Makie.dotplot"))
 
 - `nquantiles::Int`: number of dots drawn for each chain. Defaults to `50`.
 
-- `nbins::Union{Nothing,Int}`: number of bins the value axis is divided into. A bin is one
-  dot wide, so this is what sets the size of a dot. The default starts at
-  `round(Int, sqrt(2π * ndots))` and adds bins until the tallest stack fits the height of
-  the axis, so the dots stay as large as the axis has room for. All panels share one value,
-  and it is recomputed when the figure is resized.
+- `nbins::Union{Nothing,Int}`: number of bins the value axis is divided into. Since a bin is one
+  dot wide, this setting also controls dot size.
 
-- `pool_chains::Bool`: whether to pool data from all chains into a single set of dots, or to
-  compute the dots for each chain separately. Defaults to `false`.
+- `pool_chains::Bool`: if true, all dots share the same colour. Defaults to `false`.
 
 $(MakieExt.MAKIE_KWARGS_DOCSTRING)
 """
@@ -225,7 +192,6 @@ function FC.Makie.dotplot(
         values, chains = _dotplot_dots(d)
         (; ax, values, chains)
     end
-    # One binning for all panels, so that their dots are equally big.
     nchains = pool_chains ? 1 : FC.nchains(chn)
     shared_nbins = _dotplot_nbins(
         map(panel -> panel.ax, panels),
