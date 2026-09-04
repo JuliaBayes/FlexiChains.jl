@@ -98,47 +98,6 @@ _name_text(nws::NameWithSize{Nothing}) = nws.name
 _name_text(nws::NameWithSize{<:Tuple}) = "$(nws.name) $(nws.size)"
 Base.textwidth(nws::NameWithSize) = textwidth(_name_text(nws))
 
-function _wrap_items(
-    items::Vector{NameWithSize},
-    available::Int,
-)::Vector{Vector{NameWithSize}}
-    isempty(items) && return Vector{NameWithSize}[]
-
-    # Calculate the total width of all items, including commas and spaces
-    full_tw = sum(textwidth, items) + 2 * (length(items) - 1)
-    # If it fits on one line, we can return as a single line
-    full_tw <= available && return [items]
-
-    lines = Vector{NameWithSize}[]
-
-    # Try to fit as many items as possible plus the trailing comma onto the current line
-    # (a greedy algorithm). This could in principle be more fancy (e.g. Knuth-Plass)...
-    current_line = NameWithSize[]
-    remaining = available
-    for item in items
-        tw = textwidth(item)
-        if tw + 1 > remaining && !isempty(current_line)
-            # Can't fit the next one on this line, so push the current line and start a new
-            # one. But if the current line is empty, we have to put it on this line anyway.
-            push!(lines, current_line)
-            current_line = NameWithSize[]
-            remaining = available
-        end
-        push!(current_line, item)
-        remaining -= (tw + 2)
-    end
-    push!(lines, current_line)
-    return lines
-end
-
-# Choose which lines to print - for horizontal printing of long vectors of parameters
-function _elided_line_indices(n::Int; max_lines = 4)
-    n <= max_lines && return Union{Int,Nothing}[1:n;]
-    n_head = max_lines ÷ 2
-    n_tail = div(max_lines - 1, 2)
-    return Union{Int,Nothing}[1:n_head; nothing; (n - n_tail + 1):n]
-end
-
 _maybe_s(x) = x == 1 ? "" : "s"
 
 # ── Composable display blocks ───────────────────────────────────
@@ -193,6 +152,14 @@ function _eltype_groups(cs::ChainOrSummary, is_parameters::Bool)
     return groups
 end
 
+function _truncate_nwss(nwss::Vector{NameWithSize}; max_elems=15)
+    length(nwss) <= max_elems && return nwss
+    first_half = div(max_elems + 1, 2)
+    last_half = div(max_elems, 2)
+    return vcat(first(nwss, first_half), NameWithSize("…", nothing), last(nwss, last_half))
+end
+
+
 function _print_eltype_groups(
     io::IO,
     groups::OrderedDict{String,Vector{NameWithSize}},
@@ -210,45 +177,47 @@ function _print_eltype_groups(
         else
             rpad(type_str, max_tw)
         end
-        wrapped = _wrap_items(names, names_width)
-        nlines = length(wrapped)
-        for li in _elided_line_indices(nlines)
-            if isnothing(li)
+
+        firstline = true
+        buf = IOBuffer()
+        tw = 0 # visible width of the text currently buffered for this line
+        for nws in _truncate_nwss(names)
+            sep_tw = tw == 0 ? 0 : 2
+            # check if there is space on the current line and print if there is not 
+            if tw > 0 && tw + sep_tw + textwidth(nws) > names_width
                 _box_content(io, width) do io
-                    print(io, " "^prefix_width)
-                    printstyled(io, "⋮"; color=_BOX_COLOR)
-                    return prefix_width + 1
-                end
-                println(io)
-                continue
-            end
-            nwss = wrapped[li]
-            trailing = li < nlines ? "," : ""
-            _box_content(io, width) do io
-                if li == 1
-                    print(io, " ")
-                    printstyled(io, display_type; color=_ELTYPE_COLOR)
-                    print(io, "  ")
-                else
-                    print(io, " "^prefix_width)
-                end
-                tw = prefix_width
-                n_nws = length(nwss)
-                for (i, nws) in enumerate(nwss)
-                    print(io, _name_text(nws))
-                    tw += textwidth(nws)
-                    if i < n_nws
-                        print(io, ", ")
-                        tw += 2
+                    if firstline
+                        print(io, " ")
+                        printstyled(io, display_type; color=_ELTYPE_COLOR)
+                        print(io, "  ")
                     else
-                        print(io, trailing)
-                        tw += textwidth(trailing)
+                        print(io, " "^prefix_width)
                     end
+                    print(io, String(take!(buf)))
+                    return prefix_width + tw
                 end
-                return tw
+                firstline = false
+                println(io)
+                tw = 0
+                sep_tw = 0
             end
-            println(io)
+            tw > 0 && print(buf, ", ")
+            print(buf, _name_text(nws))
+            tw += sep_tw + textwidth(nws)
         end
+        # print the remaining elements
+        _box_content(io, width) do io
+            if firstline
+                print(io, " ")
+                printstyled(io, display_type; color=_ELTYPE_COLOR)
+                print(io, "  ")
+            else
+                print(io, " "^prefix_width)
+            end
+            print(io, String(take!(buf)))
+            return prefix_width + tw
+        end
+        println(io)
     end
     return
 end
