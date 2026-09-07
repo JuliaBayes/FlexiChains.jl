@@ -1,7 +1,7 @@
 module FlexiChainsEnsembleMCMCExtTests
 
 using EnsembleMCMC
-using FlexiChains: FlexiChains, Extra
+using FlexiChains: FlexiChains, Extra, @varname
 using DimensionalData: At
 using Random123: Philox4x
 using Test
@@ -13,16 +13,18 @@ using Test
                            walker_ids=[11, 23, 37, 41])
         sample!(state, 3)
     end
-    chain = FlexiChains.FlexiChain(runs...; iter_indices=101:103)
+    chain = FlexiChains.from_ensemblemcmc(runs...; iter_indices=101:103)
     @test size(chain) == (3, 2)
     @test collect(FlexiChains.iter_indices(chain)) == 101:103
     @test chain[:positions, stack=true][:, 2, :, :] == permutedims(runs[2].positions, (3, 1, 2))
     @test chain[Extra(:move_index), chain=1] == runs[1].move_indices
+    @test chain[@varname(positions[2, 3]), chain=2] == runs[2].positions[2, 3, :]
 
     names = [:alpha, :beta]
-    named = FlexiChains.FlexiChain(runs[1]; param_names=names)
+    named = FlexiChains.from_ensemblemcmc(runs[1]; param_names=names)
     names[1] = :changed
-    @test collect(FlexiChains.parameters(named)) == [:alpha, :beta]
+    @test collect(FlexiChains.parameters(named)) == [@varname(alpha), @varname(beta)]
+    @test named[@varname(beta[3]), chain=1] == runs[1].positions[2, 3, :]
     @test named[:beta, stack=true] == permutedims(runs[1].positions[2:2, :, :], (3, 1, 2))
     named[:alpha, stack=false][1, 1][walker=At(23)] = 77
     @test runs[1].positions[1, 2, 1] == 77
@@ -39,8 +41,8 @@ using Test
         shared[1] = iszero(shared[1]) ? one(eltype(shared)) : zero(eltype(shared))
         @test source[1] == shared[1]
     end
-    @test_throws DimensionMismatch FlexiChains.FlexiChain(runs[2]; param_names=[:alpha])
-    @test_throws ArgumentError FlexiChains.FlexiChain(runs[2]; param_names=[:alpha, :alpha])
+    @test_throws DimensionMismatch FlexiChains.from_ensemblemcmc(runs[2]; param_names=[:alpha])
+    @test_throws ArgumentError FlexiChains.from_ensemblemcmc(runs[2]; param_names=[:alpha, :alpha])
 end
 
 end

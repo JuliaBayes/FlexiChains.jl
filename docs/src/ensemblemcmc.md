@@ -1,6 +1,6 @@
 # EnsembleMCMC.jl
 
-[`FlexiChains.FlexiChain`](@ref) converts results from
+[`FlexiChains.from_ensemblemcmc`](@ref) converts results from
 [`EnsembleMCMC.sample!`](https://juliabayes.org/EnsembleMCMC.jl/api/) without
 pooling walkers or losing sweep order.
 
@@ -12,7 +12,7 @@ state = initialize(Philox4x((42, 1)), x -> -sum(abs2, x) / 2, initial;
                    walker_ids=[11, 23, 37, 41])
 step!(state, 100)
 draws = sample!(state, 20)
-chain = FlexiChains.FlexiChain(draws; iter_indices=101:120)
+chain = FlexiChains.from_ensemblemcmc(draws; iter_indices=101:120)
 size(chain) # 20 sweeps, one ensemble
 ```
 
@@ -29,8 +29,9 @@ positions[walker=At(23)] # one walker's trajectory
 Pass one name per coordinate to get separate walker-valued parameters:
 
 ```@example ensemble
-named = FlexiChains.FlexiChain(draws; param_names=[:alpha, :beta])
+named = FlexiChains.from_ensemblemcmc(draws; param_names=[:alpha, :beta])
 named[:alpha, stack=true][walker=At(23)]
+named[@varname(alpha[2])] # second walker (ID 23)
 ```
 
 The extras `:log_density` and `:accepted` retain a value per walker per sweep.
@@ -42,7 +43,10 @@ the stored views; `stack=true` materializes an array. Conversion still allocates
 containers and copies labels and scalar move indices. Use `deepcopy(chain)`
 when an independent copy is needed.
 
-Pass multiple results as `FlexiChains.FlexiChain(draws1, draws2)` to
+The chain uses `VarName` keys, so both whole-parameter symbol access and
+component indexing work. Component indices refer to array positions, not walker IDs.
+
+Pass multiple results as `FlexiChains.from_ensemblemcmc(draws1, draws2)` to
 represent **independent ensemble runs** as separate chains. Their shapes and
 ordered walker IDs must match. Do not pass successive chunks of the same run
 as separate chains. Each run must contain at least one sweep, since an empty

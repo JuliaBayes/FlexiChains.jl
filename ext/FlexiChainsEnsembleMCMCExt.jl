@@ -1,16 +1,16 @@
 module FlexiChainsEnsembleMCMCExt
 
 using EnsembleMCMC: EnsembleMCMC
-using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, VarName, Parameter, Extra
 using DimensionalData: DimArray, Dim
 using OrderedCollections: OrderedDict
 
 const EnsembleDraws = NamedTuple{(:positions, :logdensities, :accepted, :move_indices, :walker_ids)}
 
 """
-    FlexiChains.FlexiChain(draws, others...; param_names=nothing, kwargs...)
+    FlexiChains.from_ensemblemcmc(draws, others...; param_names=nothing, kwargs...)
 
-Convert one or more results of `EnsembleMCMC.sample!` to a `FlexiChain{Symbol}`.
+Convert one or more results of `EnsembleMCMC.sample!` to a `FlexiChain{VarName}`.
 Each result represents one independent ensemble run, not one walker. All runs
 must have the same coordinate count, positive sweep count, and ordered walker IDs.
 
@@ -32,7 +32,7 @@ Walkers within one ensemble are not independent chains. Standard diagnostics
 apply to individual coordinate/walker components, not the pooled estimator.
 Multiple arguments must come from independent runs, not chunks of one run.
 """
-function FlexiChains.FlexiChain(
+function FlexiChains.from_ensemblemcmc(
     first::EnsembleDraws, others::EnsembleDraws...; param_names=nothing, kwargs...
 )
     runs = (first, others...)
@@ -56,7 +56,7 @@ function FlexiChains.FlexiChain(
     coordinates = Dim{:coordinate}(1:ncoords)
     data = OrderedDict{Any,Matrix}()
     if param_names === nothing
-        data[Parameter(:positions)] = [
+        data[Parameter(VarName{:positions}())] = [
             DimArray(view(run.positions, :, :, i), (coordinates, walker))
             for i in 1:nsweeps, run in runs
         ]
@@ -65,7 +65,7 @@ function FlexiChains.FlexiChain(
         length(names) == ncoords || throw(DimensionMismatch("one name is required per coordinate"))
         allunique(names) || throw(ArgumentError("parameter names must be unique"))
         for (j, name) in enumerate(names)
-            data[Parameter(name)] = [
+            data[Parameter(VarName{name}())] = [
                 DimArray(view(run.positions, j, :, i), walker)
                 for i in 1:nsweeps, run in runs
             ]
@@ -78,7 +78,7 @@ function FlexiChains.FlexiChain(
         DimArray(view(run.accepted, :, i), walker) for i in 1:nsweeps, run in runs
     ]
     data[Extra(:move_index)] = [run.move_indices[i] for i in 1:nsweeps, run in runs]
-    return FlexiChain{Symbol}(nsweeps, length(runs), data; kwargs...)
+    return FlexiChain{VarName}(nsweeps, length(runs), data; kwargs...)
 end
 
 end
