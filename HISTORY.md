@@ -1,3 +1,7 @@
+# 0.6.39
+
+Added compatibility with PosteriorDB@0.7.
+
 # 0.6.38
 
 `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (as well as the plain `Array` versions) now take an additional `split_varnames` keyword argument, which determines whether or not vector-valued parameters (or summary statistics) are broken up into scalar leaves.
