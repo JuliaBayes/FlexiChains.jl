@@ -36,10 +36,10 @@ sample(M(), S(), 10; chain_type=FlexiChain{Symbol})
 ```
 
 Likewise, you can overload `to_vnt_and_stats` to obtain a `FlexiChain{VarName}`.
-This must return a tuple of a `DynamicPPL.VarNamedTuple` and a `NamedTuple`:
+This must return a tuple of a `VarNames.VarNamedTuple` and a `NamedTuple`:
 
 ```@example sampler
-using DynamicPPL: VarNamedTuple, VarName
+using VarNames: VarNamedTuple, VarName
 FlexiChains.to_vnt_and_stats(::T) = (VarNamedTuple(hello=1.0), (; world=2.0))
 sample(M(), S(), 10; chain_type=FlexiChain{VarName})
 ```

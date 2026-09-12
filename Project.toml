@@ -1,11 +1,10 @@
 name = "FlexiChains"
 uuid = "4a37a8b9-6e57-4b92-8664-298d46e639f7"
-version = "0.6.38"
+version = "0.7.0"
 authors = ["Penelope Yong <penelopeysm@gmail.com> and contributors"]
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
-AbstractPPL = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -18,8 +17,10 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+VarNames = "09a315b2-63fc-4165-8d7f-d59368e770cc"
 
 [weakdeps]
+AbstractPPL = "7a57a42e-76ec-4ea3-a279-07e840d6d9cf"
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -39,9 +40,10 @@ StanSample = "c1514b29-d3a0-5178-b312-660c88baa699"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [extensions]
+FlexiChainsAbstractPPLExt = "AbstractPPL"
 FlexiChainsAdvancedHMCExt = ["AdvancedHMC", "DimensionalData"]
 FlexiChainsComponentArraysExt = ["ComponentArrays"]
-FlexiChainsDynamicPPLExt = ["DynamicPPL", "Random", "DimensionalData", "OrderedCollections", "Distributions"]
+FlexiChainsDynamicPPLExt = ["DynamicPPL", "Random", "DimensionalData", "OrderedCollections", "Distributions", "AbstractPPL", "VarNames"]
 FlexiChainsInferenceObjectsExt = ["InferenceObjects", "DimensionalData", "OrderedCollections"]
 FlexiChainsMCMCChainsExt = ["MCMCChains", "OrderedCollections"]
 FlexiChainsMakieExt = ["Makie", "StatsBase", "KernelDensity"]
@@ -88,4 +90,5 @@ Statistics = "1"
 StatsBase = "0.34.6"
 StatsPlots = "0.15"
 Tables = "1.12.1"
+VarNames = "0.1.1"
 julia = "1.10.8"

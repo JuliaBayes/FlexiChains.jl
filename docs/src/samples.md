@@ -6,14 +6,15 @@ This means that it is very easy to access all the data for a given variable, but
 Consider the following example:
 
 ```@example samples
-using FlexiChains, Turing
+using FlexiChains, Distributions
+using DynamicPPL: @model, @varname
 
 @model function f()
     x ~ Normal()
     y ~ Uniform(1, 2)
 end
 
-chn = sample(f(), Prior(), 10; chain_type=VNChain, progress=false)
+chn = FlexiChains._make_prior_chain(f(), 10, 1)
 ```
 
 Here, we have two variables `x` and `y`.
@@ -61,7 +62,7 @@ This is a high-fidelity representation of the data, and is exactly what you get 
 The main benefit of this is that you can feed this right back into Turing's API.
 For example, to initialise MCMC sampling from the fifth sample, you can write:
 
-```@example samples
+```julia
 pws = FlexiChains.values_at(chn; iter=5, chain=1)
 sample(f(), NUTS(), 10; initial_params=InitFromParams(pws), progress=false);
 ```

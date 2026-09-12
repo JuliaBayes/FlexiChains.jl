@@ -62,7 +62,8 @@ Here, we create a model with different types of parameters (continuous, discrete
 This is the same model as used on the Plots.jl documentation page.
 
 ```@example 1
-using FlexiChains, CairoMakie, Turing
+using FlexiChains, CairoMakie, Distributions, LinearAlgebra
+using DynamicPPL: @model, @varname
 
 import FlexiChains.Makie as FM # For the plotting functions.
 
@@ -72,16 +73,7 @@ import FlexiChains.Makie as FM # For the plotting functions.
     z ~ MvNormal(zeros(2), I)
 end
 
-chn = sample(
-    f(),
-    MH(),
-    MCMCThreads(),
-    1000,
-    3;
-    discard_initial=100,
-    chain_type=VNChain,
-    progress=false,
-)
+chn = FlexiChains._make_prior_chain(f(), 1000, 3)
 ```
 
 ## Default plot
@@ -265,7 +257,8 @@ The pushforward plots in this section visualise that uncertainty as nested quant
 We'll concoct an example with the [Palmer penguins dataset](https://github.com/devmotion/PalmerPenguins.jl) to show how these plots can be used.
 
 ```@example pushforward
-using Turing, DataFrames, PalmerPenguins, CairoMakie
+using FlexiChains, Distributions, DataFrames, PalmerPenguins, CairoMakie
+using DynamicPPL: @model, @varname, filldist, predict, fix
 import FlexiChains.Makie as FM
 using StatsBase: denserank, fit, ZScoreTransform, reconstruct
 
@@ -307,7 +300,7 @@ Next, we condition the model on the observed data and run MCMC.
 ```@example pushforward
 prior_model = bill_model(penguins.species_idx, penguins.body_mass_g)
 cond_model = prior_model | (; bill_length_mm=penguins.bill_length_mm)
-chain = sample(cond_model, NUTS(0.8), MCMCThreads(), 1000, 4; progress=false)
+chain = FlexiChains._make_posterior_chain(cond_model, 1000, 4)
 nothing # hide
 ```
 

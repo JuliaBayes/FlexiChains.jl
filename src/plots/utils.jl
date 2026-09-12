@@ -26,8 +26,8 @@ const DEFAULT_HEIGHT = 250
 function get_hdi_intervals end  # Overloaded in PosteriorStatsExt
 const DEFAULT_INTERVALS = (0.66, 0.95) # for forestplot
 
-# for connquantile etc.
-const DEFAULT_QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+# for the pushforward plots
+const DEFAULT_LEVELS = [0.2, 0.4, 0.6, 0.8]
 
 using ..FlexiChains:
     FlexiChain,
@@ -100,6 +100,32 @@ function check_eltype_is_real(::AbstractArray{T}) where {T}
 end
 
 """
+Convert an interval mass `level` (e.g. `0.95`) to the pair of quantile probabilities
+`(lower, upper)` bounding the central interval of that mass, e.g. `0.95` becomes
+`(0.025, 0.975)`.
+"""
+function level_to_quantile_bounds(level::Real)
+    if !(0 < level < 1)
+        throw(ArgumentError("level must be in (0, 1), got $level"))
+    end
+    lower = (1 - level) / 2
+    upper = 1 - lower
+    return lower, upper
+end
+
+"""
+Sort `levels` (interval masses) so that index 1 is the widest, and return the sorted levels
+together with the vector of quantile probabilities needed to compute every band boundary
+plus the median. That vector is sorted ascending and always contains `0.5`.
+"""
+function levels_to_quantile_probs(levels::AbstractVector{<:Real})
+    sorted_levels = sort(levels; rev=true)
+    bounds = level_to_quantile_bounds.(sorted_levels)
+    probs = sort(vcat(0.5, first.(bounds), last.(bounds)))
+    return sorted_levels, probs
+end
+
+"""
 Compute nested-quantile band values.
 
 `quantile_levels` are in 0–1. For a matrix (`iter × chain`), each quantile is the *ensemble
@@ -116,6 +142,39 @@ function compute_quantile_bands(
         acc = acc .+ Statistics.quantile(view(data, :, c), quantile_levels)
     end
     return acc ./ nchains
+end
+
+"Compute nested-quantile band values for every key in `chn`."
+function chain_quantile_bands(
+    chn::FlexiChain,
+    probs::AbstractVector{<:Real};
+    warn::Bool=true,
+)
+    fs = Statistics.quantile(chn, probs; dims=:iter, warn=warn, split_varnames=false)
+    da = DD.DimArray(fs; split_varnames=false)
+    mu = Statistics.mean(da, dims=:chain)
+    mu_1d = dropdims(mu, dims=:chain) # (nparams,) vector of (nquantiles,)
+    return stack(mu_1d) # size (nquantiles, nparams)
+end
+
+"""
+Per-band alpha for `n_bands` nested uncertainty bands drawn outermost-first.
+
+Band `k` is drawn on top of bands `1:k-1`, so the visible (composite) opacity at depth `k`
+is `A(k) = 1 - prod(1 - alpha_j for j in 1:k)`. This targets a composite ramp that is
+linear in `k`, running from `alpha_limits[1]` at the outermost band to `alpha_limits[2]` at
+the innermost.
+"""
+function band_alpha(n_bands; alpha_limits::NTuple{2,AbstractFloat}=(0.15, 0.85))
+    a_min, a_max = alpha_limits
+    0 <= a_min <= a_max <= 1 || throw(
+        ArgumentError("`alpha_limits` must be sorted and in [0, 1], got $alpha_limits"),
+    )
+    composite(i) = a_min + (a_max - a_min) * (i - 1) / max(n_bands - 1, 1)
+    return map(1:n_bands) do i
+        i == 1 && return a_min
+        return 1 - (1 - composite(i)) / (1 - composite(i - 1))
+    end
 end
 
 """

@@ -1,3 +1,42 @@
+# 0.7
+
+v0.7 is a fairly large breaking change in FlexiChains.
+
+## New types
+
+FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
+This allows for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
+
+In order to not completely break users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
+**However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.
+Until & unless Turing itself updates its codebase (please see [this issue](https://github.com/TuringLang/Turing.jl/issues/2856)), Turing users should stick to FlexiChains 0.6 where possible (this will be enforced by compatibility bounds).**
+
+If you are only using Turing, it is unlikely that you will have FlexiChains v0.7 in your environment.
+However, if for some reason you *need* to use FlexiChains 0.7, please:
+
+  - update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`
+  - if you need to convert to/from the new VNChain, you can use the `to_new_vnchain` and `to_old_vnchain` conversion functions
+
+apart from this one change, everything else should still work seamlessly.
+If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
+
+## Pushforward plot functions
+
+The keyword arguments of the plotting functions to create pushforward visualisations (`pushforward_hist`, `pushforward_continuous`, `pushforward_discrete`) have been changed:
+
+  - the `baseline` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `lines!` or `scatter!` to overlay baseline values on the pushforward plot.
+  - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
+  - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
+
+## Other non-breaking changes
+
+The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
+There is no difference in their behaviour.
+
+A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforward_continuous`, and `pushforward_discrete`. It sets the alpha values of the outer- and innermost quantile bands drawn by these functions.
+
+The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
+
 # 0.6.38
 
 `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (as well as the plain `Array` versions) now take an additional `split_varnames` keyword argument, which determines whether or not vector-valued parameters (or summary statistics) are broken up into scalar leaves.

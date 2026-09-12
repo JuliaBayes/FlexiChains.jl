@@ -194,8 +194,7 @@ function FC.Makie.forestplot!(ax::Makie.Axis, d::FC.PlotUtils.FlexiChainForest; 
         # Return a vector of (lower, upper) tuples, one for each interval to plot for
         # the given level.
         return if d.interval === :quantile
-            lower = (1 - level) / 2
-            upper = 1 - lower
+            lower, upper = FC.PlotUtils.level_to_quantile_bounds(level)
             [(FC.quantile(data, lower), FC.quantile(data, upper))]
         elseif d.interval === :hdi
             FC.PlotUtils.get_hdi_intervals(data, level, d.hdi_method)
