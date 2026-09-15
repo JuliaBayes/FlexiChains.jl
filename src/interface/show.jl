@@ -94,52 +94,9 @@ struct NameWithSize{T<:Union{Nothing,Tuple}}
     name::String
     size::T # nothing to indicate mixed size / non-array
 end
-Base.textwidth(nws::NameWithSize{Nothing}) = textwidth(nws.name)
-Base.textwidth(nws::NameWithSize{<:Tuple}) =
-    textwidth(nws.name) + 1 + textwidth("$(nws.size)")
-Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{Nothing}) = print(io, nws.name)
-function Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{<:Tuple})
-    print(io, nws.name)
-    print(io, " ")
-    printstyled(io, "$(nws.size)"; color=:white)
-end
-
-function _wrap_items(
-    items::Vector{NameWithSize},
-    available::Int,
-)::Vector{Vector{NameWithSize}}
-    isempty(items) && return Vector{NameWithSize}[]
-
-    # Calculate the total width of all items, including commas and spaces
-    full_tw = sum(textwidth, items) + 2 * (length(items) - 1)
-    # If it fits on one line, we can return as a single line
-    full_tw <= available && return [items]
-
-    lines = Vector{NameWithSize}[]
-
-    # Try to fit as many items as possible plus the trailing comma onto the current line
-    # (a greedy algorithm). This could in principle be more fancy (e.g. Knuth-Plass)...
-    current_line = NameWithSize[]
-    remaining = available
-    n = length(items)
-    i = 1
-    while i <= n
-        next_item = items[i]
-        tw = textwidth(next_item)
-        if tw + 1 > remaining && !isempty(current_line)
-            # Can't fit the next one on this line, so push the current line and start a new
-            # one. But if the current line is empty, we have to put it on this line anyway.
-            push!(lines, current_line)
-            current_line = NameWithSize[]
-            remaining = available
-        end
-        push!(current_line, next_item)
-        remaining -= (tw + 2)
-        i += 1
-    end
-    push!(lines, current_line)
-    return lines
-end
+_name_text(nws::NameWithSize{Nothing}) = nws.name
+_name_text(nws::NameWithSize{<:Tuple}) = "$(nws.name) $(nws.size)"
+Base.textwidth(nws::NameWithSize) = textwidth(_name_text(nws))
 
 _maybe_s(x) = x == 1 ? "" : "s"
 
@@ -195,6 +152,14 @@ function _eltype_groups(cs::ChainOrSummary, is_parameters::Bool)
     return groups
 end
 
+function _truncate_nwss(nwss::Vector{NameWithSize}; max_elems=15)
+    length(nwss) <= max_elems && return nwss
+    first_half = div(max_elems + 1, 2)
+    last_half = div(max_elems, 2)
+    return vcat(first(nwss, first_half), NameWithSize("…", nothing), last(nwss, last_half))
+end
+
+
 function _print_eltype_groups(
     io::IO,
     groups::OrderedDict{String,Vector{NameWithSize}},
@@ -212,35 +177,47 @@ function _print_eltype_groups(
         else
             rpad(type_str, max_tw)
         end
-        wrapped = _wrap_items(names, names_width)
-        nlines = length(wrapped)
-        for (li, nwss) in enumerate(wrapped)
-            trailing = li < nlines ? "," : ""
-            _box_content(io, width) do io
-                if li == 1
-                    print(io, " ")
-                    printstyled(io, display_type; color=_ELTYPE_COLOR)
-                    print(io, "  ")
-                else
-                    print(io, " "^prefix_width)
-                end
-                tw = prefix_width
-                n_nws = length(nwss)
-                for (i, nws) in enumerate(nwss)
-                    Base.show(io, MIME"text/plain"(), nws)
-                    tw += textwidth(nws)
-                    if i < n_nws
-                        print(io, ", ")
-                        tw += 2
+
+        firstline = true
+        buf = IOBuffer()
+        tw = 0 # visible width of the text currently buffered for this line
+        for nws in _truncate_nwss(names)
+            sep_tw = tw == 0 ? 0 : 2
+            # check if there is space on the current line and print if there is not 
+            if tw > 0 && tw + sep_tw + textwidth(nws) > names_width
+                _box_content(io, width) do io
+                    if firstline
+                        print(io, " ")
+                        printstyled(io, display_type; color=_ELTYPE_COLOR)
+                        print(io, "  ")
                     else
-                        print(io, trailing)
-                        tw += textwidth(trailing)
+                        print(io, " "^prefix_width)
                     end
+                    print(io, String(take!(buf)))
+                    return prefix_width + tw
                 end
-                return tw
+                firstline = false
+                println(io)
+                tw = 0
+                sep_tw = 0
             end
-            println(io)
+            tw > 0 && print(buf, ", ")
+            print(buf, _name_text(nws))
+            tw += sep_tw + textwidth(nws)
         end
+        # print the remaining elements
+        _box_content(io, width) do io
+            if firstline
+                print(io, " ")
+                printstyled(io, display_type; color=_ELTYPE_COLOR)
+                print(io, "  ")
+            else
+                print(io, " "^prefix_width)
+            end
+            print(io, String(take!(buf)))
+            return prefix_width + tw
+        end
+        println(io)
     end
     return
 end
@@ -342,6 +319,36 @@ function _print_summary_dims(io::IO, summary::FlexiSummary, width::Int)
     return
 end
 
+# A lazy view over a `FlexiSummary`'s raw data
+struct LazySummaryArray <: AbstractArray{Text,2}
+    data::AbstractDict
+    rownames::Vector
+    colnames::Union{Nothing,DD.Lookup}
+    first_column_prefix::String
+    max_col_width::Int
+end
+
+function Base.size(a::LazySummaryArray)
+    ncols = isnothing(a.colnames) ? 1 : length(a.colnames)
+    return (length(a.rownames) + 1, ncols + 1)
+end
+
+function Base.getindex(a::LazySummaryArray, i::Int, j::Int)
+    if i == 1
+        j == 1 && return Text("param")
+        isnothing(a.colnames) && return Text("")
+        header = _pretty_value(a.colnames[j-1])
+        j == 2 && (header = a.first_column_prefix * header)
+        return Text(_truncate(header, a.max_col_width))
+    end
+
+    j == 1 && return Text(_truncate(_pretty_value(a.rownames[i-1]), a.max_col_width))
+
+    raw = a.data[Parameter(a.rownames[i-1])]
+    value = isnothing(a.colnames) ? only(raw) : raw[j-1]
+    return Text(_truncate(_pretty_value(value), a.max_col_width))
+end
+
 function _print_summary_table(
     io::IO,
     summary::FlexiSummary,
@@ -349,85 +356,27 @@ function _print_summary_table(
     column_indices,
     first_column_prefix::String,
     width::Int,
+    max_col_width = 12
 )
     _box_empty(io, width)
     println(io)
     _box_content(io, width, [_Segment("Summary"; bold=true)])
     println(io)
 
-    MAX_COL_WIDTH = 12
     inner_width = width - 4
-    colpadding = 2
+    screen_rows = displaysize(io)[1]
 
-    # For things like `mean(chain, dims=:chain)`, there could be a huge number of columns,
-    # very few of which will actually be displayed. To avoid performing unnecessary
-    # formatting work we cap the number of columns to be formatted.
-    max_formatted_columns = max(div(inner_width, colpadding + 1), 1)
-    columns_were_skipped =
-        !isnothing(column_indices) && length(column_indices) > max_formatted_columns
+    mat = LazySummaryArray(
+        summary._data, param_names, column_indices, first_column_prefix, max_col_width
+    )
 
-    header_col =
-        ["param", map(p -> _truncate(_pretty_value(p), MAX_COL_WIDTH), param_names)...]
-    param_values = map(pn -> summary[pn], param_names)
-
-    value_cols = if isnothing(column_indices)
-        [["", [_truncate(_pretty_value(value), MAX_COL_WIDTH) for value in param_values]...],]
-    else
-        column_names = Iterators.take(parent(column_indices), max_formatted_columns)
-        map(enumerate(column_names)) do (column_i, column_name)
-            column_header = _pretty_value(column_name)
-            if column_i == 1
-                column_header = first_column_prefix * column_header
-            end
-            [
-                _truncate(column_header, MAX_COL_WIDTH)
-                [
-                    _truncate(_pretty_value(value[column_i]), MAX_COL_WIDTH) for
-                    value in param_values
-                ]...
-            ]
-        end
-    end
-
-    rows = hcat(header_col, value_cols...)
-    colwidths = map(maximum, eachcol(map(length, rows)))
-
-    total = sum(cw + colpadding for cw in colwidths)
-    truncated = columns_were_skipped || total > inner_width
-    available = inner_width - (truncated ? 3 : 0)
-    if total <= available
-        max_cols = length(colwidths)
-    else
-        cumwidth = colwidths[1] + colpadding
-        max_cols = 1
-        for j in 2:length(colwidths)
-            needed = colwidths[j] + colpadding
-            if cumwidth + needed <= available
-                cumwidth += needed
-                max_cols = j
-            else
-                break
-            end
-        end
-    end
-
-    for (i, row) in enumerate(eachrow(rows))
+    full = sprint(
+        show, MIME"text/plain"(), mat; context=(:limit => true, :displaysize => (screen_rows, inner_width))
+    )
+    for line in Iterators.drop(split(full, '\n'), 1)
         _box_content(io, width) do io
-            visible = 0
-            for j in 1:max_cols
-                s = lpad(row[j], colwidths[j] + colpadding)
-                if i == 1 || j == 1
-                    printstyled(io, s; bold=true)
-                else
-                    print(io, s)
-                end
-                visible += textwidth(s)
-            end
-            if truncated
-                printstyled(io, "  …"; color=:light_black)
-                visible += 3
-            end
-            return visible
+            print(io, line)
+            return textwidth(line)
         end
         println(io)
     end
