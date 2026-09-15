@@ -1,3 +1,7 @@
+# 0.6.40
+
+Fixed a bug where R-hat, ESS, and MCSE were computed incorrectly if there were more than 2 chains in the `FlexiChain`.
+
 # 0.6.39
 
 Added compatibility with PosteriorDB@0.7.
