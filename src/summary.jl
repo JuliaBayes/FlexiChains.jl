@@ -3,7 +3,7 @@ using Statistics: Statistics
 using StatsBase: StatsBase
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
-@public FlexiSummary, collapse, ChainDimAware
+@public FlexiSummary, collapse
 
 const STAT_DIM_NAME = :stat
 function _make_categorical(v::AbstractVector{Symbol})
@@ -287,7 +287,7 @@ Most summary functions (`mean`, `std`, `quantile`, ...) do not care which chain 
 from, so when [`FlexiChains.collapse`](@ref) collapses them its irrelevant; the function works
 regardless of chain structure. MCMC convergence diagnostics are different: R-hat and the effective 
 sample size are defined in terms of the variation between chains, and silently return wrong answers 
-if thechain labels are discarded. Wrapping such a function in `ChainDimAware` tells `collapse` to
+if the chain labels are discarded. Wrapping such a function in `ChainDimAware` tells `collapse` to
 pass the uncollapsed matrix instead.
 """
 struct ChainDimAware{F} <: Function
@@ -379,7 +379,7 @@ collapse(chn, [mean, std]; dims=:chain)
 
 For `dims=:both`, the function is applied to all the samples stacked together as a single
 vector. Functions which need to know which chain each sample came from -- such as MCMC
-convergence diagnostics -- must be wrapped in [`FlexiChains.ChainDimAware`](@ref).
+convergence diagnostics -- must be wrapped in `FlexiChains.ChainDimAware`.
 
 Sometimes, for more complicated functions like `quantile`, you have to pass an anonymous
 function (such as `x -> quantile(x, 0.05)` or a closure (such as `Base.Fix2(quantile,
@@ -539,10 +539,7 @@ macro _forward_diagnostic(func)
         ) where {TKey}
             return collapse(
                 chn,
-                [(
-                    Symbol($(esc(func))),
-                    ChainDimAware(x -> $(esc(func))(x; kwargs...)),
-                )];
+                [(Symbol($(esc(func))), ChainDimAware(x -> $(esc(func))(x; kwargs...)))];
                 dims=dims,
                 split_varnames=split_varnames,
                 warn=warn,

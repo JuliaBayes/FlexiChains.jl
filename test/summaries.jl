@@ -174,9 +174,8 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
 
         # R-hat is a symmetric function of the chains, so should be permutation invariant
         for perm in ([1, 3, 2, 4], [4, 3, 2, 1], [2, 4, 1, 3])
-            permuted = FlexiChain{Symbol}(
-                niter, nchain, Dict(Parameter(:x) => raw[:, perm])
-            )
+            permuted =
+                FlexiChain{Symbol}(niter, nchain, Dict(Parameter(:x) => raw[:, perm]))
             @test rhat(permuted)[:x] ≈ rhat(chn)[:x]
         end
 
