@@ -277,6 +277,28 @@ function _replace_data(summary::FlexiSummary, ::Type{newkey}, new_data) where {n
     )
 end
 
+"""
+    FlexiChains.ChainDimAware(f)
+
+Wrapper marking a summary function `f` which must be given the full `(iter, chain)` matrix of
+samples, rather than a flat vector of all the samples stacked together.
+
+Most summary functions (`mean`, `std`, `quantile`, ...) do not care which chain a sample came
+from, so when [`FlexiChains.collapse`](@ref) collapses them its irrelevant; the function works
+regardless of chain structure. MCMC convergence diagnostics are different: R-hat and the effective 
+sample size are defined in terms of the variation between chains, and silently return wrong answers 
+if the chain labels are discarded. Wrapping such a function in `ChainDimAware` tells `collapse` to
+pass the uncollapsed matrix instead.
+"""
+struct ChainDimAware{F} <: Function
+    f::F
+end
+(c::ChainDimAware)(x) = c.f(x)
+Base.Symbol(c::ChainDimAware) = Symbol(c.f)
+
+_apply_to_all(f, v) = f(v[:])
+_apply_to_all(c::ChainDimAware, v) = c.f(v)
+
 function _get_names_and_funcs(names_or_funcs::AbstractVector)
     names = Symbol[]
     funcs = Function[]
@@ -356,7 +378,8 @@ collapse(chn, [mean, std]; dims=:chain)
 ```
 
 For `dims=:both`, the function is applied to all the samples stacked together as a single
-vector.
+vector. Functions which need to know which chain each sample came from -- such as MCMC
+convergence diagnostics -- must be wrapped in `FlexiChains.ChainDimAware`.
 
 Sometimes, for more complicated functions like `quantile`, you have to pass an anonymous
 function (such as `x -> quantile(x, 0.05)` or a closure (such as `Base.Fix2(quantile,
@@ -402,8 +425,8 @@ function collapse(
             for (i, f) in enumerate(funcs)
                 try
                     collapsed = if dims == :both
-                        # note: [f(v[:]);;] doesn't work if f(v[:]) is a vector
-                        reshape([f(v[:])], 1, 1)
+                        # note: [_apply_to_all(f, v);;] doesn't work if the result is a vector
+                        reshape([_apply_to_all(f, v)], 1, 1)
                     elseif dims == :iter
                         # mapslices(f, v; dims=1)
                         # again the above doesn't work if v contains vectors!
@@ -501,6 +524,32 @@ macro _forward_stat(func)
 end
 
 """
+    @_forward_diagnostic(func)
+
+As [`@_forward_stat`](@ref), but for MCMC diagnostics.
+"""
+macro _forward_diagnostic(func)
+    return quote
+        function $(esc(func))(
+            chn::FlexiChain{TKey};
+            dims::Symbol=:both,
+            warn::Bool=true,
+            split_varnames::Bool=true,
+            kwargs...,
+        ) where {TKey}
+            return collapse(
+                chn,
+                [(Symbol($(esc(func))), ChainDimAware(x -> $(esc(func))(x; kwargs...)))];
+                dims=dims,
+                split_varnames=split_varnames,
+                warn=warn,
+                drop_stat_dim=true,
+            )
+        end
+    end
+end
+
+"""
 $(_stat_docstring("Statistics.mean", "mean"))
 """
 @_forward_stat Statistics.mean
@@ -535,15 +584,15 @@ $(_stat_docstring("Base.prod", "product"))
 """
 $(_stat_docstring("MCMCDiagnosticTools.ess", "effective sample size"))
 """
-@_forward_stat MCMCDiagnosticTools.ess
+@_forward_diagnostic MCMCDiagnosticTools.ess
 """
 $(_stat_docstring("MCMCDiagnosticTools.rhat", "R-hat diagnostic"))
 """
-@_forward_stat MCMCDiagnosticTools.rhat
+@_forward_diagnostic MCMCDiagnosticTools.rhat
 """
 $(_stat_docstring("MCMCDiagnosticTools.mcse", "Monte Carlo standard error"))
 """
-@_forward_stat MCMCDiagnosticTools.mcse
+@_forward_diagnostic MCMCDiagnosticTools.mcse
 """
 $(_stat_docstring("StatsBase.mad", "median absolute deviation"))
 """
@@ -648,10 +697,10 @@ function StatsBase.summarystats(
     _DEFAULT_SUMMARYSTAT_FUNCTIONS = [
         (:mean, Statistics.mean),
         (:std, Statistics.std),
-        (:mcse, MCMCDiagnosticTools.mcse),
-        (:ess_bulk, x -> MCMCDiagnosticTools.ess(x; kind=:bulk)),
-        (:ess_tail, x -> MCMCDiagnosticTools.ess(x; kind=:tail)),
-        (:rhat, MCMCDiagnosticTools.rhat),
+        (:mcse, ChainDimAware(MCMCDiagnosticTools.mcse)),
+        (:ess_bulk, ChainDimAware(x -> MCMCDiagnosticTools.ess(x; kind=:bulk))),
+        (:ess_tail, ChainDimAware(x -> MCMCDiagnosticTools.ess(x; kind=:tail))),
+        (:rhat, ChainDimAware(MCMCDiagnosticTools.rhat)),
         (:q5, x -> Statistics.quantile(x, 0.05)),
         (:q50, x -> Statistics.quantile(x, 0.5)),
         (:q95, x -> Statistics.quantile(x, 0.95)),

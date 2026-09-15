@@ -14,6 +14,7 @@ using FlexiChains:
 using Logging: Warn
 using MCMCDiagnosticTools: ess, rhat, mcse
 using OrderedCollections: OrderedDict
+using Random: Random, randn
 using Statistics
 using StatsBase: geomean, harmmean, mad, iqr
 using Test
@@ -145,6 +146,43 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         @test quantile(chain, [0.5, 0.9]) isa FlexiSummary
         @test quantile(chain, [0.5, 0.9]; dims=:iter) isa FlexiSummary
         @test quantile(chain, [0.5, 0.9]; dims=:chain) isa FlexiSummary
+    end
+
+    @testset "diagnostics respect the chain dimension" begin
+        # NOTE: use at least 3 chains. With 2 chains the flattened vector happens to split
+        # back into the original two chains, so the bug is invisible.
+        rng = Random.MersenneTwister(468)
+        niter, nchain = 500, 4
+        # Four individually well-mixed chains stuck at two different modes; arranged so
+        # that [c1; c2] and [c3; c4] have the same distribution
+        raw = randn(rng, niter, nchain) .+ [0.0, 8.0, 0.0, 8.0]'
+        as_3d = reshape(raw, niter, nchain, 1)
+        chn = FlexiChain{Symbol}(niter, nchain, Dict(Parameter(:x) => raw))
+
+        @test rhat(chn)[:x] ≈ rhat(as_3d)[1]
+        @test ess(chn)[:x] ≈ ess(as_3d)[1]
+        @test ess(chn; kind=:tail)[:x] ≈ ess(as_3d; kind=:tail)[1]
+        @test mcse(chn)[:x] ≈ mcse(as_3d)[1]
+        # sanity: this  really is non-converged, i.e., the test can fail
+        @test rhat(chn)[:x] > 1.5
+
+        sm = summarystats(chn)
+        @test sm[:x, stat=DD.At(:rhat)] ≈ rhat(as_3d)[1]
+        @test sm[:x, stat=DD.At(:ess_bulk)] ≈ ess(as_3d; kind=:bulk)[1]
+        @test sm[:x, stat=DD.At(:ess_tail)] ≈ ess(as_3d; kind=:tail)[1]
+        @test sm[:x, stat=DD.At(:mcse)] ≈ mcse(as_3d)[1]
+
+        # R-hat is a symmetric function of the chains, so should be permutation invariant
+        for perm in ([1, 3, 2, 4], [4, 3, 2, 1], [2, 4, 1, 3])
+            permuted =
+                FlexiChain{Symbol}(niter, nchain, Dict(Parameter(:x) => raw[:, perm]))
+            @test rhat(permuted)[:x] ≈ rhat(chn)[:x]
+        end
+
+        # Statistics that don't care about chain structure are unaffected.
+        @test mean(chn)[:x] ≈ mean(raw)
+        @test std(chn)[:x] ≈ std(vec(raw))
+        @test quantile(chn, 0.5)[:x] ≈ quantile(vec(raw), 0.5)
     end
 
     @testset "summarystats" begin
