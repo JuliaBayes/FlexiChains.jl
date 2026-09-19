@@ -43,6 +43,9 @@ jobs:
           # 1.11
           - version: '1.11'
             os: ubuntu-latest
+          # 1.12
+          - version: '1.12'
+            os: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1

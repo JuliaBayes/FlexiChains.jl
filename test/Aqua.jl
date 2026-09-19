@@ -2,6 +2,7 @@ module AquaTests
 
 using Aqua: Aqua
 using FlexiChains: FlexiChains
+using Test
 
 @info "Testing Aqua.jl"
 
