@@ -250,7 +250,7 @@ See [`DimensionalData.DimArray(::FlexiChains.FlexiChain)`](@ref) for more detail
 conversion process and available keyword arguments.
 """
 function Base.Array(
-    chain::FlexiChain{TKey};
+    chain::ChainOrSummary{TKey};
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
@@ -318,19 +318,8 @@ Convert a `FlexiSummary` into a standard `Array`. This is the same as the conver
 
 See [`DimensionalData.DimArray(::FlexiChains.FlexiSummary)`](@ref) for details.
 """
-function Base.Array(
-    summary::FlexiSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey,T}
-    data, _ = _parameter_array_components(
-        summary; warn, eltype_filter, parameters_only, split_varnames
-    )
-    return data
-end
-
+Base.Array
+    
 function _prepare_chain_or_summary(
     cs::ChainOrSummary;
     split_varnames::Bool=true,
