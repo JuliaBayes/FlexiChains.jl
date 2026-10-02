@@ -83,6 +83,21 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
+function _parameter_array(arrays, dims, empty_eltype)
+    if isempty(arrays)
+        Array{empty_eltype}(undef, (length.(dims)..., 0))
+    elseif allequal(eltype, arrays)
+        stack(arrays)
+    else
+        T = reduce(typejoin, map(eltype, arrays))
+        output = Array{T}(undef, (length.(dims)..., length(arrays)))
+        for (i, arr) in enumerate(arrays)
+            selectdim(output, ndims(output), i) .= arr
+        end
+        output
+    end
+end
+
 """
     FlexiChains._split_varnames(
         cs::ChainOrSummary{Union{Symbol,<:AbstractString}};
@@ -182,11 +197,10 @@ function DD.DimArray(
 ) where {TKey,T}
     chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : chain
     kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    ni, nc = size(chain)
     kept_matrices = Matrix[]
     skipped_keys = ParameterOrExtra{<:TKey}[]
     for (k, v) in chain._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
+        if eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
             k = if parameters_only && k isa Parameter
                 FlexiChains.get_name(k)
             else
@@ -202,26 +216,14 @@ function DD.DimArray(
     end
     if warn && !isempty(skipped_keys)
         skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
+        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
     end
-    np = length(kept_matrices)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    # Here we could call `stack(kept_matrices)` to do mostly the same thing. Unfortunately
-    # `stack` aggressively promotes element types, so if there are e.g. continuous
-    # and discrete parameters it will promote everything to `Float64`. We work
-    # around that by manually filling in an array.
-    kept_data = Array{eltype_filter}(undef, ni, nc, np)
-    for (i, m) in enumerate(kept_matrices)
-        kept_data[:, :, i] = m
-    end
-    # Concretise as far as possible.
-    kept_data = [x for x in kept_data]
+    isempty(kept_matrices) && @warn "no keys with values subtyping $eltype_filter found"
     dims = (
         DD.Dim{ITER_DIM_NAME}(iter_indices(chain)),
         DD.Dim{CHAIN_DIM_NAME}(chain_indices(chain)),
-        DD.Dim{PARAM_DIM_NAME}(kept_keys),
     )
-    return DD.DimArray(kept_data, dims)
+    return _parameter_dimarray(kept_matrices, dims, kept_keys, T)
 end
 
 """
@@ -305,7 +307,7 @@ function DD.DimArray(
     kept_arrays = AbstractArray[]
     skipped_keys = ParameterOrExtra{<:TKey}[]
     for (k, v) in summary._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
+        if eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
             k = if parameters_only && k isa Parameter
                 FlexiChains.get_name(k)
             else
@@ -326,20 +328,10 @@ function DD.DimArray(
     end
     if warn && !isempty(skipped_keys)
         skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
+        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
     end
-    np = length(kept_arrays)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    base_shape = tuple(length.(new_dims)...)
-    kept_data = Array{eltype_filter}(undef, base_shape..., np)
-    for (i, arr) in enumerate(kept_arrays)
-        # This is equivalent to kept_data[:, :, ..., i] = arr but works
-        # for any number of dimensions
-        selectdim(kept_data, ndims(kept_data), i) .= arr
-    end
-    kept_data = [x for x in kept_data] # Concretise
-    all_dims = (new_dims..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
-    return DD.DimArray(kept_data, all_dims)
+    isempty(kept_arrays) && @warn "no keys with values subtyping $eltype_filter found"
+    return _parameter_dimarray(kept_arrays, tuple(new_dims...), kept_keys, T)
 end
 
 """
