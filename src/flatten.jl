@@ -83,6 +83,20 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
+function _parameter_array(arrays, dims_to_drop, empty_eltype)
+    if allequal(eltype, arrays)
+        dropdims(stack(arrays); dims=dims_to_drop)
+    else
+        T = reduce(typejoin, map(eltype, arrays))
+        s = size(dropdims(first(arrays); dims=dims_to_drop))
+        output = Array{T}(undef, (s..., length(arrays)))
+        for (i, arr) in enumerate(arrays)
+            selectdim(output, ndims(output), i) .= arr
+        end
+        output
+    end
+end
+
 """
     FlexiChains._split_varnames(
         cs::ChainOrSummary{Union{Symbol,<:AbstractString}};
@@ -145,6 +159,40 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
     return cs, Dict{T,String}() # No plot names to return
 end
 
+_parameter_dims_to_drop(::FlexiChain) = ()
+_parameter_dims_to_drop(summary::FlexiSummary) = _get_summary_dims(summary)[2]
+
+function _parameter_array_components(
+    cs::ChainOrSummary{TKey};
+    warn::Bool=true,
+    eltype_filter::Type{T}=Any,
+    parameters_only::Bool=true,
+    split_varnames::Bool=true,
+) where {TKey,T}
+    cs::ChainOrSummary = split_varnames ? first(FlexiChains._split_varnames(cs)) : cs
+    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
+    kept_arrays = AbstractArray[]
+    skipped_keys = ParameterOrExtra{<:TKey}[]
+    for (k, v) in cs._data
+        if eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
+            push!(kept_keys, parameters_only ? FlexiChains.get_name(k) : k)
+            push!(kept_arrays, v)
+        elseif !(parameters_only && k isa Extra)
+            push!(skipped_keys, k)
+        end
+    end
+    if warn && !isempty(skipped_keys)
+        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
+        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
+    end
+    if isempty(kept_arrays)
+        @warn "no keys with values subtyping $eltype_filter found"
+        return Array{T}(undef, (size(DD.dims(cs))..., 0)), kept_keys
+    end
+    data = _parameter_array(kept_arrays, _parameter_dims_to_drop(cs), T)
+    return data, kept_keys
+end
+
 """
     DimensionalData.DimArray(
         chain::FlexiChain{TKey};
@@ -174,54 +222,18 @@ If `parameters_only=true` (the default), then two things happen:
   be `Union{Parameter{<:TKey},Extra}`.
 """
 function DD.DimArray(
-    chain::FlexiChain{TKey};
+    cs::ChainOrSummary{TKey};
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : chain
-    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    ni, nc = size(chain)
-    kept_matrices = Matrix[]
-    skipped_keys = ParameterOrExtra{<:TKey}[]
-    for (k, v) in chain._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
-            k = if parameters_only && k isa Parameter
-                FlexiChains.get_name(k)
-            else
-                k
-            end
-            push!(kept_keys, k)
-            push!(kept_matrices, v)
-        else
-            if !(parameters_only && k isa Extra)
-                push!(skipped_keys, k)
-            end
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
-    end
-    np = length(kept_matrices)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    # Here we could call `stack(kept_matrices)` to do mostly the same thing. Unfortunately
-    # `stack` aggressively promotes element types, so if there are e.g. continuous
-    # and discrete parameters it will promote everything to `Float64`. We work
-    # around that by manually filling in an array.
-    kept_data = Array{eltype_filter}(undef, ni, nc, np)
-    for (i, m) in enumerate(kept_matrices)
-        kept_data[:, :, i] = m
-    end
-    # Concretise as far as possible.
-    kept_data = [x for x in kept_data]
-    dims = (
-        DD.Dim{ITER_DIM_NAME}(iter_indices(chain)),
-        DD.Dim{CHAIN_DIM_NAME}(chain_indices(chain)),
-        DD.Dim{PARAM_DIM_NAME}(kept_keys),
+    data, kept_keys = _parameter_array_components(
+        cs; warn, eltype_filter, parameters_only, split_varnames
     )
-    return DD.DimArray(kept_data, dims)
+    dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
+
+    return DD.DimArray(data, dims)
 end
 
 """
@@ -238,15 +250,19 @@ See [`DimensionalData.DimArray(::FlexiChains.FlexiChain)`](@ref) for more detail
 conversion process and available keyword arguments.
 """
 function Base.Array(
-    chain::FlexiChain{TKey};
+    chain::ChainOrSummary{TKey};
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    da = DD.DimArray(chain; warn, eltype_filter, parameters_only, split_varnames)
-    return parent(da)
+    data, _ = _parameter_array_components(
+        chain; warn, eltype_filter, parameters_only, split_varnames
+    )
+    return data
 end
+
+Base.collect(cs::ChainOrSummary) = DD.Array(cs; warn=false)
 
 """
     DimensionalData.DimArray(
@@ -291,56 +307,7 @@ non-collapsed dimensions of the summary. For example:
 - `warn::Bool=true`: whether to issue a warning if any keys are skipped due to their values
   not subtyping `eltype_filter`.
 """
-function DD.DimArray(
-    summary::FlexiSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey,T}
-    summary::FlexiSummary =
-        split_varnames ? first(FlexiChains._split_varnames(summary)) : summary
-    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    new_dims, dim_indices_to_drop = _get_summary_dims(summary)
-    kept_arrays = AbstractArray[]
-    skipped_keys = ParameterOrExtra{<:TKey}[]
-    for (k, v) in summary._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
-            k = if parameters_only && k isa Parameter
-                FlexiChains.get_name(k)
-            else
-                k
-            end
-            push!(kept_keys, k)
-            dropped = if isempty(dim_indices_to_drop)
-                v
-            else
-                dropdims(v; dims=dim_indices_to_drop)
-            end
-            push!(kept_arrays, dropped)
-        else
-            if !(parameters_only && k isa Extra)
-                push!(skipped_keys, k)
-            end
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
-    end
-    np = length(kept_arrays)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    base_shape = tuple(length.(new_dims)...)
-    kept_data = Array{eltype_filter}(undef, base_shape..., np)
-    for (i, arr) in enumerate(kept_arrays)
-        # This is equivalent to kept_data[:, :, ..., i] = arr but works
-        # for any number of dimensions
-        selectdim(kept_data, ndims(kept_data), i) .= arr
-    end
-    kept_data = [x for x in kept_data] # Concretise
-    all_dims = (new_dims..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
-    return DD.DimArray(kept_data, all_dims)
-end
+DD.DimArray
 
 """
     Base.Array(
@@ -353,17 +320,8 @@ Convert a `FlexiSummary` into a standard `Array`. This is the same as the conver
 
 See [`DimensionalData.DimArray(::FlexiChains.FlexiSummary)`](@ref) for details.
 """
-function Base.Array(
-    summary::FlexiSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey,T}
-    da = DD.DimArray(summary; warn, eltype_filter, parameters_only, split_varnames)
-    return parent(da)
-end
-
+Base.Array
+    
 function _prepare_chain_or_summary(
     cs::ChainOrSummary;
     split_varnames::Bool=true,

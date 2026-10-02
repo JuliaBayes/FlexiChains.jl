@@ -198,26 +198,24 @@ Returns a tuple of two elements:
   passed to `dropdims`.
 """
 function _get_summary_dims(fs::FlexiSummary)
-    new_dims = DD.Dim[]
-    dims_to_keep = Int[]
+    ds = DD.dims(fs)
+    alldims = (ITER_DIM_NAME, CHAIN_DIM_NAME, STAT_DIM_NAME)
+    dim_indices_to_drop = DD.dimnum(alldims, DD.otherdims(alldims, ds))
+    return collect(ds), dim_indices_to_drop
+end
+
+function DD.dims(fs::FlexiSummary)
     ii = iter_indices(fs)
     ci = chain_indices(fs)
     si = stat_indices(fs)
-    if ii !== nothing
-        push!(dims_to_keep, 1)
-        push!(new_dims, DD.Dim{ITER_DIM_NAME}(ii))
-    end
-    if ci !== nothing
-        push!(dims_to_keep, 2)
-        push!(new_dims, DD.Dim{CHAIN_DIM_NAME}(ci))
-    end
-    if si !== nothing
-        push!(dims_to_keep, 3)
-        push!(new_dims, DD.Dim{STAT_DIM_NAME}(si))
-    end
-    dim_indices_to_drop = tuple(setdiff(1:3, dims_to_keep)...)
-    return new_dims, dim_indices_to_drop
+    ds = (
+        DD.Dim{ITER_DIM_NAME}(ii),
+        DD.Dim{CHAIN_DIM_NAME}(ci),
+        DD.Dim{STAT_DIM_NAME}(si),
+    )
+    filter(!isnothing ∘ DD.val, ds)
 end
+
 """
     _raw_to_user_data(summary::FlexiSummary, data::AbstractArray; stack=nothing)
 
