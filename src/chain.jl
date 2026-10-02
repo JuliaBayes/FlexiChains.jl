@@ -698,6 +698,8 @@ function _default_dims(chain::FlexiChain)
         DD.Dim{CHAIN_DIM_NAME}(chain_indices(chain)),
     )
 end
+DD.dims(chain::FlexiChain) = _default_dims(chain)
+
 """
     _stack_arrays(dimarr::DimArray{<:AbstractArray}; name)
 
