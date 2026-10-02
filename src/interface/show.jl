@@ -94,9 +94,15 @@ struct NameWithSize{T<:Union{Nothing,Tuple}}
     name::String
     size::T # nothing to indicate mixed size / non-array
 end
-_name_text(nws::NameWithSize{Nothing}) = nws.name
-_name_text(nws::NameWithSize{<:Tuple}) = "$(nws.name) $(nws.size)"
-Base.textwidth(nws::NameWithSize) = textwidth(_name_text(nws))
+Base.textwidth(nws::NameWithSize{Nothing}) = textwidth(nws.name)
+Base.textwidth(nws::NameWithSize{<:Tuple}) =
+    textwidth(nws.name) + 1 + textwidth("$(nws.size)")
+Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{Nothing}) = print(io, nws.name)
+function Base.show(io::IO, ::MIME"text/plain", nws::NameWithSize{<:Tuple})
+    print(io, nws.name)
+    print(io, " ")
+    printstyled(io, "$(nws.size)"; color=:white)
+end
 
 _maybe_s(x) = x == 1 ? "" : "s"
 
@@ -179,7 +185,8 @@ function _print_eltype_groups(
         end
 
         firstline = true
-        buf = IOBuffer()
+        rawbuf = IOBuffer()
+        buf = IOContext(rawbuf, io)
         tw = 0 # visible width of the text currently buffered for this line
         for nws in _truncate_nwss(names)
             sep_tw = tw == 0 ? 0 : 2
@@ -193,7 +200,7 @@ function _print_eltype_groups(
                     else
                         print(io, " "^prefix_width)
                     end
-                    print(io, String(take!(buf)))
+                    print(io, String(take!(rawbuf)))
                     return prefix_width + tw
                 end
                 firstline = false
@@ -202,7 +209,7 @@ function _print_eltype_groups(
                 sep_tw = 0
             end
             tw > 0 && print(buf, ", ")
-            print(buf, _name_text(nws))
+            show(buf, MIME"text/plain"(), nws)
             tw += sep_tw + textwidth(nws)
         end
         # print the remaining elements
@@ -214,7 +221,7 @@ function _print_eltype_groups(
             else
                 print(io, " "^prefix_width)
             end
-            print(io, String(take!(buf)))
+            print(io, String(take!(rawbuf)))
             return prefix_width + tw
         end
         println(io)
@@ -356,7 +363,7 @@ function _print_summary_table(
     column_indices,
     first_column_prefix::String,
     width::Int,
-    max_col_width = 12
+    max_col_width=12,
 )
     _box_empty(io, width)
     println(io)
@@ -367,11 +374,18 @@ function _print_summary_table(
     screen_rows = displaysize(io)[1]
 
     mat = LazySummaryArray(
-        summary._data, param_names, column_indices, first_column_prefix, max_col_width
+        summary._data,
+        param_names,
+        column_indices,
+        first_column_prefix,
+        max_col_width,
     )
 
     full = sprint(
-        show, MIME"text/plain"(), mat; context=(:limit => true, :displaysize => (screen_rows, inner_width))
+        show,
+        MIME"text/plain"(),
+        mat;
+        context=(:limit => true, :displaysize => (screen_rows, inner_width)),
     )
     for line in Iterators.drop(split(full, '\n'), 1)
         _box_content(io, width) do io
