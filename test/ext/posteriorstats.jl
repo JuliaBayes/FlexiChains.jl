@@ -24,19 +24,19 @@ using Test
 
         @testset "basic return types" begin
             for func in (PosteriorStats.hdi, PosteriorStats.eti)
-                fs = func(chain; prob=0.95)
+                fs = func(chain; prob=0.95, split_interval=false)
                 @test fs isa FlexiSummary
                 @test FlexiChains.iter_indices(fs) === nothing
                 @test FlexiChains.chain_indices(fs) === nothing
                 @test FlexiChains.stat_indices(fs) === nothing
 
-                fsi = func(chain; prob=0.95, dims=:chain)
+                fsi = func(chain; prob=0.95, dims=:chain, split_interval=false)
                 @test fsi isa FlexiSummary
                 @test FlexiChains.iter_indices(fsi) == FlexiChains.iter_indices(chain)
                 @test FlexiChains.chain_indices(fsi) === nothing
                 @test FlexiChains.stat_indices(fsi) === nothing
 
-                fsc = func(chain; prob=0.95, dims=:iter)
+                fsc = func(chain; prob=0.95, dims=:iter, split_interval=false)
                 @test fsc isa FlexiSummary
                 @test FlexiChains.iter_indices(fsc) === nothing
                 @test FlexiChains.chain_indices(fsc) == FlexiChains.chain_indices(chain)
@@ -73,20 +73,29 @@ using Test
             @test FlexiChains.chain_indices(fs_split_eti) === nothing
             @test FlexiChains.stat_indices(fs_split_eti) == [:eti_lower, :eti_upper]
 
-            # If we use method=:multimodal, split_interval should be ignored
-            @test_logs (:warn, r"Returning the original FlexiSummary without splitting") PosteriorStats.hdi(
-                chain;
-                prob=0.95,
-                method=:multimodal,
-                split_interval=true,
+            # If we use a multimodal method, split_interval should be silently ignored
+            for method in (:multimodal, :multimodal_sample)
+                for kwargs in ((;), (; split_interval=true))
+                    fs_multimodal = @test_logs PosteriorStats.hdi(
+                        chain; prob=0.95, method=method, kwargs...
+                    )
+                    @test FlexiChains.stat_indices(fs_multimodal) === nothing
+                end
+            end
+        end
+
+        @testset "split_interval defaults to true" begin
+            for (func, names) in (
+                (PosteriorStats.hdi, [:hdi_lower, :hdi_upper]),
+                (PosteriorStats.eti, [:eti_lower, :eti_upper]),
             )
-            fs_multimodal = PosteriorStats.hdi(
-                chain;
-                prob=0.95,
-                method=:multimodal,
-                split_interval=true,
-            )
-            @test FlexiChains.stat_indices(fs_multimodal) === nothing
+                fs_default = func(chain; prob=0.95)
+                fs_split = func(chain; prob=0.95, split_interval=true)
+                @test FlexiChains.stat_indices(fs_default) == names
+                for k in keys(fs_default), n in names
+                    @test fs_default[k, stat=At(n)] == fs_split[k, stat=At(n)]
+                end
+            end
         end
 
         @testset "test info message when prob isn't passed" begin

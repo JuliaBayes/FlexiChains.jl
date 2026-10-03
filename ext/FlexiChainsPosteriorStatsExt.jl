@@ -13,11 +13,13 @@ end
 function _split_interval(
     fs::FlexiChains.FlexiSummary{TKey},
     lower_name::Symbol,
-    upper_name::Symbol,
+    upper_name::Symbol;
+    warn::Bool=true,
 ) where {TKey}
     FlexiChains.stat_indices(fs) === nothing || _split_interval_fail_sanity_check()
     if any(v -> !(eltype(v) <: ClosedInterval), values(fs._data))
-        @warn "split_interval=true was requested, but not all values in the statistic column are ClosedIntervals. Returning the original FlexiSummary without splitting."
+        warn &&
+            @warn "split_interval=true was requested, but not all values in the statistic column are ClosedIntervals. Returning the original FlexiSummary without splitting."
         return fs
     end
     new_data = OrderedDict{ParameterOrExtra{<:TKey},Array{<:Any,3}}()
@@ -44,21 +46,22 @@ $(FlexiChains._stat_docstring("PosteriorStats.hdi", "highest density interval"))
 
 ## Splitting intervals
 
-The `split_interval` keyword argument, if set to true, causes the output `FlexiSummary` to
-have one statistic column per interval bound, i.e., `hdi_lower` and `hdi_upper`. Note that
-this will only be valid if you request a _single_ interval (i.e., `method=:unimodal`, which
-is the default in PosteriorStats.jl).
+By default (`split_interval=true`), the output `FlexiSummary` has one statistic column per
+interval bound, i.e., `hdi_lower` and `hdi_upper`. Set `split_interval=false` to instead get
+a single statistic column named `hdi` containing `IntervalSets.ClosedInterval`s.
 
-If you specify `method=:multimodal`, the returned `FlexiSummary` will have a single
-statistic column named `hdi` that contains a vector of intervals, and the `split_interval`
-argument will be ignored.
+Splitting is only possible when a _single_ interval is computed per parameter (i.e.,
+`method=:unimodal`, which is the default in PosteriorStats.jl). If you use a multimodal
+method (e.g. `method=:multimodal`), each parameter can have several intervals, so the
+returned `FlexiSummary` will always have a single statistic column named `hdi` containing a
+vector of intervals, and `split_interval` is ignored.
 """
 function PosteriorStats.hdi(
     chn::FlexiChain{TKey};
     dims::Symbol=:both,
     warn::Bool=true,
     split_varnames::Bool=true,
-    split_interval::Bool=false,
+    split_interval::Bool=true,
     kwargs...,
 ) where {TKey}
     # Emit a message if `prob` is not passed since PosteriorStats intentionally chooses an
@@ -75,7 +78,8 @@ function PosteriorStats.hdi(
         warn=warn,
         drop_stat_dim=true,
     )
-    return split_interval ? _split_interval(fs, :hdi_lower, :hdi_upper) : fs
+
+    return split_interval ? _split_interval(fs, :hdi_lower, :hdi_upper; warn=false) : fs
 end
 
 
@@ -84,15 +88,16 @@ $(FlexiChains._stat_docstring("PosteriorStats.eti", "equal-tailed interval"))
 
 ## Splitting intervals
 
-The `split_interval` keyword argument, if set to true, causes the output `FlexiSummary` to
-have one statistic column per interval bound, i.e., `eti_lower` and `eti_upper`.
+By default (`split_interval=true`), the output `FlexiSummary` has one statistic column per
+interval bound, i.e., `eti_lower` and `eti_upper`. Set `split_interval=false` to instead get
+a single statistic column named `eti` containing `IntervalSets.ClosedInterval`s.
 """
 function PosteriorStats.eti(
     chn::FlexiChain{TKey};
     dims::Symbol=:both,
     warn::Bool=true,
     split_varnames::Bool=true,
-    split_interval::Bool=false,
+    split_interval::Bool=true,
     kwargs...,
 ) where {TKey}
     # Emit a message if `prob` is not passed since PosteriorStats intentionally chooses an
