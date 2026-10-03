@@ -37,6 +37,18 @@ A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforw
 
 The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
 
+# 0.6.41
+
+Improved the printing of `FlexiSummary` objects with many parameters.
+
+# 0.6.40
+
+Fixed a bug where R-hat, ESS, and MCSE were computed incorrectly if there were more than 2 chains in the `FlexiChain`.
+
+# 0.6.39
+
+Added compatibility with PosteriorDB@0.7.
+
 # 0.6.38
 
 `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (as well as the plain `Array` versions) now take an additional `split_varnames` keyword argument, which determines whether or not vector-valued parameters (or summary statistics) are broken up into scalar leaves.

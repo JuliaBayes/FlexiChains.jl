@@ -5,7 +5,9 @@ if get(ENV, "UPDATE_REFIMAGES", "") == "1"
     include("plots/ref.jl")
 else
     @testset verbose = true "FlexiChains.jl" begin
-        include("Aqua.jl")
+        if get(ENV, "AQUA", "true") == "true"
+            include("Aqua.jl")
+        end
         include("chain.jl")
         include("summaries.jl")
         include("diagnostics.jl")
