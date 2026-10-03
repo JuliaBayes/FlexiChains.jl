@@ -60,6 +60,9 @@ include("plots/shims.jl")
 function from_mcmcchains end
 @public from_mcmcchains
 
+function from_ensemblemcmc end
+@public from_ensemblemcmc
+
 # Extended in Pigeons extension
 function from_pigeons end
 @public from_pigeons
