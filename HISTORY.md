@@ -40,6 +40,13 @@ The deprecated top-level plotting functions have been removed. Please use the ve
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
 
+## `split_interval` is now the default for `hdi` and `eti`
+
+`PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.
+To restore the old behaviour, pass `split_interval=false`.
+
+When using a multimodal HDI method (e.g. `method=:multimodal`), intervals cannot be split, so `split_interval` is now silently ignored (previously, explicitly passing `split_interval=true` would emit a warning).
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
