@@ -54,7 +54,6 @@ function from_posteriordb_ref end
 include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
-include("plots/shims.jl")
 
 # Extended in AbstractPPL extension and used in MCMCChains extension
 _internal_to_varname(sym::Symbol) = VarName{sym}()

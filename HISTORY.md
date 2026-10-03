@@ -28,6 +28,13 @@ The keyword arguments of the plotting functions to create pushforward visualisat
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
   - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
 
+## Removal of deprecated plotting functions
+
+The deprecated top-level plotting functions have been removed. Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
+
+  - `FlexiChains.traceplot`, `FlexiChains.mixeddensity`, `FlexiChains.meanplot`, `FlexiChains.rankplot`, and `FlexiChains.autocorplot` (and their mutating versions) are now `FlexiChains.Plots.traceplot` etc.
+  - `FlexiChains.mtraceplot`, `FlexiChains.mmixeddensity`, `FlexiChains.mmeanplot`, `FlexiChains.mrankplot`, and `FlexiChains.mautocorplot` (and their mutating versions) are now `FlexiChains.Makie.traceplot` etc.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
