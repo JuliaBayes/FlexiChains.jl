@@ -35,7 +35,7 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
             # (Note that `d` could be Array{T,2} or Array{T,3} depending on whether `cs` is
             # a chain or summary.)
             d1 = first(d)
-            vn_leaves = AbstractPPL.varname_leaves(vn, d1)
+            vn_leaves = VarNames.varname_leaves(vn, d1)
             for vn_leaf in vn_leaves
                 push!(vns, vn_leaf)
             end
@@ -51,7 +51,7 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
             end
         else
             for i in eachindex(d)
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
+                for vn_leaf in VarNames.varname_leaves(vn, d[i])
                     push!(vns, vn_leaf)
                 end
             end

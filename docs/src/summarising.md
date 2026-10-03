@@ -19,7 +19,8 @@ If at least one statistic is successfully computed for a key, that key will be i
 To give a flavour of how this works, here is an example of a model that generates parameters of different types:
 
 ```@example stats
-using FlexiChains, Turing
+using FlexiChains, Distributions, LinearAlgebra
+using DynamicPPL: @model, @varname
 
 @model function f()
     f ~ Normal()               # float
@@ -27,7 +28,7 @@ using FlexiChains, Turing
     s := "a string"            # string
 end
 
-chain = sample(f(), MH(), MCMCThreads(), 20, 3; chain_type=VNChain)
+chain = FlexiChains._make_prior_chain(f(), 20, 3)
 ```
 
 Over the course of this page we will see what happens to each of these parameters when we try to compute summary statistics.

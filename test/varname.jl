@@ -2,7 +2,7 @@ module FCVarNameTests
 
 using FlexiChains:
     FlexiChains, FlexiChain, FlexiSummary, Parameter, Extra, VarName, @varname, Prefixed
-using AbstractPPL: Iden, @opticof
+using VarNames: Iden, @opticof
 using DimensionalData: DimensionalData as DD
 using OrderedCollections: OrderedDict
 using Statistics: mean

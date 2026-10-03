@@ -1,6 +1,6 @@
 module FlexiChainsMCMCChainsExt
 
-using FlexiChains: FlexiChains, FlexiChain, VarName, AbstractPPL, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, VarName, VarNames, Parameter, Extra
 using MCMCChains: MCMCChains
 using OrderedCollections: OrderedDict, OrderedSet
 
@@ -113,12 +113,12 @@ function _infer_key_type(key_spec::Tuple)
     for k in key_spec
         key = k isa Pair ? first(k) : k
         if key isa Parameter
-            # Special-case VarName parameters to avoid overly narrow key types like
+            Tnew = typeof(key).parameters[1]
+            # Special-case promote VarName parameters to avoid overly narrow key types like
             # `VarName{sym,Iden} where {sym}`, which can happen if you have [@varname(x),
             # @varname(y)]. This causes issues when parameters like e.g. @varname(x[1]) are
             # used later on, e.g. in _split_varnames.
-            Tnew = typeof(key).parameters[1]
-            Tnew = Tnew <: VarName ? VarName : Tnew
+            Tnew = FlexiChains._maybe_promote_key(Tnew)
             T = typejoin(T, Tnew)
         end
     end
@@ -161,8 +161,8 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         else
             # Force conversion of keys to VarNames, so that we can split them up with
             # varname_and_value_leaves.
-            keys_as_vns = map(_to_varname, collect(Base.keys(d)))
-            iters = map(AbstractPPL.varname_and_value_leaves, keys_as_vns, Base.values(d))
+            keys_as_vns = map(FlexiChains._internal_to_varname, collect(Base.keys(d)))
+            iters = map(VarNames.varname_and_value_leaves, keys_as_vns, Base.values(d))
             mapreduce(collect, vcat, iters)
         end
         nms = map(first, nms_and_vs)
@@ -233,8 +233,5 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         iterations=parent(FlexiChains.iter_indices(fchain)),
     )
 end
-
-_to_varname(vn::VarName) = vn
-_to_varname(t) = VarName{Symbol(t)}()
 
 end # module

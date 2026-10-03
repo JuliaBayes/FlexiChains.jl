@@ -11,7 +11,8 @@ This page provides a handful of examples.
 We begin by sampling our familiar eight-schools model.
 
 ```@example aog
-using FlexiChains, Turing
+using FlexiChains, Distributions, LinearAlgebra
+using DynamicPPL: @model, @varname
 
 y = [28, 8, -3, 7, -1, 1, 18, 12]
 sigma = [15, 10, 16, 11, 9, 11, 10, 18]
@@ -25,7 +26,7 @@ sigma = [15, 10, 16, 11, 9, 11, 10, 18]
     return (mu=mu, tau=tau)
 end
 model = eight_schools(y, sigma)
-chain = sample(model, NUTS(), MCMCSerial(), 100, 3; progress=false)
+chain = FlexiChains._make_prior_chain(model, 100, 3)
 ```
 
 Because AoG mainly works with long-form data, we need to specify this when creating a Tables.jl-compatible object, as the default for FlexiChains is a wide-form table.

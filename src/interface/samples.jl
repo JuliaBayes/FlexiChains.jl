@@ -128,6 +128,28 @@ function reconstruct_values(chn::FlexiChain{TKey}, iter, chain, structure) where
         k => chn[k, iter=iter, chain=chain] for k in keys(chn)
     )
 end
+function FlexiChains.reconstruct_values(
+    chn::FlexiChain{<:VarName},
+    i,
+    j,
+    structure::VarNamedTuple,
+)
+    vnt = VarNamedTuple()
+    nt = NamedTuple()
+    for param_or_extra in keys(chn)
+        val = chn[param_or_extra][i, j]
+        if param_or_extra isa Parameter
+            ismissing(val) && continue
+            vn = param_or_extra.name
+            top_sym = VarNames.getsym(vn)
+            template = get(structure.data, top_sym, VarNames.NoTemplate())
+            vnt = VarNames.templated_setindex!!(vnt, val, vn, template)
+        elseif param_or_extra isa Extra
+            nt = merge(nt, (; Symbol(param_or_extra.name) => val))
+        end
+    end
+    return VarNames.Draw(vnt, nt)
+end
 
 """
     reconstruct_parameters(chn::FlexiChain{T}, iter, chain, structure) where {T}
@@ -143,6 +165,22 @@ function reconstruct_parameters(chn::FlexiChain{TKey}, iter, chain, structure) w
     return OrderedDict{TKey,Any}(
         k => chn[Parameter(k), iter=iter, chain=chain] for k in FlexiChains.parameters(chn)
     )
+end
+function FlexiChains.reconstruct_parameters(
+    chn::FlexiChain{<:VarName},
+    i,
+    j,
+    structure::VarNamedTuple,
+)
+    vnt = VarNamedTuple()
+    for vn in FlexiChains.parameters(chn)
+        val = chn[Parameter(vn)][i, j]
+        ismissing(val) && continue
+        top_sym = VarNames.getsym(vn)
+        template = get(structure.data, top_sym, VarNames.NoTemplate())
+        vnt = VarNames.templated_setindex!!(vnt, val, vn, template)
+    end
+    return vnt
 end
 
 # This eval block is quite nasty, but the alternative of duplicating all this code was even

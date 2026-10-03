@@ -1,4 +1,6 @@
-@public parameters, extras, has_parameter
+using VarNames: VarNames, parameters, extras
+
+@public has_parameter
 @public map_keys, map_parameters
 
 """
@@ -72,11 +74,11 @@ function Base.pairs(cs::ChainOrSummary; parameters_only::Bool=false)
 end
 
 """
-    FlexiChains.parameters(cs::ChainOrSummary{TKey}) where {TKey}
+    VarNames.parameters(cs::ChainOrSummary{TKey}) where {TKey}
 
 Returns a vector of parameter names in the `FlexiChain` or summary thereof.
 """
-function parameters(cs::ChainOrSummary{TKey})::Vector{TKey} where {TKey}
+function VarNames.parameters(cs::ChainOrSummary{TKey})::Vector{TKey} where {TKey}
     parameter_names = TKey[]
     for k in keys(cs)
         if k isa Parameter{<:TKey}
@@ -95,11 +97,11 @@ function has_parameter(cs::ChainOrSummary{TKey}, key::TKey) where {TKey}
 end
 
 """
-    FlexiChains.extras(cs::ChainOrSummary)
+    VarNames.extras(cs::ChainOrSummary)
 
 Returns a vector of non-parameter names in the `FlexiChain` or summary thereof.
 """
-function extras(cs::ChainOrSummary)::Vector{Extra}
+function VarNames.extras(cs::ChainOrSummary)::Vector{Extra}
     other_key_names = Extra[]
     for k in keys(cs)
         if k isa Extra

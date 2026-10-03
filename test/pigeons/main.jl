@@ -1,6 +1,6 @@
 module FlexiChainsPigeonsExtTests
 
-using FlexiChains: FlexiChains, SymChain, VNChain, Extra
+using FlexiChains: FlexiChains, SymChain, Extra
 using BridgeStan
 using Pigeons
 using DynamicPPL
@@ -51,7 +51,7 @@ using Test
         pt = pigeons(; target=my_turing_target, record=[traces])
 
         chn = FlexiChains.from_pigeons(pt)
-        @test chn isa VNChain
+        @test chn isa FlexiChains.FlexiChain{DynamicPPL.VarName}
         @test only(FlexiChains.parameters(chn)) == @varname(p1)
         sample = first(chn[@varname(p1)])
         @test size(sample) == (1, 2)
@@ -73,7 +73,7 @@ using Test
         # `_faithful_sample_array` function). If we used `Pigeons.sample_array` then `y`
         # would be converted to `Float64`.
         chn = FlexiChains.from_pigeons(pt)
-        @test chn isa VNChain
+        @test chn isa FlexiChains.FlexiChain{DynamicPPL.VarName}
         @test eltype(chn[@varname(x)]) == Float64
         @test eltype(chn[@varname(y)]) == Int
         for lp in (:logprior, :loglikelihood, :logjoint)

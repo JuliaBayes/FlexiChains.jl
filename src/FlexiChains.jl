@@ -56,6 +56,11 @@ include("plots/plots.jl")
 include("plots/makie.jl")
 include("plots/shims.jl")
 
+# Extended in AbstractPPL extension and used in MCMCChains extension
+_internal_to_varname(sym::Symbol) = VarName{sym}()
+_maybe_promote_key(::Type{Tnew}) where {Tnew} = Tnew
+_maybe_promote_key(::Type{<:VarName}) = VarName
+
 # Extended in MCMCChains extension
 function from_mcmcchains end
 @public from_mcmcchains
@@ -92,7 +97,8 @@ Alias for `FlexiChain{Symbol}`.
 """
 const SymChain = FlexiChain{Symbol}
 
-export VarName, @varname, VNChain, SymChain
+# Don't export @varname to avoid clashes with Turing
+export VarName, @vn, VNChain, SymChain
 
 # Test utils, overloaded in DynamicPPLExt.
 function _make_prior_chain end

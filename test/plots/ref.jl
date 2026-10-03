@@ -118,7 +118,6 @@ function make_conn_chain(rng)
         s .* randn(rng, N_iters, N_chains, N_params)
     return FlexiChain{Symbol}(arr, :f_grid)
 end
-const CONN_BASELINE = [1.0 + 2.0 * x for x in CONN_XGRID]   # true line for overlay/residual
 conn_chn = make_conn_chain(StableRNG(101))
 
 # disc: beta[1..5] with distinct, spread means
@@ -128,7 +127,6 @@ function make_disc_chain(rng)
     arr = reshape(DISC_MEANS, 1, 1, :) .+ 0.5 .* randn(rng, N_iters, N_chains, N_params)
     return FlexiChain{Symbol}(arr, :beta)
 end
-const DISC_BASELINE = copy(DISC_MEANS)
 disc_chn = make_disc_chain(StableRNG(202))
 
 # hist: predictive array y_pred[1..40], skewed shape; plus observed data
@@ -213,48 +211,17 @@ const REFTEST_SPECS = [
     RefTestSpec(
         MakieBE(),
         "pushforward_continuous",
-        () -> FC.Makie.pushforward_continuous(
-            conn_chn,
-            :f_grid;
-            x_grid=CONN_XGRID,
-            baseline=CONN_BASELINE,
-        ),
-    ),
-    RefTestSpec(
-        MakieBE(),
-        "pushforward_continuous_residual",
-        () -> FC.Makie.pushforward_continuous(
-            conn_chn,
-            :f_grid;
-            x_grid=CONN_XGRID,
-            baseline=CONN_BASELINE,
-            residual=true,
-        ),
+        () -> FC.Makie.pushforward_continuous(conn_chn, :f_grid; x_grid=CONN_XGRID),
     ),
     RefTestSpec(
         MakieBE(),
         "pushforward_discrete",
-        () -> FC.Makie.pushforward_discrete(disc_chn, :beta; baseline=DISC_BASELINE),
+        () -> FC.Makie.pushforward_discrete(disc_chn, :beta),
     ),
     RefTestSpec(
         MakieBE(),
         "pushforward_discrete_horizontal",
-        () -> FC.Makie.pushforward_discrete(
-            disc_chn,
-            :beta;
-            baseline=DISC_BASELINE,
-            vertical=false,
-        ),
-    ),
-    RefTestSpec(
-        MakieBE(),
-        "pushforward_discrete_residual",
-        () -> FC.Makie.pushforward_discrete(
-            disc_chn,
-            :beta;
-            baseline=DISC_BASELINE,
-            residual=true,
-        ),
+        () -> FC.Makie.pushforward_discrete(disc_chn, :beta; vertical=false),
     ),
     RefTestSpec(
         MakieBE(),
