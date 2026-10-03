@@ -35,6 +35,11 @@ The deprecated top-level plotting functions have been removed. Please use the ve
   - `FlexiChains.traceplot`, `FlexiChains.mixeddensity`, `FlexiChains.meanplot`, `FlexiChains.rankplot`, and `FlexiChains.autocorplot` (and their mutating versions) are now `FlexiChains.Plots.traceplot` etc.
   - `FlexiChains.mtraceplot`, `FlexiChains.mmixeddensity`, `FlexiChains.mmeanplot`, `FlexiChains.mrankplot`, and `FlexiChains.mautocorplot` (and their mutating versions) are now `FlexiChains.Makie.traceplot` etc.
 
+## `values_at` and `parameters_at`
+
+The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
+Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).

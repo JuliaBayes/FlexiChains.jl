@@ -727,16 +727,11 @@ using Random: Xoshiro
             end
         end
 
-        @testset "deprecated positional API" begin
-            # Positional arguments should still work but emit a deprecation warning
-            d = @test_deprecated FlexiChains.values_at(c, 1, 1)
-            @test d == FlexiChains.values_at(c; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.values_at(c, 1, 1, NamedTuple)
-            @test d == FlexiChains.values_at(c, NamedTuple; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.parameters_at(c, 1, 1)
-            @test d == FlexiChains.parameters_at(c; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.parameters_at(c, 1, 1, NamedTuple)
-            @test d == FlexiChains.parameters_at(c, NamedTuple; iter=1, chain=1)
+        @testset "positional API removed" begin
+            @test_throws MethodError FlexiChains.values_at(c, 1, 1)
+            @test_throws MethodError FlexiChains.values_at(c, 1, 1, NamedTuple)
+            @test_throws MethodError FlexiChains.parameters_at(c, 1, 1)
+            @test_throws MethodError FlexiChains.parameters_at(c, 1, 1, NamedTuple)
         end
     end
 
