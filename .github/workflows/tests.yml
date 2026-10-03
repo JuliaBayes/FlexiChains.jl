@@ -43,6 +43,9 @@ jobs:
           # 1.11
           - version: '1.11'
             os: ubuntu-latest
+          # 1.12
+          - version: '1.12'
+            os: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
@@ -55,5 +58,4 @@ jobs:
 
       - uses: julia-actions/julia-runtest@6e050c8013b833b1195105ff2fce9cd802f53271 # 1.12.0
         env:
-          # Only run Aqua tests on latest version
-          AQUA: ${{ matrix.runner.version == '1' && 'true' || 'false' }}
+          AQUA: ${{ (matrix.runner.os == 'ubuntu-latest' && matrix.runner.version == '1') && 'true' || 'false' }}
