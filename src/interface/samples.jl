@@ -98,18 +98,6 @@ for f in (:values_at, :parameters_at)
         function $f(chn::FlexiChain, ::Type{Tout}=Nothing; iter=:, chain=:) where {Tout}
             return $_f(chn, iter, chain, Tout)
         end
-        function $f(chn::FlexiChain, iter, chain, ::Type{Tout}=Nothing) where {Tout}
-            Base.depwarn(
-                "Positional `iter` and `chain` arguments to `" *
-                $(string(f)) *
-                "` are deprecated and will be removed in a future version. " *
-                "Please use keyword arguments instead: `" *
-                $(string(f)) *
-                "(chn[, Tout]; iter=..., chain=...)`.",
-                $(QuoteNode(f)),
-            )
-            return $_f(chn, iter, chain, Tout)
-        end
     end
 end
 
