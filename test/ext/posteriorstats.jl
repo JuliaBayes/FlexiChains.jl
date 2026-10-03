@@ -77,7 +77,10 @@ using Test
             for method in (:multimodal, :multimodal_sample)
                 for kwargs in ((;), (; split_interval=true))
                     fs_multimodal = @test_logs PosteriorStats.hdi(
-                        chain; prob=0.95, method=method, kwargs...
+                        chain;
+                        prob=0.95,
+                        method=method,
+                        kwargs...,
                     )
                     @test FlexiChains.stat_indices(fs_multimodal) === nothing
                 end
