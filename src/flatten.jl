@@ -260,13 +260,13 @@ end
 Convert a `FlexiSummary` into a `DimArray` with a `:param` dimension appended after the
 non-collapsed dimensions of the summary. For example:
 
-| Summary produced via                     | Dimensions of resulting `DimArray` |
-| :--------------------------------------- | :--------------------------------- |
-| `mean(chn)`                              | `(:param)`                         |
-| `mean(chn; dims=:iter)`                  | `(:chain, :param)`                 |
-| `mean(chn; dims=:chain)`                 | `(:iter, :param)`                  |
-| `summarystats(chn)`                      | `(:stat, :param)`                  |
-| `collapse(chn, [mean, std]; dims=:iter)` | `(:chain, :stat, :param)`          |
+| Summary produced via                          | Dimensions of resulting `DimArray` |
+| :-------------------------------------------- | :--------------------------------- |
+| `mean(chn)`                                   | `(:param)`                         |
+| `mean(chn; dims=:iter)`                       | `(:chain, :param)`                 |
+| `mean(chn; dims=:chain)`                      | `(:iter, :param)`                  |
+| `summarystats(chn)`                           | `(:stat, :param)`                  |
+| `collapse(chn, [cfunc1, cfunc2]; dims=:iter)` | `(:chain, :stat, :param)`          |
 
 ## Keyword arguments
 

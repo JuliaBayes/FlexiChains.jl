@@ -3,6 +3,9 @@ module FCSummariesTests
 using DimensionalData: DimensionalData as DD
 using FlexiChains:
     FlexiChains,
+    CollapseFunction,
+    CollapseFunctionDiagnostic,
+    CollapseFunctionVec,
     FlexiChain,
     FlexiSummary,
     Parameter,
@@ -21,6 +24,7 @@ using Test
 
 const ENABLED_SUMMARY_FUNCS = [mean, median, minimum, maximum, std, var, sum, prod]
 const WORKS_ON_STRING = [minimum, maximum, prod]
+const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
 
 @testset verbose = true "summaries.jl" begin
     @info "Testing summaries.jl"
@@ -46,7 +50,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
     @testset "collapse" begin
         @testset for func in ENABLED_SUMMARY_FUNCS
             @testset "dims=:iter" begin
-                fs = FlexiChains.collapse(chain, [func]; dims=:iter)
+                fs = FlexiChains.collapse(chain, [CollapseFunctionVec(func)]; dims=:iter)
                 @test fs[:a] isa DD.DimMatrix
                 @test parent(parent(DD.dims(fs[:a], :chain))) ==
                       FlexiChains.chain_indices(chain) ==
@@ -61,7 +65,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
                     # the key "actuallyString" should be skipped
                     @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
                         chain,
-                        [func];
+                        [CollapseFunctionVec(func)];
                         dims=:iter,
                         warn=true,
                     )
@@ -69,7 +73,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
             end
 
             @testset "dims=:chain" begin
-                fs = FlexiChains.collapse(chain, [func]; dims=:chain)
+                fs = FlexiChains.collapse(chain, [CollapseFunctionVec(func)]; dims=:chain)
                 @test fs[:a] isa DD.DimMatrix
                 @test parent(parent(DD.dims(fs[:a], :iter))) ==
                       FlexiChains.iter_indices(chain) ==
@@ -85,7 +89,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
                     # the key "actuallyString" should be skipped
                     @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
                         chain,
-                        [func];
+                        [CollapseFunctionVec(func)];
                         dims=:chain,
                         warn=true,
                     )
@@ -93,7 +97,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
             end
 
             @testset "dims=:both" begin
-                fs = FlexiChains.collapse(chain, [func]; dims=:both)
+                fs = FlexiChains.collapse(chain, [CollapseFunctionVec(func)]; dims=:both)
                 @test fs[:a] isa DD.DimVector
                 @test parent(parent(DD.dims(fs[:a], :stat))) == [Symbol(func)]
                 @test isapprox(only(fs[:a]), func(as); nans=true)
@@ -106,7 +110,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
                     # the key "actuallyString" should be skipped
                     @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
                         chain,
-                        [func];
+                        [CollapseFunctionVec(func)];
                         dims=:both,
                         warn=true,
                     )
@@ -130,22 +134,108 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         @test iqr(chain; dims=:chain) isa FlexiSummary
         @test ess(chain) isa FlexiSummary
         @test ess(chain; dims=:iter) isa FlexiSummary
-        @test ess(chain; dims=:chain) isa FlexiSummary
+        @test_throws ArgumentError ess(chain; dims=:chain)
         @test ess(chain; kind=:tail) isa FlexiSummary
         @test ess(chain; dims=:iter, kind=:tail) isa FlexiSummary
-        @test ess(chain; dims=:chain, kind=:tail) isa FlexiSummary
+        @test_throws ArgumentError ess(chain; dims=:chain, kind=:tail)
         @test rhat(chain) isa FlexiSummary
         @test rhat(chain; dims=:iter) isa FlexiSummary
-        @test rhat(chain; dims=:chain) isa FlexiSummary
+        @test_throws ArgumentError rhat(chain; dims=:chain)
         @test mcse(chain) isa FlexiSummary
         @test mcse(chain; dims=:iter) isa FlexiSummary
-        @test mcse(chain; dims=:chain) isa FlexiSummary
+        @test_throws ArgumentError mcse(chain; dims=:chain)
         @test quantile(chain, 0.5) isa FlexiSummary
         @test quantile(chain, 0.5; dims=:iter) isa FlexiSummary
         @test quantile(chain, 0.5; dims=:chain) isa FlexiSummary
         @test quantile(chain, [0.5, 0.9]) isa FlexiSummary
         @test quantile(chain, [0.5, 0.9]; dims=:iter) isa FlexiSummary
         @test quantile(chain, [0.5, 0.9]; dims=:chain) isa FlexiSummary
+    end
+
+    @testset "statistics agree with applying them per column / row" begin
+        @testset for f in [
+            mean,
+            median,
+            std,
+            var,
+            minimum,
+            maximum,
+            sum,
+            prod,
+            mad,
+            geomean,
+            harmmean,
+            iqr,
+        ]
+            @test f(chain)[:a] ≈ f(vec(as))
+            @test f(chain; dims=:iter)[:a] ≈ map(f, eachcol(as))
+            @test f(chain; dims=:chain)[:a] ≈ map(f, eachrow(as))
+        end
+
+        @testset "quantile" begin
+            @test quantile(chain, 0.3)[:a] ≈ quantile(vec(as), 0.3)
+            @test quantile(chain, 0.3; dims=:iter)[:a] ≈ quantile.(eachcol(as), 0.3)
+            @test quantile(chain, 0.3; dims=:chain)[:a] ≈ quantile.(eachrow(as), 0.3)
+            ps = [0.1, 0.9]
+            @test quantile(chain, ps)[:a] ≈ quantile(vec(as), ps)
+            @test collect(quantile(chain, ps; dims=:iter)[:a]) ≈
+                  [quantile(c, ps) for c in eachcol(as)]
+            @test collect(quantile(chain, ps; dims=:chain)[:a]) ≈
+                  [quantile(r, ps) for r in eachrow(as)]
+        end
+    end
+
+    @testset "CollapseFunction" begin
+        @testset "bare functions are rejected" begin
+            @test_throws ArgumentError FlexiChains.collapse(chain, [mean])
+            @test_throws ArgumentError FlexiChains.collapse(chain, [(:m, mean)])
+        end
+
+        @testset "custom CollapseFunction" begin
+            meanfn = CollapseFunction(mean, m -> mean(m; dims=2), m -> mean(m; dims=1))
+            for dims in (:both, :iter, :chain)
+                fs = FlexiChains.collapse(chain, [meanfn]; dims=dims, warn=false)
+                @test FlexiChains.stat_indices(fs) == [:mean]
+                @test isapprox(fs[:a, stat=DD.At(:mean)], mean(chain; dims=dims)[:a])
+            end
+        end
+
+        @testset "unsupported dims throw" begin
+            cf = CollapseFunction(mean, nothing, m -> mean(m; dims=1))
+            @test_throws ArgumentError FlexiChains.collapse(chain, [cf]; dims=:chain)
+            @test FlexiChains.collapse(chain, [cf]; dims=:iter, warn=false) isa FlexiSummary
+            @test_throws ArgumentError CollapseFunction(nothing, nothing, nothing)
+        end
+
+        @testset "explicit name" begin
+            cf = CollapseFunction(:mymean, mean, nothing, nothing)
+            fs = FlexiChains.collapse(chain, [cf]; warn=false)
+            @test FlexiChains.stat_indices(fs) == [:mymean]
+        end
+
+        @testset "wrongly-sized output throws" begin
+            cf = CollapseFunction(mean, nothing, m -> [1.0])
+            @test_throws DimensionMismatch FlexiChains.collapse(chain, [cf]; dims=:iter)
+        end
+
+        @testset "names and arguments" begin
+            fs = FlexiChains.collapse(
+                chain,
+                [
+                    CollapseFunctionVec(std; corrected=false),
+                    CollapseFunctionVec(quantile, 0.25),
+                    (:q75, CollapseFunctionVec(quantile, 0.75)),
+                    CollapseFunctionDiagnostic(ess; kind=:tail),
+                ];
+                warn=false,
+            )
+            @test FlexiChains.stat_indices(fs) == [:std, :quantile, :q75, :ess]
+            @test fs[:a, stat=DD.At(:std)] ≈ std(as; corrected=false)
+            @test fs[:a, stat=DD.At(:quantile)] ≈ quantile(vec(as), 0.25)
+            @test fs[:a, stat=DD.At(:q75)] ≈ quantile(vec(as), 0.75)
+            @test fs[:a, stat=DD.At(:ess)] ≈
+                  ess(reshape(as, N_iters, N_chains, 1); kind=:tail)[1]
+        end
     end
 
     @testset "diagnostics respect the chain dimension" begin
@@ -179,6 +269,23 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
             @test rhat(permuted)[:x] ≈ rhat(chn)[:x]
         end
 
+        # Collapsing over the raw (iter, chain) matrix for this key gives the same answer
+        for f in (rhat, ess, mcse)
+            @test f(chn)[:x] ≈ f(chn[:x])
+        end
+
+        # dims=:iter computes the diagnostic separately for each chain
+        @test rhat(chn; dims=:iter)[:x] ≈ map(rhat, eachcol(raw))
+        @test ess(chn; dims=:iter)[:x] ≈ map(ess, eachcol(raw))
+        @test ess(chn; dims=:iter, kind=:tail)[:x] ≈
+              map(c -> ess(c; kind=:tail), eachcol(raw))
+        @test mcse(chn; dims=:iter)[:x] ≈ map(mcse, eachcol(raw))
+
+        # Diagnostics across chains at a single iteration are meaningless
+        @test_throws ArgumentError rhat(chn; dims=:chain)
+        @test_throws ArgumentError ess(chn; dims=:chain)
+        @test_throws ArgumentError mcse(chn; dims=:chain)
+
         # Statistics that don't care about chain structure are unaffected.
         @test mean(chn)[:x] ≈ mean(raw)
         @test std(chn)[:x] ≈ std(vec(raw))
@@ -196,7 +303,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         @test_logs min_level = Warn mean(chain; warn=false)
         @test_logs min_level = Warn FlexiChains.collapse(
             chain,
-            [mean];
+            [CollapseFunctionVec(mean)];
             dims=:both,
             warn=false,
         )
@@ -204,7 +311,12 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
 
     @testset "drop_stat_dim=true" begin
         @testset "iter" begin
-            fs = FlexiChains.collapse(chain, [mean]; dims=:iter, drop_stat_dim=true)
+            fs = FlexiChains.collapse(
+                chain,
+                [CollapseFunctionVec(mean)];
+                dims=:iter,
+                drop_stat_dim=true,
+            )
             @test fs[:a] isa DD.DimVector
             @test parent(parent(DD.dims(fs[:a], :chain))) ==
                   FlexiChains.chain_indices(chain) ==
@@ -213,7 +325,12 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         end
 
         @testset "chain" begin
-            fs = FlexiChains.collapse(chain, [mean]; dims=:chain, drop_stat_dim=true)
+            fs = FlexiChains.collapse(
+                chain,
+                [CollapseFunctionVec(mean)];
+                dims=:chain,
+                drop_stat_dim=true,
+            )
             @test fs[:a] isa DD.DimVector
             @test parent(parent(DD.dims(fs[:a], :iter))) ==
                   FlexiChains.iter_indices(chain) ==
@@ -222,7 +339,12 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         end
 
         @testset "both" begin
-            fs = FlexiChains.collapse(chain, [mean]; dims=:both, drop_stat_dim=true)
+            fs = FlexiChains.collapse(
+                chain,
+                [CollapseFunctionVec(mean)];
+                dims=:both,
+                drop_stat_dim=true,
+            )
             @test fs[:a] isa Float64
             @test isapprox(fs[:a], mean(as))
         end
@@ -531,12 +653,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
             end
 
             @testset "with multiple statistics" begin
-                ms = FlexiChains.collapse(
-                    chain,
-                    [mean, std];
-                    dims=:iter,
-                    split_varnames=false,
-                )
+                ms = FlexiChains.collapse(chain, MEAN_STD; dims=:iter, split_varnames=false)
 
                 @testset "Array parameter" begin
                     result = ms[:arr, stack=true, stat=DD.At(:mean)]
@@ -613,7 +730,12 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
 
         @testset "iter collapsed only" begin
             # Test that attempting to index in with `iter=...` errors, but `stat=...` works
-            fs = FlexiChains.collapse(chain, [mean]; dims=:iter, split_varnames=false)
+            fs = FlexiChains.collapse(
+                chain,
+                [CollapseFunctionVec(mean)];
+                dims=:iter,
+                split_varnames=false,
+            )
             @test_throws ArgumentError FlexiChains._check_summary_kwargs(
                 fs,
                 Colon(),
@@ -763,8 +885,8 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         )
 
         @testset "same keys, same stats: s2 takes priority" begin
-            s1 = FlexiChains.collapse(chain_ab, [mean, std]; dims=:both)
-            s2 = FlexiChains.collapse(chain_ab, [mean, std]; dims=:both)
+            s1 = FlexiChains.collapse(chain_ab, MEAN_STD; dims=:both)
+            s2 = FlexiChains.collapse(chain_ab, MEAN_STD; dims=:both)
             merged = merge(s1, s2)
             @test merged isa FlexiSummary{Symbol}
             for k in keys(s2)
@@ -815,7 +937,7 @@ const WORKS_ON_STRING = [minimum, maximum, prod]
         end
 
         @testset "overlapping stats: s2 values take priority" begin
-            s1 = FlexiChains.collapse(chain_ab, [mean, std]; dims=:both)
+            s1 = FlexiChains.collapse(chain_ab, MEAN_STD; dims=:both)
             chain_ab2 = FlexiChain{Symbol}(
                 N_iters,
                 N_chains,

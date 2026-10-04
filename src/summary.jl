@@ -4,6 +4,7 @@ using StatsBase: StatsBase
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
 @public FlexiSummary, collapse
+@public CollapseFunction, CollapseFunctionVec, CollapseFunctionDiagnostic
 
 const STAT_DIM_NAME = :stat
 function _make_categorical(v::AbstractVector{Symbol})
@@ -278,41 +279,150 @@ function _replace_data(summary::FlexiSummary, ::Type{newkey}, new_data) where {n
 end
 
 """
-    FlexiChains.ChainDimAware(f)
+    FlexiChains.CollapseFunction(name::Symbol, over_chain_iter, over_chain, over_iter)
+    FlexiChains.CollapseFunction(over_chain_iter, over_chain, over_iter)
 
-Wrapper marking a summary function `f` which must be given the full `(iter, chain)` matrix of
-samples, rather than a flat vector of all the samples stacked together.
+A summary statistic that can be passed to [`FlexiChains.collapse`](@ref). It bundles together
+three functions, one for each way that the `(iter, chain)` dimensions of a `FlexiChain` can
+be collapsed. Each function receives the full `(iter, chain)` matrix of samples for a single
+key, and must return:
 
-Most summary functions (`mean`, `std`, `quantile`, ...) do not care which chain a sample came
-from, so when [`FlexiChains.collapse`](@ref) collapses them its irrelevant; the function works
-regardless of chain structure. MCMC convergence diagnostics are different: R-hat and the effective 
-sample size are defined in terms of the variation between chains, and silently return wrong answers 
-if the chain labels are discarded. Wrapping such a function in `ChainDimAware` tells `collapse` to
-pass the uncollapsed matrix instead.
+ - `over_chain_iter`: a single summary value (used for `dims=:both`);
+ - `over_chain`: one value per iteration, i.e. a vector of length `niters` or an `(niters, 1)`
+   matrix (used for `dims=:chain`);
+ - `over_iter`: one value per chain, i.e. a vector of length `nchains` or a `(1, nchains)`
+   matrix (used for `dims=:iter`).
+
+Any of these may be `nothing`, which indicates that the statistic cannot be computed when
+collapsing over those dimensions. In that case, `collapse` throws an `ArgumentError` if the
+corresponding `dims` is requested.
+
+`name` is the name of the statistic in the resulting `FlexiSummary`. If it is not provided,
+it is obtained from the first function which is not `nothing`.
+
+For example, the mean can be expressed as
+
+```julia
+using Statistics: mean
+CollapseFunction(mean, m -> mean(m; dims=2), m -> mean(m; dims=1))
+```
+
+Most of the time, you will not need to construct this directly, and can instead use one of
+the following shortcuts:
+
+ - [`FlexiChains.CollapseFunctionVec`](@ref), for functions which map a vector to a single
+   value (e.g. `mean`, `quantile`);
+ - [`FlexiChains.CollapseFunctionDiagnostic`](@ref), for MCMC diagnostics which need to know
+   which chain each sample came from (e.g. `rhat`, `ess`).
 """
-struct ChainDimAware{F} <: Function
-    f::F
+struct CollapseFunction{F1,F2,F3}
+    name::Symbol
+    over_chain_iter::F1
+    over_chain::F2
+    over_iter::F3
 end
-(c::ChainDimAware)(x) = c.f(x)
-Base.Symbol(c::ChainDimAware) = Symbol(c.f)
+function CollapseFunction(over_chain_iter, over_chain, over_iter)
+    fs = (over_chain_iter, over_chain, over_iter)
+    i = findfirst(!isnothing, fs)
+    i === nothing &&
+        throw(ArgumentError("a CollapseFunction must have at least one non-`nothing` field"))
+    return CollapseFunction(Symbol(fs[i]), over_chain_iter, over_chain, over_iter)
+end
 
-_apply_to_all(f, v) = f(v[:])
-_apply_to_all(c::ChainDimAware, v) = c.f(v)
+"""
+    FlexiChains.CollapseFunctionVec(f, args...; kwargs...)
+
+Construct a [`FlexiChains.CollapseFunction`](@ref) from a function `f` which maps a vector to
+a single value, like `Statistics.mean` or `Statistics.quantile`. When collapsing over both
+dimensions, `f` is applied to all samples stacked together into a single vector; otherwise it
+is applied to each row (`dims=:chain`) or column (`dims=:iter`) of the `(iter, chain)` matrix.
+This is equivalent to
+
+```julia
+CollapseFunction(
+    Symbol(f),
+    m -> f(vec(m), args...; kwargs...),
+    m -> map(r -> f(r, args...; kwargs...), eachrow(m)),
+    m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
+)
+```
+
+Note that this discards the information about which chain each sample came from when
+collapsing over both dimensions. For MCMC diagnostics, which depend on this information, use
+[`FlexiChains.CollapseFunctionDiagnostic`](@ref) instead.
+"""
+function CollapseFunctionVec(f, args...; kwargs...)
+    return CollapseFunction(
+        Symbol(f),
+        m -> f(vec(m), args...; kwargs...),
+        m -> map(r -> f(r, args...; kwargs...), eachrow(m)),
+        m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
+    )
+end
+
+"""
+    FlexiChains.CollapseFunctionDiagnostic(f, args...; kwargs...)
+
+Construct a [`FlexiChains.CollapseFunction`](@ref) from an MCMC diagnostic function `f`, such
+as `MCMCDiagnosticTools.rhat` or `MCMCDiagnosticTools.ess`, which takes an `(iter, chain)`
+matrix of samples and returns a single value.
+
+ - When collapsing over both dimensions, `f` is applied to the full `(iter, chain)` matrix, so
+   that it can make use of the chain structure.
+ - When collapsing over iterations only (`dims=:iter`), `f` is applied to each chain
+   separately.
+ - Collapsing over chains only (`dims=:chain`) is not supported, since a diagnostic computed
+   across chains at a single iteration is not meaningful.
+
+This is equivalent to
+
+```julia
+CollapseFunction(
+    Symbol(f),
+    m -> f(m, args...; kwargs...),
+    nothing,
+    m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
+)
+```
+"""
+function CollapseFunctionDiagnostic(f, args...; kwargs...)
+    return CollapseFunction(
+        Symbol(f),
+        m -> f(m, args...; kwargs...),
+        nothing,
+        m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
+    )
+end
+
+function _get_collapse_func(cf::CollapseFunction, dims::Symbol)
+    return if dims == :both
+        cf.over_chain_iter
+    elseif dims == :chain
+        cf.over_chain
+    elseif dims == :iter
+        cf.over_iter
+    else
+        throw(ArgumentError("`dims` must be `:iter`, `:chain`, or `:both`"))
+    end
+end
 
 function _get_names_and_funcs(names_or_funcs::AbstractVector)
     names = Symbol[]
-    funcs = Function[]
+    funcs = CollapseFunction[]
     for nf in names_or_funcs
-        if nf isa Function
-            push!(names, Symbol(nf))
+        if nf isa CollapseFunction
+            push!(names, nf.name)
             push!(funcs, nf)
-        elseif nf isa Tuple{Symbol,Function}
+        elseif nf isa Tuple{Symbol,CollapseFunction}
             push!(names, nf[1])
             push!(funcs, nf[2])
         else
             throw(
                 ArgumentError(
-                    "each element of `funcs` must be a Function or a (Symbol, Function) tuple",
+                    "each element of `funcs` must be a `FlexiChains.CollapseFunction` or a " *
+                    "`(Symbol, CollapseFunction)` tuple; to convert an ordinary function `f` " *
+                    "that maps a vector to a single value, use " *
+                    "`FlexiChains.CollapseFunctionVec(f)`",
                 ),
             )
         end
@@ -323,6 +433,7 @@ function _get_names_and_funcs(names_or_funcs::AbstractVector)
     end
     return names, funcs
 end
+
 function _get_expected_size(niters::Int, nchains::Int, collapsed_dims::Symbol)
     return if collapsed_dims == :iter
         (1, nchains)
@@ -340,63 +451,89 @@ struct CollapseFailedError{T} <: Exception
 end
 
 """
+    _reshape_collapsed(result, expected_size::NTuple{2,Int}, dims::Symbol)
+
+Reshape the output of a `CollapseFunction` field into a matrix of size `expected_size`.
+"""
+function _reshape_collapsed(result, expected_size::NTuple{2,Int}, dims::Symbol)
+    # note: [result;;] doesn't work if the result is a vector
+    dims == :both && return reshape([result], 1, 1)
+    if !(result isa AbstractArray) || length(result) != prod(expected_size)
+        throw(
+            DimensionMismatch(
+                "collapsing with `dims=$(repr(dims))` should return an array with $(prod(expected_size)) elements",
+            ),
+        )
+    end
+    return reshape(result, expected_size)
+end
+
+"""
     FlexiChains.collapse(
         chain::FlexiChain,
         funcs::AbstractVector;
         dims::Symbol=:both,
         warn::Bool=true,
+        split_varnames::Bool=true,
         drop_stat_dim::Bool=false,
     )
 
 Low-level function to collapse one or both dimensions of a `FlexiChain` by applying a list
-of summary functions.
+of summary statistics.
 
 The `funcs` argument must be a vector which contains either:
- - tuples of the form `(statistic_name::Symbol, func::Function)`; or
- - just functions, in which case the statistic name is obtained from the function name.
+ - tuples of the form `(statistic_name::Symbol, func::FlexiChains.CollapseFunction)`; or
+ - just [`FlexiChains.CollapseFunction`](@ref)s, in which case the statistic name is obtained
+   from the name of the underlying function.
 
 The `dims` keyword argument specifies which dimensions to collapse. By default, `dims` is
 `:both`, which collapses both the iteration and chain dimensions. Other valid values are
 `:iter` or `:chain`, which respectively collapse only the iteration or chain dimension.
 
-**The functions in `funcs` must map a vector to a single value.** For example, both
-`Statistics.mean` and `Statistics.std` satisfy this:
+A `CollapseFunction` specifies how to compute a statistic for each of the three possible
+values of `dims`. Ordinary functions can be converted to `CollapseFunction`s using one of
+the following shortcuts:
+
+ - [`FlexiChains.CollapseFunctionVec`](@ref) for functions that map a vector to a single
+   value, such as `Statistics.mean`;
+ - [`FlexiChains.CollapseFunctionDiagnostic`](@ref) for MCMC diagnostics, such as
+   `MCMCDiagnosticTools.rhat`.
 
 ```julia
-using FlexiChains: collapse
+using FlexiChains: collapse, CollapseFunctionVec
 using Statistics: mean, std
 
-collapse(chn, [mean, std]; dims=:both)
+collapse(chn, [CollapseFunctionVec(mean), CollapseFunctionVec(std)]; dims=:both)
+collapse(chn, [CollapseFunctionVec(mean), CollapseFunctionVec(std)]; dims=:iter)
 ```
 
-If `dims=:iter` or `dims=:chain` are selected, then the functions are automatically applied
-to each column or row as appropriate. No adjustment to the functions is necessary:
+Positional and keyword arguments passed to the shortcut constructors are forwarded to the
+underlying function. Sometimes the inferred statistic name is not what you want (for example,
+if you calculate several quantiles). In this case, you can pass a tuple of the form
+`(statistic_name::Symbol, func::CollapseFunction)`:
 
 ```julia
-collapse(chn, [mean, std]; dims=:iter)
-collapse(chn, [mean, std]; dims=:chain)
-```
+using FlexiChains: CollapseFunctionVec
+using Statistics: quantile
 
-For `dims=:both`, the function is applied to all the samples stacked together as a single
-vector. Functions which need to know which chain each sample came from -- such as MCMC
-convergence diagnostics -- must be wrapped in `FlexiChains.ChainDimAware`.
-
-Sometimes, for more complicated functions like `quantile`, you have to pass an anonymous
-function (such as `x -> quantile(x, 0.05)` or a closure (such as `Base.Fix2(quantile,
-0.05)`). In this case, to get a sensible statistic name, instead of just passing the function
-you can pass a tuple of the form `(statistic_name::Symbol, func::Function)`.
-
-```julia
 collapse(chn, [
-    mean,
-    std,
-    (:q5, x -> quantile(x, 0.05)),
-    (:q95, x -> quantile(x, 0.95)),
+    CollapseFunctionVec(mean),
+    CollapseFunctionVec(std),
+    (:q5, CollapseFunctionVec(quantile, 0.05)),
+    (:q95, CollapseFunctionVec(quantile, 0.95)),
 ])
 ```
 
-If a statistic function errors when applied to a key, that key is skipped and a warning
+If a statistic function errors when applied to a key, the value for that statistic is
+`missing`. If all statistic functions error for a key, that key is skipped and a warning
 is issued. The warning can be suppressed by setting `warn=false`.
+
+If any `CollapseFunction` does not support the requested `dims` (i.e., the corresponding field
+is `nothing`), an `ArgumentError` is thrown. If a `CollapseFunction` returns an output of the
+wrong size, a `DimensionMismatch` is thrown.
+
+The `split_varnames` keyword argument, if `true`, will first split up variables in the
+chain such that each key corresponds to a single scalar value.
 
 If the `drop_stat_dim` keyword argument is `true` and only one function is provided in
 `funcs`, then the resulting `FlexiSummary` will have the `stat` dimension dropped. This allows
@@ -411,37 +548,44 @@ function collapse(
     split_varnames::Bool=true,
     drop_stat_dim::Bool=false,
 ) where {TKey}
+    names, funcs = _get_names_and_funcs(funcs)
+    if drop_stat_dim && length(funcs) != 1
+        throw(
+            ArgumentError(
+                "`drop_stat_dim=true` only allowed when one function is provided",
+            ),
+        )
+    end
+    expected_size = _get_expected_size(niters(chain), nchains(chain), dims)
+    fs = map(cf -> _get_collapse_func(cf, dims), funcs)
+    for (name, f) in zip(names, fs)
+        if f === nothing
+            throw(
+                ArgumentError(
+                    "the statistic `$name` does not support collapsing with `dims=$(repr(dims))`",
+                ),
+            )
+        end
+    end
     if split_varnames
         chain, _ = FlexiChains._split_varnames(chain)
     end
     data = OrderedDict{ParameterOrExtra{<:TKey},AbstractArray{<:Any,3}}()
-    names, funcs = _get_names_and_funcs(funcs)
-    expected_size = _get_expected_size(niters(chain), nchains(chain), dims)
-    # Not proud of this function, but it does what it needs to do... sigh.
     for (k, v) in chain._data
         try
             at_least_one_summary_func_succeeded = false
-            output = Array{Any,3}(undef, (expected_size..., length(funcs)))
-            for (i, f) in enumerate(funcs)
-                try
-                    collapsed = if dims == :both
-                        # note: [_apply_to_all(f, v);;] doesn't work if the result is a vector
-                        reshape([_apply_to_all(f, v)], 1, 1)
-                    elseif dims == :iter
-                        # mapslices(f, v; dims=1)
-                        # again the above doesn't work if v contains vectors!
-                        reshape(f.(eachcol(v)), 1, size(v, 2))
-                    elseif dims == :chain
-                        # mapslices(f, v; dims=2)
-                        reshape(f.(eachrow(v)), size(v, 1), 1)
-                    else
-                        throw(ArgumentError("`dims` must be `:iter`, `:chain`, or `:both`"))
-                    end
-                    output[:, :, i] = collapsed
-                    at_least_one_summary_func_succeeded = true
+            output = Array{Any,3}(undef, (expected_size..., length(fs)))
+            for (i, f) in enumerate(fs)
+                result = try
+                    f(v)
                 catch
                     output[:, :, i] = fill(missing, expected_size)
+                    continue
                 end
+                # this is outside the try block so that a wrongly-shaped output is reported
+                # rather than being silently replaced with `missing`
+                output[:, :, i] = _reshape_collapsed(result, expected_size, dims)
+                at_least_one_summary_func_succeeded = true
             end
             at_least_one_summary_func_succeeded || throw(CollapseFailedError(k))
             data[k] = map(identity, output)
@@ -453,13 +597,6 @@ function collapse(
                 rethrow()
             end
         end
-    end
-    if drop_stat_dim && length(funcs) != 1
-        throw(
-            ArgumentError(
-                "`drop_stat_dim=true` only allowed when one function is provided",
-            ),
-        )
     end
     iter_idxs = dims == :chain ? FlexiChains.iter_indices(chain) : nothing
     chain_idxs = dims == :iter ? FlexiChains.chain_indices(chain) : nothing
@@ -498,11 +635,13 @@ function _stat_docstring(func_name, short_name)
 end
 
 """
-    @_forward_stat(func)
+    @_forward_stat(make_collapse_func, func)
 
-Helper macro to define the functions `func(chain; dims, warn, kwargs...)`.
+Helper macro to define the functions `func(chain; dims, warn, kwargs...)`, where
+`make_collapse_func` is one of the shortcut constructors for [`CollapseFunction`](@ref) (e.g.
+`CollapseFunctionVec`), which determines how `func` is applied to the samples.
 """
-macro _forward_stat(func)
+macro _forward_stat(make_collapse_func, func)
     return quote
         function $(esc(func))(
             chn::FlexiChain{TKey};
@@ -513,33 +652,7 @@ macro _forward_stat(func)
         ) where {TKey}
             return collapse(
                 chn,
-                [(Symbol($(esc(func))), x -> $(esc(func))(x; kwargs...))];
-                dims=dims,
-                split_varnames=split_varnames,
-                warn=warn,
-                drop_stat_dim=true,
-            )
-        end
-    end
-end
-
-"""
-    @_forward_diagnostic(func)
-
-As [`@_forward_stat`](@ref), but for MCMC diagnostics.
-"""
-macro _forward_diagnostic(func)
-    return quote
-        function $(esc(func))(
-            chn::FlexiChain{TKey};
-            dims::Symbol=:both,
-            warn::Bool=true,
-            split_varnames::Bool=true,
-            kwargs...,
-        ) where {TKey}
-            return collapse(
-                chn,
-                [(Symbol($(esc(func))), ChainDimAware(x -> $(esc(func))(x; kwargs...)))];
+                [$(esc(make_collapse_func))($(esc(func)); kwargs...)];
                 dims=dims,
                 split_varnames=split_varnames,
                 warn=warn,
@@ -552,63 +665,75 @@ end
 """
 $(_stat_docstring("Statistics.mean", "mean"))
 """
-@_forward_stat Statistics.mean
+@_forward_stat CollapseFunctionVec Statistics.mean
 """
 $(_stat_docstring("Statistics.median", "median"))
 """
-@_forward_stat Statistics.median
+@_forward_stat CollapseFunctionVec Statistics.median
 """
 $(_stat_docstring("Statistics.std", "standard deviation"))
 """
-@_forward_stat Statistics.std
+@_forward_stat CollapseFunctionVec Statistics.std
 """
 $(_stat_docstring("Statistics.var", "variance"))
 """
-@_forward_stat Statistics.var
+@_forward_stat CollapseFunctionVec Statistics.var
 """
 $(_stat_docstring("Base.minimum", "minimum"))
 """
-@_forward_stat Base.minimum
+@_forward_stat CollapseFunctionVec Base.minimum
 """
 $(_stat_docstring("Base.maximum", "maximum"))
 """
-@_forward_stat Base.maximum
+@_forward_stat CollapseFunctionVec Base.maximum
 """
 $(_stat_docstring("Base.sum", "sum"))
 """
-@_forward_stat Base.sum
+@_forward_stat CollapseFunctionVec Base.sum
 """
 $(_stat_docstring("Base.prod", "product"))
 """
-@_forward_stat Base.prod
+@_forward_stat CollapseFunctionVec Base.prod
 """
 $(_stat_docstring("MCMCDiagnosticTools.ess", "effective sample size"))
+
+!!! note
+    `dims=:chain` is not supported, since the effective sample size cannot be meaningfully
+    computed across chains at a single iteration.
 """
-@_forward_diagnostic MCMCDiagnosticTools.ess
+@_forward_stat CollapseFunctionDiagnostic MCMCDiagnosticTools.ess
 """
 $(_stat_docstring("MCMCDiagnosticTools.rhat", "R-hat diagnostic"))
+
+!!! note
+    `dims=:chain` is not supported, since R-hat cannot be meaningfully computed across chains
+    at a single iteration.
 """
-@_forward_diagnostic MCMCDiagnosticTools.rhat
+@_forward_stat CollapseFunctionDiagnostic MCMCDiagnosticTools.rhat
 """
 $(_stat_docstring("MCMCDiagnosticTools.mcse", "Monte Carlo standard error"))
+
+!!! note
+    `dims=:chain` is not supported, since the Monte Carlo standard error cannot be
+    meaningfully computed across chains at a single iteration.
 """
-@_forward_diagnostic MCMCDiagnosticTools.mcse
+@_forward_stat CollapseFunctionDiagnostic MCMCDiagnosticTools.mcse
 """
 $(_stat_docstring("StatsBase.mad", "median absolute deviation"))
 """
-@_forward_stat StatsBase.mad
+@_forward_stat CollapseFunctionVec StatsBase.mad
 """
 $(_stat_docstring("StatsBase.geomean", "geometric mean"))
 """
-@_forward_stat StatsBase.geomean
+@_forward_stat CollapseFunctionVec StatsBase.geomean
 """
 $(_stat_docstring("StatsBase.harmmean", "harmonic mean"))
 """
-@_forward_stat StatsBase.harmmean
+@_forward_stat CollapseFunctionVec StatsBase.harmmean
 """
 $(_stat_docstring("StatsBase.iqr", "interquartile range"))
 """
-@_forward_stat StatsBase.iqr
+@_forward_stat CollapseFunctionVec StatsBase.iqr
 
 # Quantile is just different! Grr.
 """
@@ -641,19 +766,9 @@ function Statistics.quantile(
     split_varnames::Bool=true,
     kwargs...,
 ) where {TKey}
-    funcs = if dims == :both
-        # quantile only acts on a vector so we have to linearise the matrix x
-        [(:quantile, x -> Statistics.quantile(x[:], p; kwargs...))]
-    elseif dims == :iter
-        [(:quantile, x -> mapslices(c -> Statistics.quantile(c, p; kwargs...), x; dims=1))]
-    elseif dims == :chain
-        [(:quantile, x -> mapslices(r -> Statistics.quantile(r, p; kwargs...), x; dims=2))]
-    else
-        throw(ArgumentError("`dims` must be `:iter`, `:chain`, or `:both`"))
-    end
     return collapse(
         chn,
-        funcs;
+        [(:quantile, CollapseFunctionVec(Statistics.quantile, p; kwargs...))];
         dims=dims,
         split_varnames=split_varnames,
         warn=warn,
@@ -695,15 +810,15 @@ function StatsBase.summarystats(
     warn::Bool=true,
 ) where {TKey}
     _DEFAULT_SUMMARYSTAT_FUNCTIONS = [
-        (:mean, Statistics.mean),
-        (:std, Statistics.std),
-        (:mcse, ChainDimAware(MCMCDiagnosticTools.mcse)),
-        (:ess_bulk, ChainDimAware(x -> MCMCDiagnosticTools.ess(x; kind=:bulk))),
-        (:ess_tail, ChainDimAware(x -> MCMCDiagnosticTools.ess(x; kind=:tail))),
-        (:rhat, ChainDimAware(MCMCDiagnosticTools.rhat)),
-        (:q5, x -> Statistics.quantile(x, 0.05)),
-        (:q50, x -> Statistics.quantile(x, 0.5)),
-        (:q95, x -> Statistics.quantile(x, 0.95)),
+        (:mean, CollapseFunctionVec(Statistics.mean)),
+        (:std, CollapseFunctionVec(Statistics.std)),
+        (:mcse, CollapseFunctionDiagnostic(MCMCDiagnosticTools.mcse)),
+        (:ess_bulk, CollapseFunctionDiagnostic(MCMCDiagnosticTools.ess; kind=:bulk)),
+        (:ess_tail, CollapseFunctionDiagnostic(MCMCDiagnosticTools.ess; kind=:tail)),
+        (:rhat, CollapseFunctionDiagnostic(MCMCDiagnosticTools.rhat)),
+        (:q5, CollapseFunctionVec(Statistics.quantile, 0.05)),
+        (:q50, CollapseFunctionVec(Statistics.quantile, 0.5)),
+        (:q95, CollapseFunctionVec(Statistics.quantile, 0.95)),
     ]
     return collapse(
         chain,

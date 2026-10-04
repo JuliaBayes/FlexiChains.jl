@@ -71,7 +71,7 @@ function PosteriorStats.hdi(
     end
     fs = FlexiChains.collapse(
         chn,
-        [(:hdi, x -> PosteriorStats.hdi(x; kwargs...))];
+        [(:hdi, FlexiChains.CollapseFunctionVec(PosteriorStats.hdi; kwargs...))];
         dims=dims,
         split_varnames=split_varnames,
         warn=warn,
@@ -107,7 +107,7 @@ function PosteriorStats.eti(
     end
     fs = FlexiChains.collapse(
         chn,
-        [(:eti, x -> PosteriorStats.eti(x; kwargs...))];
+        [(:eti, FlexiChains.CollapseFunctionVec(PosteriorStats.eti; kwargs...))];
         dims=dims,
         split_varnames=split_varnames,
         warn=warn,
