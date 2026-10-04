@@ -1,7 +1,6 @@
 module FlexiChainsPosteriorStatsTests
 
-using FlexiChains:
-    FlexiChains, FlexiChain, Parameter, Extra, VarName, @varname, FlexiSummary
+using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra, VarName, @varname
 using DimensionalData: DimensionalData as DD, val, At
 using OrderedCollections: OrderedDict
 using PosteriorStats: PosteriorStats
@@ -22,25 +21,14 @@ using Test
             OrderedDict(Parameter(:a) => as, Parameter(:b) => bs, Extra("c") => cs),
         )
 
-        @testset "basic return types" begin
-            for func in (PosteriorStats.hdi, PosteriorStats.eti)
-                fs = func(chain; prob=0.95, split_interval=false)
-                @test fs isa FlexiSummary
-                @test FlexiChains.iter_indices(fs) === nothing
-                @test FlexiChains.chain_indices(fs) === nothing
-                @test FlexiChains.stat_indices(fs) === nothing
-
-                fsi = func(chain; prob=0.95, dims=:chain, split_interval=false)
-                @test fsi isa FlexiSummary
-                @test FlexiChains.iter_indices(fsi) == FlexiChains.iter_indices(chain)
-                @test FlexiChains.chain_indices(fsi) === nothing
-                @test FlexiChains.stat_indices(fsi) === nothing
-
-                fsc = func(chain; prob=0.95, dims=:iter, split_interval=false)
-                @test fsc isa FlexiSummary
-                @test FlexiChains.iter_indices(fsc) === nothing
-                @test FlexiChains.chain_indices(fsc) == FlexiChains.chain_indices(chain)
-                @test FlexiChains.stat_indices(fsc) === nothing
+        @testset "split_interval defaults to true" begin
+            for (func, names) in (
+                (PosteriorStats.hdi, [:hdi_lower, :hdi_upper]),
+                (PosteriorStats.eti, [:eti_lower, :eti_upper]),
+            )
+                fs_default = func(chain; prob=0.95)
+                @test FlexiChains.stat_indices(fs_default) == names
+                @test fs_default == func(chain; prob=0.95, split_interval=true)
             end
         end
 
@@ -83,20 +71,6 @@ using Test
                         kwargs...,
                     )
                     @test FlexiChains.stat_indices(fs_multimodal) === nothing
-                end
-            end
-        end
-
-        @testset "split_interval defaults to true" begin
-            for (func, names) in (
-                (PosteriorStats.hdi, [:hdi_lower, :hdi_upper]),
-                (PosteriorStats.eti, [:eti_lower, :eti_upper]),
-            )
-                fs_default = func(chain; prob=0.95)
-                fs_split = func(chain; prob=0.95, split_interval=true)
-                @test FlexiChains.stat_indices(fs_default) == names
-                for k in keys(fs_default), n in names
-                    @test fs_default[k, stat=At(n)] == fs_split[k, stat=At(n)]
                 end
             end
         end

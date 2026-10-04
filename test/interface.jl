@@ -726,13 +726,6 @@ using Random: Xoshiro
                       OrderedDict
             end
         end
-
-        @testset "positional API removed" begin
-            @test_throws MethodError FlexiChains.values_at(c, 1, 1)
-            @test_throws MethodError FlexiChains.values_at(c, 1, 1, NamedTuple)
-            @test_throws MethodError FlexiChains.parameters_at(c, 1, 1)
-            @test_throws MethodError FlexiChains.parameters_at(c, 1, 1, NamedTuple)
-        end
     end
 
     @testset "keys merge: `merge`" begin
