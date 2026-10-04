@@ -61,10 +61,12 @@ using Test
             @test FlexiChains.chain_indices(fs_split_eti) === nothing
             @test FlexiChains.stat_indices(fs_split_eti) == [:eti_lower, :eti_upper]
 
-            # If we use a multimodal method, split_interval should be silently ignored
+            # If we use a multimodal method, intervals can't be split: we should warn
+            # unless split_interval=false is explicitly passed
+            expected_warning = r"not all values in the statistic column are ClosedIntervals"
             for method in (:multimodal, :multimodal_sample)
                 for kwargs in ((;), (; split_interval=true))
-                    fs_multimodal = @test_logs PosteriorStats.hdi(
+                    fs_multimodal = @test_logs (:warn, expected_warning) PosteriorStats.hdi(
                         chain;
                         prob=0.95,
                         method=method,
@@ -72,6 +74,13 @@ using Test
                     )
                     @test FlexiChains.stat_indices(fs_multimodal) === nothing
                 end
+                fs_multimodal = @test_logs PosteriorStats.hdi(
+                    chain;
+                    prob=0.95,
+                    method=method,
+                    split_interval=false,
+                )
+                @test FlexiChains.stat_indices(fs_multimodal) === nothing
             end
         end
 

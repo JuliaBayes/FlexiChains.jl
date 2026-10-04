@@ -45,7 +45,7 @@ Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=..
 `PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.
 To restore the old behaviour, pass `split_interval=false`.
 
-When using a multimodal HDI method (e.g. `method=:multimodal`), intervals cannot be split, so `split_interval` is now silently ignored (previously, explicitly passing `split_interval=true` would emit a warning).
+When using a multimodal HDI method (e.g. `method=:multimodal`), intervals cannot be split, so the unsplit `FlexiSummary` is returned along with a warning. Pass `split_interval=false` to silence the warning.
 
 ## Other non-breaking changes
 

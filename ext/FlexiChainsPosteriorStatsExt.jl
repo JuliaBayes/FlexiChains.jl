@@ -13,13 +13,11 @@ end
 function _split_interval(
     fs::FlexiChains.FlexiSummary{TKey},
     lower_name::Symbol,
-    upper_name::Symbol;
-    warn::Bool=true,
+    upper_name::Symbol,
 ) where {TKey}
     FlexiChains.stat_indices(fs) === nothing || _split_interval_fail_sanity_check()
     if any(v -> !(eltype(v) <: ClosedInterval), values(fs._data))
-        warn &&
-            @warn "split_interval=true was requested, but not all values in the statistic column are ClosedIntervals. Returning the original FlexiSummary without splitting."
+        @warn "split_interval=true was requested, but not all values in the statistic column are ClosedIntervals. Returning the original FlexiSummary without splitting."
         return fs
     end
     new_data = OrderedDict{ParameterOrExtra{<:TKey},Array{<:Any,3}}()
@@ -54,7 +52,8 @@ Splitting is only possible when a _single_ interval is computed per parameter (i
 `method=:unimodal`, which is the default in PosteriorStats.jl). If you use a multimodal
 method (e.g. `method=:multimodal`), each parameter can have several intervals, so the
 returned `FlexiSummary` will always have a single statistic column named `hdi` containing a
-vector of intervals, and `split_interval` is ignored.
+vector of intervals. In this case, a warning is emitted unless you pass
+`split_interval=false`.
 """
 function PosteriorStats.hdi(
     chn::FlexiChain{TKey};
@@ -79,7 +78,7 @@ function PosteriorStats.hdi(
         drop_stat_dim=true,
     )
 
-    return split_interval ? _split_interval(fs, :hdi_lower, :hdi_upper; warn=false) : fs
+    return split_interval ? _split_interval(fs, :hdi_lower, :hdi_upper) : fs
 end
 
 
