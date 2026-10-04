@@ -177,7 +177,7 @@ There are two things worth mentioning, which we will note in passing here withou
 
  1. If there is only one function provided, you can additionally pass `drop_stat_dim=true` to remove the `:stat` dimension from the result, much like what `mean(chain)` et al. do.
 
- 2. The name of the statistic is inferred from the underlying function. Sometimes this doesn't work out nicely, for example if you pass an anonymous function. In this case you can provide a tuple of `(:name, collapse_function)` instead of just the `CollapseFunction`.
+ 2. The name of the statistic is inferred from the underlying function. Sometimes this doesn't work out nicely, for example if you pass an anonymous function. In this case you can pass the name as the first argument, e.g. `FlexiChains.CollapseFunctionVec(:name, f)`.
 
 ## Merging summaries
 

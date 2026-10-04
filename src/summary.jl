@@ -298,7 +298,8 @@ collapsing over those dimensions. In that case, `collapse` throws an `ArgumentEr
 corresponding `dims` is requested.
 
 `name` is the name of the statistic in the resulting `FlexiSummary`. If it is not provided,
-it is obtained from the first function which is not `nothing`.
+it is obtained from the first function which is not `nothing` (so at least one of them must
+not be `nothing`).
 
 For example, the mean can be expressed as
 
@@ -322,15 +323,12 @@ struct CollapseFunction{F1,F2,F3}
     over_iter::F3
 end
 function CollapseFunction(over_chain_iter, over_chain, over_iter)
-    fs = (over_chain_iter, over_chain, over_iter)
-    i = findfirst(!isnothing, fs)
-    i === nothing &&
-        throw(ArgumentError("a CollapseFunction must have at least one non-`nothing` field"))
-    return CollapseFunction(Symbol(fs[i]), over_chain_iter, over_chain, over_iter)
+    name = Symbol(something(over_chain_iter, over_chain, over_iter))
+    return CollapseFunction(name, over_chain_iter, over_chain, over_iter)
 end
 
 """
-    FlexiChains.CollapseFunctionVec(f, args...; kwargs...)
+    FlexiChains.CollapseFunctionVec([name::Symbol,] f, args...; kwargs...)
 
 Construct a [`FlexiChains.CollapseFunction`](@ref) from a function `f` which maps a vector to
 a single value, like `Statistics.mean` or `Statistics.quantile`. When collapsing over both
@@ -340,20 +338,25 @@ This is equivalent to
 
 ```julia
 CollapseFunction(
-    Symbol(f),
+    name,
     m -> f(vec(m), args...; kwargs...),
     m -> map(r -> f(r, args...; kwargs...), eachrow(m)),
     m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
 )
 ```
 
+where `name` defaults to `Symbol(f)`.
+
 Note that this discards the information about which chain each sample came from when
 collapsing over both dimensions. For MCMC diagnostics, which depend on this information, use
 [`FlexiChains.CollapseFunctionDiagnostic`](@ref) instead.
 """
 function CollapseFunctionVec(f, args...; kwargs...)
+    return CollapseFunctionVec(Symbol(f), f, args...; kwargs...)
+end
+function CollapseFunctionVec(name::Symbol, f, args...; kwargs...)
     return CollapseFunction(
-        Symbol(f),
+        name,
         m -> f(vec(m), args...; kwargs...),
         m -> map(r -> f(r, args...; kwargs...), eachrow(m)),
         m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
@@ -361,7 +364,7 @@ function CollapseFunctionVec(f, args...; kwargs...)
 end
 
 """
-    FlexiChains.CollapseFunctionDiagnostic(f, args...; kwargs...)
+    FlexiChains.CollapseFunctionDiagnostic([name::Symbol,] f, args...; kwargs...)
 
 Construct a [`FlexiChains.CollapseFunction`](@ref) from an MCMC diagnostic function `f`, such
 as `MCMCDiagnosticTools.rhat` or `MCMCDiagnosticTools.ess`, which takes an `(iter, chain)`
@@ -378,16 +381,21 @@ This is equivalent to
 
 ```julia
 CollapseFunction(
-    Symbol(f),
+    name,
     m -> f(m, args...; kwargs...),
     nothing,
     m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
 )
 ```
+
+where `name` defaults to `Symbol(f)`.
 """
 function CollapseFunctionDiagnostic(f, args...; kwargs...)
+    return CollapseFunctionDiagnostic(Symbol(f), f, args...; kwargs...)
+end
+function CollapseFunctionDiagnostic(name::Symbol, f, args...; kwargs...)
     return CollapseFunction(
-        Symbol(f),
+        name,
         m -> f(m, args...; kwargs...),
         nothing,
         m -> map(c -> f(c, args...; kwargs...), eachcol(m)),
@@ -406,27 +414,17 @@ function _get_collapse_func(cf::CollapseFunction, dims::Symbol)
     end
 end
 
-function _get_names_and_funcs(names_or_funcs::AbstractVector)
-    names = Symbol[]
-    funcs = CollapseFunction[]
-    for nf in names_or_funcs
-        if nf isa CollapseFunction
-            push!(names, nf.name)
-            push!(funcs, nf)
-        elseif nf isa Tuple{Symbol,CollapseFunction}
-            push!(names, nf[1])
-            push!(funcs, nf[2])
-        else
-            throw(
-                ArgumentError(
-                    "each element of `funcs` must be a `FlexiChains.CollapseFunction` or a " *
-                    "`(Symbol, CollapseFunction)` tuple; to convert an ordinary function `f` " *
-                    "that maps a vector to a single value, use " *
-                    "`FlexiChains.CollapseFunctionVec(f)`",
-                ),
-            )
-        end
+function _get_names_and_funcs(funcs::AbstractVector)
+    if !all(f -> f isa CollapseFunction, funcs)
+        throw(
+            ArgumentError(
+                "each element of `funcs` must be a `FlexiChains.CollapseFunction`; to " *
+                "convert an ordinary function `f` that maps a vector to a single value, " *
+                "use `FlexiChains.CollapseFunctionVec(f)`",
+            ),
+        )
     end
+    names = [cf.name for cf in funcs]
     # check that there are no repeats
     if length(names) != length(unique(names))
         throw(ArgumentError("function names must be unique"))
@@ -481,10 +479,8 @@ end
 Low-level function to collapse one or both dimensions of a `FlexiChain` by applying a list
 of summary statistics.
 
-The `funcs` argument must be a vector which contains either:
- - tuples of the form `(statistic_name::Symbol, func::FlexiChains.CollapseFunction)`; or
- - just [`FlexiChains.CollapseFunction`](@ref)s, in which case the statistic name is obtained
-   from the name of the underlying function.
+The `funcs` argument must be a vector of [`FlexiChains.CollapseFunction`](@ref)s. The name
+of each statistic in the result is taken from the `CollapseFunction`.
 
 The `dims` keyword argument specifies which dimensions to collapse. By default, `dims` is
 `:both`, which collapses both the iteration and chain dimensions. Other valid values are
@@ -509,8 +505,8 @@ collapse(chn, [CollapseFunctionVec(mean), CollapseFunctionVec(std)]; dims=:iter)
 
 Positional and keyword arguments passed to the shortcut constructors are forwarded to the
 underlying function. Sometimes the inferred statistic name is not what you want (for example,
-if you calculate several quantiles). In this case, you can pass a tuple of the form
-`(statistic_name::Symbol, func::CollapseFunction)`:
+if you calculate several quantiles). In this case, you can pass the name as the first
+argument:
 
 ```julia
 using FlexiChains: CollapseFunctionVec
@@ -519,8 +515,8 @@ using Statistics: quantile
 collapse(chn, [
     CollapseFunctionVec(mean),
     CollapseFunctionVec(std),
-    (:q5, CollapseFunctionVec(quantile, 0.05)),
-    (:q95, CollapseFunctionVec(quantile, 0.95)),
+    CollapseFunctionVec(:q5, quantile, 0.05),
+    CollapseFunctionVec(:q95, quantile, 0.95),
 ])
 ```
 
@@ -768,7 +764,7 @@ function Statistics.quantile(
 ) where {TKey}
     return collapse(
         chn,
-        [(:quantile, CollapseFunctionVec(Statistics.quantile, p; kwargs...))];
+        [CollapseFunctionVec(Statistics.quantile, p; kwargs...)];
         dims=dims,
         split_varnames=split_varnames,
         warn=warn,
@@ -810,15 +806,15 @@ function StatsBase.summarystats(
     warn::Bool=true,
 ) where {TKey}
     _DEFAULT_SUMMARYSTAT_FUNCTIONS = [
-        (:mean, CollapseFunctionVec(Statistics.mean)),
-        (:std, CollapseFunctionVec(Statistics.std)),
-        (:mcse, CollapseFunctionDiagnostic(MCMCDiagnosticTools.mcse)),
-        (:ess_bulk, CollapseFunctionDiagnostic(MCMCDiagnosticTools.ess; kind=:bulk)),
-        (:ess_tail, CollapseFunctionDiagnostic(MCMCDiagnosticTools.ess; kind=:tail)),
-        (:rhat, CollapseFunctionDiagnostic(MCMCDiagnosticTools.rhat)),
-        (:q5, CollapseFunctionVec(Statistics.quantile, 0.05)),
-        (:q50, CollapseFunctionVec(Statistics.quantile, 0.5)),
-        (:q95, CollapseFunctionVec(Statistics.quantile, 0.95)),
+        CollapseFunctionVec(Statistics.mean),
+        CollapseFunctionVec(Statistics.std),
+        CollapseFunctionDiagnostic(MCMCDiagnosticTools.mcse),
+        CollapseFunctionDiagnostic(:ess_bulk, MCMCDiagnosticTools.ess; kind=:bulk),
+        CollapseFunctionDiagnostic(:ess_tail, MCMCDiagnosticTools.ess; kind=:tail),
+        CollapseFunctionDiagnostic(MCMCDiagnosticTools.rhat),
+        CollapseFunctionVec(:q5, Statistics.quantile, 0.05),
+        CollapseFunctionVec(:q50, Statistics.quantile, 0.5),
+        CollapseFunctionVec(:q95, Statistics.quantile, 0.95),
     ]
     return collapse(
         chain,

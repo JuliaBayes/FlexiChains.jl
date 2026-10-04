@@ -49,11 +49,11 @@ When using a multimodal HDI method (e.g. `method=:multimodal`), intervals cannot
 
 ## `FlexiChains.collapse` now requires `CollapseFunction`s
 
-`collapse` now accepts `CollapseFunction`s or `(name::Symbol, ::CollapseFunction)` tuples instead of plain functions. Previously, collapsing over both dimensions flattened samples into a vector, discarding chain identity and requiring special handling for MCMC diagnostics (see the v0.6.40 bug fix).
+`collapse` now accepts a vector of `CollapseFunction`s instead of plain functions or `(name::Symbol, f)` tuples. Previously, collapsing over both dimensions flattened samples into a vector, discarding chain identity and requiring special handling for MCMC diagnostics (see the v0.6.40 bug fix).
 
 A `CollapseFunction` holds a statistic name and three functions for `dims=:both`, `:chain`, and `:iter`. Each receives the full `(iter, chain)` sample matrix for a key. Setting a function to `nothing` disables that dimension; requesting it throws an `ArgumentError`. Returning an output of the wrong size throws a `DimensionMismatch`.
 
-Two shortcut constructors cover common uses, each accepting `(f, args...; kwargs...)`:
+Two shortcut constructors cover common uses, each accepting `([name::Symbol,] f, args...; kwargs...)` (the name defaults to `Symbol(f)`):
 
 - `FlexiChains.CollapseFunctionVec`: for vector-to-scalar functions, such as `mean` or `quantile`. Preserves the previous behavior.
 - `FlexiChains.CollapseFunctionDiagnostic`: applies diagnostics to the full matrix for `:both` or separately to each chain for `:iter`. Does not support `:chain`.
@@ -69,7 +69,7 @@ with:
 ```julia
 collapse(chn, [
     FlexiChains.CollapseFunctionVec(f),
-    (:name, FlexiChains.CollapseFunctionVec(g)),
+    FlexiChains.CollapseFunctionVec(:name, g),
 ])
 ```
 

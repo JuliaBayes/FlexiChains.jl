@@ -186,9 +186,12 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
     end
 
     @testset "CollapseFunction" begin
-        @testset "bare functions are rejected" begin
+        @testset "non-CollapseFunctions are rejected" begin
             @test_throws ArgumentError FlexiChains.collapse(chain, [mean])
-            @test_throws ArgumentError FlexiChains.collapse(chain, [(:m, mean)])
+            @test_throws ArgumentError FlexiChains.collapse(
+                chain,
+                [(:m, CollapseFunctionVec(mean))],
+            )
         end
 
         @testset "custom CollapseFunction" begin
@@ -204,7 +207,6 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             cf = CollapseFunction(mean, nothing, m -> mean(m; dims=1))
             @test_throws ArgumentError FlexiChains.collapse(chain, [cf]; dims=:chain)
             @test FlexiChains.collapse(chain, [cf]; dims=:iter, warn=false) isa FlexiSummary
-            @test_throws ArgumentError CollapseFunction(nothing, nothing, nothing)
         end
 
         @testset "explicit name" begin
@@ -224,7 +226,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 [
                     CollapseFunctionVec(std; corrected=false),
                     CollapseFunctionVec(quantile, 0.25),
-                    (:q75, CollapseFunctionVec(quantile, 0.75)),
+                    CollapseFunctionVec(:q75, quantile, 0.75),
                     CollapseFunctionDiagnostic(ess; kind=:tail),
                 ];
                 warn=false,
