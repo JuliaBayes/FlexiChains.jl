@@ -474,7 +474,7 @@ julia> df = DataFrame(Wide(summarystats(chn)))
 
 julia> df = DataFrame(Wide(mean(chn)))
 2×2 DataFrame
- Row │ param     stat
+ Row │ param     mean
      │ VarName…  Float64
 ─────┼─────────────────────
    1 │ x         -0.253812
@@ -613,18 +613,15 @@ function Tables.columnnames(w::Wide{<:FlexiSummary})
     if chain_indices(w.cs) !== nothing
         push!(cols, FlexiChains.CHAIN_DIM_NAME)
     end
-    si = stat_indices(w.cs)
-    if si !== nothing
-        append!(cols, parent(si))
-    else
-        push!(cols, FlexiChains.STAT_DIM_NAME)
-    end
+    # Use the stored stat indices even if the stat dimension was dropped, so that e.g.
+    # `DataFrame(mean(chn))` has a `mean` column rather than a generic `stat` column.
+    append!(cols, parent(w.cs._stat_indices))
     return cols
 end
 function Tables.getcolumn(w::Wide{<:FlexiSummary}, col::Symbol)
     ii = iter_indices(w.cs)
     ci = chain_indices(w.cs)
-    si = stat_indices(w.cs)
+    si = w.cs._stat_indices
     nic = if ii === nothing && ci === nothing
         1
     elseif ii === nothing
@@ -651,50 +648,23 @@ function Tables.getcolumn(w::Wide{<:FlexiSummary}, col::Symbol)
             ArgumentError("summary does not have a chain dimension; should not happen"),
         )
         repeat(ci; outer=nparams)
-    elseif col === FlexiChains.STAT_DIM_NAME
-        if si === nothing
-            if ii === nothing && ci === nothing
-                [w.cs._data[k][] for k in values(w.symbol_to_keys)]
-            else
-                vcat([vec(w.cs._data[k]) for k in values(w.symbol_to_keys)]...)
-            end
+    elseif col in parent(si)
+        # Named stat column. Perf optimisation: this is equivalent to
+        #     get_stat_val(k) = w.cs[k, stat=At(col)]
+        # but avoids the overhead of the getindex call when we know for certain that `k`
+        # is already a valid key in `w.cs._data`.
+        idx = findfirst(==(col), parent(si))
+        get_stat_val(k) = w.cs._data[k][:, :, idx]
+        if ii === nothing && ci === nothing
+            # get_stat_val returns 1x1x1 array
+            [get_stat_val(k)[] for k in values(w.symbol_to_keys)]
         else
-            throw(
-                ArgumentError(
-                    "summary has a non-collapse stat dimension but :stat column was requested; should not happen",
-                ),
-            )
+            # get_stat_val returns iters x 1 x 1 array or 1 x nchains x 1 array
+            stat_vals = [vec(get_stat_val(k)) for k in values(w.symbol_to_keys)]
+            vcat(stat_vals...)
         end
     else
-        # named stat dimension.
-        if si === nothing
-            throw(
-                ArgumentError("summary does not have a stat dimension; should not happen"),
-            )
-        else
-            if col in parent(si)
-                # Perf optimisation. This is equivalent to
-                #     get_stat_val(k) = w.cs[k, stat=At(col)]
-                # but avoids the overhead of the getindex call when we know for certain
-                # that `k` is already a valid key in `w.cs._data`.
-                idx = findfirst(==(col), parent(si))
-                get_stat_val(k) = w.cs._data[k][:, :, idx]
-                if ii === nothing && ci === nothing
-                    # get_stat_val returns 1x1x1 array
-                    [get_stat_val(k)[] for k in values(w.symbol_to_keys)]
-                else
-                    # get_stat_val returns iters x 1 x 1 array or 1 x nchains x 1 array
-                    stat_vals = [vec(get_stat_val(k)) for k in values(w.symbol_to_keys)]
-                    vcat(stat_vals...)
-                end
-            else
-                throw(
-                    ArgumentError(
-                        "summary does not have a stat named $col; should not happen",
-                    ),
-                )
-            end
-        end
+        throw(ArgumentError("summary does not have a stat named $col; should not happen"))
     end
 end
 

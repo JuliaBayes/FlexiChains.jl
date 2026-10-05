@@ -40,6 +40,11 @@ The deprecated top-level plotting functions have been removed. Please use the ve
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
 
+## Tables.jl output for single-statistic summaries
+
+When converting a `FlexiSummary` with a dropped stat dimension (e.g. the output of `mean(chn)`) to a table, the statistic column is now named after the statistic (e.g. `mean`), rather than the generic `stat`.
+For example, `DataFrame(mean(chn))` now has columns `param` and `mean`.
+
 ## `split_interval` is now the default for `hdi` and `eti`
 
 `PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.

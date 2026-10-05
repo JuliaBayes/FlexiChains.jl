@@ -403,10 +403,10 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 fs = mean(sc)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2
-                @test names(df) == ["param", "stat"]
+                @test names(df) == ["param", "mean"]
                 @test df.param == [:a, :b]
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param]
+                    @test row.mean ≈ fs[row.param]
                 end
             end
 
@@ -414,11 +414,11 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 fs = mean(sc; dims=:iter)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_chains
-                @test names(df) == ["param", "chain", "stat"]
+                @test names(df) == ["param", "chain", "mean"]
                 @test df.param == repeat([:a, :b]; inner=N_chains)
                 @test df.chain == repeat(1:N_chains; outer=2)
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param, chain=At(row.chain)]
+                    @test row.mean ≈ fs[row.param, chain=At(row.chain)]
                 end
             end
 
@@ -426,11 +426,25 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 fs = mean(sc; dims=:chain)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_iters
-                @test names(df) == ["param", "iter", "stat"]
+                @test names(df) == ["param", "iter", "mean"]
                 @test df.param == repeat([:a, :b]; inner=N_iters)
                 @test df.iter == repeat(1:N_iters; outer=2)
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param, iter=At(row.iter)]
+                    @test row.mean ≈ fs[row.param, iter=At(row.iter)]
+                end
+            end
+
+            @testset "single named stat with drop_stat_dim=true" begin
+                fs = FlexiChains.collapse(
+                    sc,
+                    [FlexiChains.CollapseFunctionVec(:mymean, mean)];
+                    dims=:both,
+                    drop_stat_dim=true,
+                )
+                df = DataFrame(Wide(fs))
+                @test names(df) == ["param", "mymean"]
+                for row in eachrow(df)
+                    @test row.mymean ≈ fs[row.param]
                 end
             end
 
@@ -492,17 +506,17 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 @testset "split_varnames=true" begin
                     df = DataFrame(Wide(fs; split_varnames=true))
                     @test nrow(df) == 3
-                    @test names(df) == ["param", "stat"]
+                    @test names(df) == ["param", "mean"]
                     for row in eachrow(df)
-                        @test row.stat ≈ fs[row.param]
+                        @test row.mean ≈ fs[row.param]
                     end
                 end
                 @testset "split_varnames=false" begin
                     df = DataFrame(Wide(fs; split_varnames=false))
                     @test nrow(df) == 2
-                    @test names(df) == ["param", "stat"]
+                    @test names(df) == ["param", "mean"]
                     for row in eachrow(df)
-                        @test row.stat ≈ fs[row.param]
+                        @test row.mean ≈ fs[row.param]
                     end
                 end
             end
