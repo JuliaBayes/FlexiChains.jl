@@ -75,8 +75,8 @@ argument. Possible options are:
   `VarNamedTuple`, and consequently the output of `parameters_at` will be a `VarNamedTuple`
   per iteration.
 
-  For chains that do not have a stored `structure`, the default output will be an
-  `OrderedDict`.
+  For chains that do not have a stored `structure`, the default output will be a
+  `NamedTuple` if the key type is `Symbol`, and an `OrderedDict` otherwise.
 
 - `Tout <: AbstractDict`: returns a dictionary mapping `TKey` to their values.
 
@@ -151,6 +151,13 @@ output types.
 """
 function reconstruct_parameters(chn::FlexiChain{TKey}, iter, chain, structure) where {TKey}
     return OrderedDict{TKey,Any}(
+        k => chn[Parameter(k), iter=iter, chain=chain] for k in FlexiChains.parameters(chn)
+    )
+end
+# For `Symbol` keys, a `NamedTuple` is isomorphic to `OrderedDict{Symbol}` but more
+# ergonomic, so we return that by default.
+function reconstruct_parameters(chn::FlexiChain{Symbol}, iter, chain, ::Nothing)
+    return NamedTuple(
         k => chn[Parameter(k), iter=iter, chain=chain] for k in FlexiChains.parameters(chn)
     )
 end
