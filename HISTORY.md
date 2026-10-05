@@ -55,8 +55,8 @@ A `CollapseFunction` holds a statistic name and three functions for `dims=:both`
 
 Two shortcut constructors cover common uses, each accepting `([name::Symbol,] f, args...; kwargs...)` (the name defaults to `Symbol(f)`):
 
-- `FlexiChains.CollapseFunctionVec`: for vector-to-scalar functions, such as `mean` or `quantile`. Preserves the previous behavior.
-- `FlexiChains.CollapseFunctionDiagnostic`: applies diagnostics to the full matrix for `:both` or separately to each chain for `:iter`. Does not support `:chain`.
+  - `FlexiChains.CollapseFunctionVec`: for vector-to-scalar functions, such as `mean` or `quantile`. Preserves the previous behavior.
+  - `FlexiChains.CollapseFunctionDiagnostic`: applies diagnostics to the full matrix for `:both` or separately to each chain for `:iter`. Does not support `:chain`.
 
 To migrate, replace:
 
@@ -67,10 +67,10 @@ collapse(chn, [f, (:name, g)])
 with:
 
 ```julia
-collapse(chn, [
-    FlexiChains.CollapseFunctionVec(f),
-    FlexiChains.CollapseFunctionVec(:name, g),
-])
+collapse(
+    chn,
+    [FlexiChains.CollapseFunctionVec(f), FlexiChains.CollapseFunctionVec(:name, g)],
+)
 ```
 
 `FlexiChains.ChainDimAware` has been removed; use `FlexiChains.CollapseFunctionDiagnostic` instead.
