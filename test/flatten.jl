@@ -2,6 +2,7 @@ module FCFlattenTests
 
 using FlexiChains:
     FlexiChains,
+    CollapseFunctionVec,
     FlexiChain,
     FlexiSummary,
     Parameter,
@@ -20,6 +21,8 @@ using OrderedCollections: OrderedDict
 using Statistics: mean, std
 using Test
 using FlexiChains: Tables
+
+const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
 
 @testset verbose = true "flatten.jl" begin
     @info "Testing flatten.jl"
@@ -158,7 +161,7 @@ using FlexiChains: Tables
         chain = FlexiChain{Symbol}(N_iters, N_chains, d)
 
         @testset "basic interface" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:both)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:both)
             da = DD.DimArray(fs; warn=false)
             @test da isa DD.DimMatrix
             @test collect(val(DD.dims(da, :param))) == [:a, :b]
@@ -210,7 +213,7 @@ using FlexiChains: Tables
         end
 
         @testset "dims=:both" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:both)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:both)
             da = DD.DimArray(fs; warn=false)
             @test size(da) == (2, 2)  # (stat, param)
             @test val(DD.dims(da, :stat)) == [:mean, :std]
@@ -235,7 +238,7 @@ using FlexiChains: Tables
         end
 
         @testset ":chain, :stat, :param" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:iter)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:iter)
             da = DD.DimArray(fs)
             @test DD.name(DD.dims(da)) == (
                 FlexiChains.CHAIN_DIM_NAME,
@@ -249,7 +252,7 @@ using FlexiChains: Tables
         end
 
         @testset ":iter, :stat, :param" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:chain)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:chain)
             da = DD.DimArray(fs)
             @test DD.name(DD.dims(da)) == (
                 FlexiChains.ITER_DIM_NAME,
@@ -432,7 +435,7 @@ using FlexiChains: Tables
             end
 
             @testset "collapse(chain, [mean, std]; dims=:both) — named stat cols" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:both)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:both)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2
                 @test names(df) == ["param", "mean", "std"]
@@ -445,7 +448,7 @@ using FlexiChains: Tables
             end
 
             @testset "collapse(chain, [mean, std]; dims=:iter) — chain + named stats" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:iter)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:iter)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_chains
                 @test names(df) == ["param", "chain", "mean", "std"]
@@ -460,7 +463,7 @@ using FlexiChains: Tables
             end
 
             @testset "FlexiSummary directly as table source" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:both)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:both)
                 df = DataFrame(fs)
                 df_wide = DataFrame(Wide(fs))
                 @test names(df) == names(df_wide)
