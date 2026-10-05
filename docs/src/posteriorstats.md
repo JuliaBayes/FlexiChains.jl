@@ -20,7 +20,14 @@ end
 model = g(1.0)
 
 chn = FlexiChains._make_prior_chain(model, 100, 2)
-PosteriorStats.hdi(chn; prob=0.95, split_interval=true)
+PosteriorStats.hdi(chn; prob=0.95)
+```
+
+By default, each interval is split into its lower and upper bounds, which are stored as separate statistics (`hdi_lower` and `hdi_upper`, or `eti_lower` and `eti_upper`).
+If you would rather have a single statistic containing `IntervalSets.ClosedInterval`s, pass `split_interval=false`:
+
+```@example posteriorstats
+PosteriorStats.hdi(chn; prob=0.95, split_interval=false)
 ```
 
 ## LOO-CV
