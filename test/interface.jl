@@ -623,6 +623,10 @@ using Random: Xoshiro
         @testset "parameters_at" begin
             for i in 1:Ni
                 d = FlexiChains.parameters_at(c; iter=i, chain=1)
+                @test d isa NamedTuple
+                @test d == (; a=c[Parameter(:a)][i])
+                d = FlexiChains.parameters_at(c, OrderedDict; iter=i, chain=1)
+                @test d isa OrderedDict{Symbol}
                 @test length(d) == 1
                 @test d[:a] == c[Parameter(:a)][i]
                 d = FlexiChains.parameters_at(c, NamedTuple; iter=i, chain=1)
@@ -635,7 +639,7 @@ using Random: Xoshiro
 
             @testset "default kwargs (all iters/chains)" begin
                 d = FlexiChains.parameters_at(c)
-                @test d isa DD.DimMatrix{<:OrderedDict{Symbol}}
+                @test d isa DD.DimMatrix{<:NamedTuple}
                 @test size(d) == (Ni, Nc)
                 for i in 1:Ni, j in 1:Nc
                     @test d[i, j] == FlexiChains.parameters_at(c; iter=i, chain=j)
@@ -645,12 +649,12 @@ using Random: Xoshiro
             @testset "with ranges of indices" begin
                 iters = 1:5
                 d = FlexiChains.parameters_at(c; iter=iters, chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 for i in iters
                     @test d[i] == FlexiChains.parameters_at(c; iter=i, chain=1)
                 end
                 d = FlexiChains.parameters_at(c; iter=iters, chain=:)
-                @test d isa DD.DimMatrix{<:OrderedDict{Symbol}}
+                @test d isa DD.DimMatrix{<:NamedTuple}
                 for i in iters, j in 1:Nc
                     @test d[i, j] == FlexiChains.parameters_at(c; iter=i, chain=j)
                 end
@@ -659,7 +663,7 @@ using Random: Xoshiro
             @testset "with vector indices" begin
                 iters = [5, 6]
                 d = FlexiChains.parameters_at(c; iter=iters, chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 for i in iters
                     @test d[At(i)] == FlexiChains.parameters_at(c; iter=i, chain=1)
                 end
@@ -667,7 +671,7 @@ using Random: Xoshiro
 
             @testset "with Not() selector" begin
                 d = FlexiChains.parameters_at(c; iter=Not(3), chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 @test size(d, 1) == Ni - 1
                 for i in [1, 2, 4, 5, 6, 7, 8, 9, 10]
                     @test d[At(i)] == FlexiChains.parameters_at(c; iter=i, chain=1)
@@ -1181,7 +1185,10 @@ using Random: Xoshiro
         # Test with and without rng
         for args in ((rng,), ())
             @test rand(args..., chn) isa OrderedDict{ParameterOrExtra{<:Symbol}}
-            @test rand(args..., chn; parameters_only=true) isa OrderedDict{Symbol}
+            # `chn` is built from a `Dict`, so key order is not guaranteed.
+            params = rand(args..., chn; parameters_only=true)
+            @test params isa NamedTuple
+            @test Set(keys(params)) == Set([:a, :b])
             @test rand(args..., chn, 5) isa
                   Vector{<:OrderedDict{ParameterOrExtra{<:Symbol}}}
             @test size(rand(args..., chn, 5)) == (5,)

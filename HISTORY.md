@@ -40,6 +40,10 @@ The deprecated top-level plotting functions have been removed. Please use the ve
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
 
+For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and therefore `rand(chn; parameters_only=true)`) now returns a `NamedTuple` by default instead of an `OrderedDict{Symbol}`.
+The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
+To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
+
 ## Tables.jl output for single-statistic summaries
 
 When converting a `FlexiSummary` with a dropped stat dimension (e.g. the output of `mean(chn)`) to a table, the statistic column is now named after the statistic (e.g. `mean`), rather than the generic `stat`.
