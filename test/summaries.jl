@@ -213,6 +213,8 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             cf = CollapseFunction(:mymean, mean, nothing, nothing)
             fs = FlexiChains.collapse(chain, [cf]; warn=false)
             @test FlexiChains.stat_indices(fs) == [:mymean]
+            # name plus only two functions is an error
+            @test_throws ArgumentError CollapseFunction(:mymean, mean, nothing)
         end
 
         @testset "wrongly-sized output throws" begin

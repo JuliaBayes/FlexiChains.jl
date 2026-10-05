@@ -323,6 +323,9 @@ struct CollapseFunction{F1,F2,F3}
     over_iter::F3
 end
 function CollapseFunction(over_chain_iter, over_chain, over_iter)
+    over_chain_iter isa Symbol && throw(
+        ArgumentError("a `CollapseFunction` with a name must be given all three functions"),
+    )
     name = Symbol(something(over_chain_iter, over_chain, over_iter))
     return CollapseFunction(name, over_chain_iter, over_chain, over_iter)
 end
