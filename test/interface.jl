@@ -1185,7 +1185,10 @@ using Random: Xoshiro
         # Test with and without rng
         for args in ((rng,), ())
             @test rand(args..., chn) isa OrderedDict{ParameterOrExtra{<:Symbol}}
-            @test rand(args..., chn; parameters_only=true) isa NamedTuple{(:a, :b)}
+            # `chn` is built from a `Dict`, so key order is not guaranteed.
+            params = rand(args..., chn; parameters_only=true)
+            @test params isa NamedTuple
+            @test Set(keys(params)) == Set([:a, :b])
             @test rand(args..., chn, 5) isa
                   Vector{<:OrderedDict{ParameterOrExtra{<:Symbol}}}
             @test size(rand(args..., chn, 5)) == (5,)
