@@ -262,8 +262,6 @@ function Base.Array(
     return data
 end
 
-Base.collect(cs::ChainOrSummary) = DD.Array(cs; warn=false)
-
 """
     DimensionalData.DimArray(
         summary::FlexiSummary{TKey};
