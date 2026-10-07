@@ -27,7 +27,7 @@ If `collect_plot_names` is `false`, then the dictionary will always be empty.
 """
 function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool=false)
     plot_names = Dict{VarName,String}()
-    N = length(DD.dims(cs))
+    N = cs isa FlexiChain ? 2 : 3
     new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for vn in FlexiChains.parameters(cs)
         d = _get_raw_data(cs, Parameter(vn))
