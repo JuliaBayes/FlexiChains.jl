@@ -83,19 +83,6 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
-function _parameter_array(arrays, dims_to_drop, empty_eltype)
-    if allequal(eltype, arrays)
-        dropdims(stack(arrays); dims=dims_to_drop)
-    else
-        T = reduce(typejoin, map(eltype, arrays))
-        s = size(dropdims(first(arrays); dims=dims_to_drop))
-        output = Array{T}(undef, (s..., length(arrays)))
-        for (i, arr) in enumerate(arrays)
-            selectdim(output, ndims(output), i) .= arr
-        end
-        output
-    end
-end
 
 """
     FlexiChains._split_varnames(
@@ -185,11 +172,23 @@ function _parameter_array_components(
         skipped_str = join(("`$k`" for k in skipped_keys), ", ")
         @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
     end
-    if isempty(kept_arrays)
+
+    # stack arrays into a single array
+    data = if isempty(kept_arrays)
         @warn "no keys with values subtyping $eltype_filter found"
-        return Array{T}(undef, (size(DD.dims(cs))..., 0)), kept_keys
+        Array{T}(undef, (size(DD.dims(cs))..., 0)), kept_keys
+    elseif allequal(eltype, kept_arrays)
+        dropdims(stack(kept_arrays); dims=_parameter_dims_to_drop(cs))
+    else # avoid Base.stack to limit type promotion
+        Tout = reduce(typejoin, map(eltype, kept_arrays))
+        s = size(dropdims(first(kept_arrays); dims=_parameter_dims_to_drop(cs)))
+        output = Array{Tout}(undef, (s..., length(kept_arrays)))
+        for (i, arr) in enumerate(kept_arrays)
+            copyto!(selectdim(output, ndims(output), i), arr)
+        end
+        output
     end
-    data = _parameter_array(kept_arrays, _parameter_dims_to_drop(cs), T)
+
     return data, kept_keys
 end
 
