@@ -31,45 +31,19 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
     new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for vn in FlexiChains.parameters(cs)
         d = _get_raw_data(cs, Parameter(vn))
-        if _elems_have_fixed_vn_leaves(d)
-            # Don't need to iterate over all array elements - just check the first one.
-            # (Note that `d` could be Array{T,2} or Array{T,3} depending on whether `cs` is
-            # a chain or summary.)
+        for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, d)
+            new_data[Parameter(vn_leaf)] = leaf_data
+        end
+        if collect_plot_names && _elems_have_fixed_vn_leaves(d) && eltype(d) <: DD.DimVector
             d1 = first(d)
-            vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
-            if length(vn_leaves) == 1 && only(vn_leaves) == vn
-                # Scalar-valued parameter: nothing to split.
-                new_data[Parameter(vn)] = d
-            elseif d1 isa AbstractArray{<:Union{Real,Missing}}
-                # all leaves have the same dimensions, so invert the nested array structure
-                # with a simple broadcast
-                for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)
-                    new_data[Parameter(vn_leaf)] = getindex.(d, i)
+            dim = DD.dims(d1, 1)
+            label_type = eltype(dim)
+            if (label_type === Symbol || label_type <: AbstractString)
+                vn_leaves = AbstractPPL.varname_leaves(vn, d1)
+                for (vn_leaf, label) in zip(vn_leaves, dim)
+                    prettylabel = label isa Symbol ? repr(label) : label
+                    plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
                 end
-            else
-                for vn_leaf in vn_leaves
-                    new_data[Parameter(vn_leaf)] = _get_raw_data(cs, Parameter(vn_leaf))
-                end
-            end
-            if collect_plot_names && eltype(d) <: DD.DimVector
-                dim = DD.dims(d1, 1)
-                label_type = eltype(dim)
-                if (label_type === Symbol || label_type <: AbstractString)
-                    for (vn_leaf, label) in zip(vn_leaves, dim)
-                        prettylabel = label isa Symbol ? repr(label) : label
-                        plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
-                    end
-                end
-            end
-        else
-            vns = OrderedSet{VarName}()
-            for i in eachindex(d)
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
-                    push!(vns, vn_leaf)
-                end
-            end
-            for vn_leaf in vns
-                new_data[Parameter(vn_leaf)] = _get_raw_data(cs, Parameter(vn_leaf))
             end
         end
     end
@@ -103,6 +77,49 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
+# convert symbol/string to VarName
+_as_varname(name::VarName) = name
+_as_varname(name::Symbol) = VarName{name}()
+_as_varname(name::AbstractString) = _as_varname(Symbol(name))
+
+# convert VarName to symbol or string
+_varname_as(::Type{<:VarName}, vn::VarName) = vn
+_varname_as(::Type{Symbol}, vn::VarName) = Symbol(vn)
+_varname_as(::Type{<:AbstractString}, vn::VarName) = String(Symbol(vn))
+
+# Get leaf data by applying the optic - slower fallback that always works
+function _get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
+    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
+    return _map_optic(optic, d, vn_leaf)
+end
+
+# Split a parameter into its leaves, if it has any
+function _split_parameter_leaves(vn::VarName, d::AbstractArray)
+    if _elems_have_fixed_vn_leaves(d)
+        # Don't need to iterate over all array elements - just check the first one.
+        d1 = first(d)
+        vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+        if length(vn_leaves) == 1 && only(vn_leaves) == vn
+            # Scalar-valued parameter: nothing to split.
+            return [vn => d]
+        elseif d1 isa AbstractArray{<:Union{Real,Missing}}
+            # all leaves have the same dimensions, so invert the nested array structure
+            # with a simple broadcast
+            return [vn_leaf => getindex.(d, i) for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)]
+        else
+            return [vn_leaf => _get_leaf_data(vn, d, vn_leaf) for vn_leaf in vn_leaves]
+        end
+    else # leaves may have different sizes
+        vns = OrderedSet{VarName}()
+        for i in eachindex(d)
+            for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
+                push!(vns, vn_leaf)
+            end
+        end
+        return [vn_leaf => _get_leaf_data(vn, d, vn_leaf) for vn_leaf in vns]
+    end
+end
+
 
 """
     FlexiChains._split_varnames(
@@ -116,32 +133,18 @@ scalar leaves, then convert the keys back to `Symbol`.
 Likewise for `AbstractString`-keyed chains; the keys are converted back to standard
 `String`.
 """
-function _split_varnames(cs::ChainOrSummary{Symbol}; collect_plot_names::Bool=false)
+function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false
+    ) where T <: Union{Symbol, AbstractString}
     N = cs isa FlexiChain ? 2 : 3
     new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for (k, v) in cs._data
-        new_key = k isa Parameter ? Parameter(VarName{k.name}()) : k
+        new_key = k isa Parameter ? Parameter(_as_varname(k.name)) : k
         new_data[new_key] = v
     end
     vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
     split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names)
-    plot_names = Dict{Symbol,String}(Symbol(k) => v for (k, v) in plot_names)
-    return FlexiChains.map_parameters(k -> Symbol(k), split_cs), plot_names
-end
-function _split_varnames(
-    cs::ChainOrSummary{<:AbstractString};
-    collect_plot_names::Bool=false,
-)
-    N = cs isa FlexiChain ? 2 : 3
-    new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
-    for (k, v) in cs._data
-        new_key = k isa Parameter ? Parameter(VarName{Symbol(k.name)}()) : k
-        new_data[new_key] = v
-    end
-    vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
-    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names)
-    plot_names = Dict{String,String}(String(Symbol(k)) => v for (k, v) in plot_names)
-    return FlexiChains.map_parameters(k -> String(Symbol(k)), split_cs), plot_names
+    plot_names = Dict(_varname_as(T, k) => v for (k, v) in plot_names)
+    return FlexiChains.map_parameters(k -> _varname_as(T, k), split_cs), plot_names
 end
 
 """
