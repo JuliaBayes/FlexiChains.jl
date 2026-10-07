@@ -225,31 +225,34 @@ function _parameter_array_components(
     # Allocate output and loop again to copy data
     Tout = reduce(typejoin, kept_eltypes)
     output = Array{Tout}(undef, (s..., length(kept_keys)))
+    _write_parameters_to_array!(output, cs; split_varnames, parameters_only)
+    return output, kept_keys
+end
+# function barrier for a small performance improvement
+function _write_parameters_to_array!(output::Array{T,N}, cs; split_varnames, parameters_only) where {T, N}
     col = 0
     for (k, v) in cs._data
-        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:eltype_filter}
+        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:T}
             vn = _as_varname(FlexiChains.get_name(k))
             d1 = first(v)
             if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
                 for i in eachindex(d1)
                     col += 1
-                    @inline selectdim(output, ndims(output), col) .= getindex.(v, i)
+                    selectdim(output, N, col) .= getindex.(v, i)
                 end
             else
                 for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
-                    if eltype(leaf_data) <: eltype_filter
+                    if eltype(leaf_data) <: T
                         col += 1
-                        copyto!(selectdim(output, ndims(output), col), leaf_data)
+                        copyto!(selectdim(output, N, col), leaf_data)
                     end
                 end
             end
-        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
+        elseif eltype(v) <: T && (!parameters_only || k isa Parameter)
             col += 1
-            copyto!(selectdim(output, ndims(output), col), v)
+            copyto!(selectdim(output, N, col), v)
         end
     end
-
-    return output, kept_keys
 end
 
 """
