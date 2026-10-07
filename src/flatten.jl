@@ -169,9 +169,6 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
     return cs, Dict{T,String}() # No plot names to return
 end
 
-_parameter_dims_to_drop(::FlexiChain) = ()
-_parameter_dims_to_drop(summary::FlexiSummary) = _get_summary_dims(summary)[2]
-
 function _parameter_array_components(
     cs::ChainOrSummary{TKey};
     warn::Bool=true,
@@ -179,14 +176,37 @@ function _parameter_array_components(
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    cs::ChainOrSummary = split_varnames ? first(FlexiChains._split_varnames(cs)) : cs
     kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    kept_arrays = AbstractArray[]
+    kept_eltypes = Type[]
     skipped_keys = ParameterOrExtra{<:TKey}[]
+
+    # Loop through data without copying to figure out eltype and size
     for (k, v) in cs._data
-        if eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
+        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:eltype_filter}
+            vn = _as_varname(FlexiChains.get_name(k))
+            d1 = first(v)
+            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
+                # No need to look more at data if all have fixed leaves
+                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
+                    leaf_name = _varname_as(TKey, vn_leaf)
+                    push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
+                    push!(kept_eltypes, eltype(d1))
+                end
+            else
+                # Fall back to materializing leaves
+                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
+                    leaf_name = _varname_as(TKey, vn_leaf)
+                    if eltype(leaf_data) <: eltype_filter
+                        push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
+                        push!(kept_eltypes, eltype(leaf_data))
+                    else
+                        push!(skipped_keys, Parameter(leaf_name))
+                    end
+                end
+            end
+        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
             push!(kept_keys, parameters_only ? FlexiChains.get_name(k) : k)
-            push!(kept_arrays, v)
+            push!(kept_eltypes, eltype(v))
         elseif !(parameters_only && k isa Extra)
             push!(skipped_keys, k)
         end
@@ -196,23 +216,40 @@ function _parameter_array_components(
         @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
     end
 
-    # stack arrays into a single array
-    data = if isempty(kept_arrays)
+    s = map(length, DD.dims(cs))
+    if isempty(kept_keys)
         @warn "no keys with values subtyping $eltype_filter found"
-        Array{T}(undef, (size(DD.dims(cs))..., 0))
-    elseif allequal(eltype, kept_arrays)
-        dropdims(stack(kept_arrays); dims=_parameter_dims_to_drop(cs))
-    else # avoid Base.stack to limit type promotion
-        Tout = reduce(typejoin, map(eltype, kept_arrays))
-        s = size(dropdims(first(kept_arrays); dims=_parameter_dims_to_drop(cs)))
-        output = Array{Tout}(undef, (s..., length(kept_arrays)))
-        for (i, arr) in enumerate(kept_arrays)
-            copyto!(selectdim(output, ndims(output), i), arr)
-        end
-        output
+        return Array{T}(undef, (s..., 0)), kept_keys
     end
 
-    return data, kept_keys
+    # Allocate output and loop again to copy data
+    Tout = reduce(typejoin, kept_eltypes)
+    output = Array{Tout}(undef, (s..., length(kept_keys)))
+    col = 0
+    for (k, v) in cs._data
+        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:eltype_filter}
+            vn = _as_varname(FlexiChains.get_name(k))
+            d1 = first(v)
+            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
+                for i in eachindex(d1)
+                    col += 1
+                    @inline selectdim(output, ndims(output), col) .= getindex.(v, i)
+                end
+            else
+                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
+                    if eltype(leaf_data) <: eltype_filter
+                        col += 1
+                        copyto!(selectdim(output, ndims(output), col), leaf_data)
+                    end
+                end
+            end
+        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
+            col += 1
+            copyto!(selectdim(output, ndims(output), col), v)
+        end
+    end
+
+    return output, kept_keys
 end
 
 """
