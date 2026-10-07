@@ -26,8 +26,9 @@ default.
 If `collect_plot_names` is `false`, then the dictionary will always be empty.
 """
 function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool=false)
-    vns = OrderedSet{VarName}()
     plot_names = Dict{VarName,String}()
+    N = length(DD.dims(cs))
+    new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for vn in FlexiChains.parameters(cs)
         d = _get_raw_data(cs, Parameter(vn))
         if _elems_have_fixed_vn_leaves(d)
@@ -35,9 +36,20 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
             # (Note that `d` could be Array{T,2} or Array{T,3} depending on whether `cs` is
             # a chain or summary.)
             d1 = first(d)
-            vn_leaves = AbstractPPL.varname_leaves(vn, d1)
-            for vn_leaf in vn_leaves
-                push!(vns, vn_leaf)
+            vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+            if length(vn_leaves) == 1 && only(vn_leaves) == vn
+                # Scalar-valued parameter: nothing to split.
+                new_data[Parameter(vn)] = d
+            elseif d1 isa AbstractArray{<:Union{Real,Missing}}
+                # all leaves have the same dimensions, so invert the nested array structure
+                # with a simple broadcast
+                for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)
+                    new_data[Parameter(vn_leaf)] = getindex.(d, i)
+                end
+            else
+                for vn_leaf in vn_leaves
+                    new_data[Parameter(vn_leaf)] = _get_raw_data(cs, Parameter(vn_leaf))
+                end
             end
             if collect_plot_names && eltype(d) <: DD.DimVector
                 dim = DD.dims(d1, 1)
@@ -50,15 +62,23 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
                 end
             end
         else
+            vns = OrderedSet{VarName}()
             for i in eachindex(d)
                 for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
                     push!(vns, vn_leaf)
                 end
             end
+            for vn_leaf in vns
+                new_data[Parameter(vn_leaf)] = _get_raw_data(cs, Parameter(vn_leaf))
+            end
         end
     end
-    return cs[[collect(vns)..., FlexiChains.extras(cs)...]], plot_names
+    for k in FlexiChains.extras(cs)
+        new_data[k] = _get_raw_data(cs, k)
+    end
+    return _replace_data(cs, VarName, new_data), plot_names
 end
+
 
 # This helper function identifies cases where we don't need to check every single Niters x
 # Nchains elements, because they all have the same structure.
@@ -86,7 +106,7 @@ _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
 """
     FlexiChains._split_varnames(
-        cs::ChainOrSummary{Union{Symbol,<:AbstractString}};
+        cs::ChainOrSummary{Symbol};
         collect_plot_names::Bool=false
     )
 
@@ -104,7 +124,7 @@ function _split_varnames(cs::ChainOrSummary{Symbol}; collect_plot_names::Bool=fa
         new_data[new_key] = v
     end
     vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
-    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names=collect_plot_names)
+    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names)
     plot_names = Dict{Symbol,String}(Symbol(k) => v for (k, v) in plot_names)
     return FlexiChains.map_parameters(k -> Symbol(k), split_cs), plot_names
 end
@@ -119,7 +139,7 @@ function _split_varnames(
         new_data[new_key] = v
     end
     vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
-    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names=collect_plot_names)
+    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names)
     plot_names = Dict{String,String}(String(Symbol(k)) => v for (k, v) in plot_names)
     return FlexiChains.map_parameters(k -> String(Symbol(k)), split_cs), plot_names
 end
