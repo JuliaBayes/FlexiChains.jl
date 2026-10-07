@@ -196,7 +196,7 @@ function _parameter_array_components(
     # stack arrays into a single array
     data = if isempty(kept_arrays)
         @warn "no keys with values subtyping $eltype_filter found"
-        Array{T}(undef, (size(DD.dims(cs))..., 0)), kept_keys
+        Array{T}(undef, (size(DD.dims(cs))..., 0))
     elseif allequal(eltype, kept_arrays)
         dropdims(stack(kept_arrays); dims=_parameter_dims_to_drop(cs))
     else # avoid Base.stack to limit type promotion
