@@ -1178,17 +1178,16 @@ using Random: Xoshiro
 
     @testset "rand" begin
         N_iters, N_chains = 10, 3
-        d = Dict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra("lp") => -3.0)
+        d = OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra("lp") => -3.0)
         chn = FlexiChain{Symbol}(N_iters, N_chains, fill(d, N_iters, N_chains))
         rng = Xoshiro(468)
 
         # Test with and without rng
         for args in ((rng,), ())
             @test rand(args..., chn) isa OrderedDict{ParameterOrExtra{<:Symbol}}
-            # `chn` is built from a `Dict`, so key order is not guaranteed.
             params = rand(args..., chn; parameters_only=true)
             @test params isa NamedTuple
-            @test Set(keys(params)) == Set([:a, :b])
+            @test keys(params) == (:a, :b)
             @test rand(args..., chn, 5) isa
                   Vector{<:OrderedDict{ParameterOrExtra{<:Symbol}}}
             @test size(rand(args..., chn, 5)) == (5,)
