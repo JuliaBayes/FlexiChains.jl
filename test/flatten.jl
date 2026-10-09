@@ -388,6 +388,23 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             @test nrow(df) == 5 * 1 * 2
         end
 
+        @testset "reserved column names error" begin
+            # Parameter names clashing with iter/chain columns
+            for name in (:iter, :chain)
+                d = OrderedDict(Parameter(name) => 1.0)
+                chn = FlexiChain{Symbol}(5, 1, fill(d, 5))
+                @test_throws ArgumentError Wide(chn)
+            end
+            # Stat names clashing with param/iter/chain columns
+            chn = FlexiChain{Symbol}(5, 2, OrderedDict(Parameter(:a) => rand(5, 2)))
+            for (name, dims) in ((:param, :both), (:iter, :chain), (:chain, :iter))
+                fs = FlexiChains.collapse(
+                    chn, [FlexiChains.CollapseFunctionVec(name, mean)]; dims=dims
+                )
+                @test_throws ArgumentError Wide(fs)
+            end
+        end
+
         @testset "Wide summary" begin
             N_iters, N_chains = 10, 2
             as = rand(N_iters, N_chains)

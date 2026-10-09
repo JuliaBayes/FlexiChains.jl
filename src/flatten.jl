@@ -391,7 +391,9 @@ function _check_duplicate_keys(ks)
     return if !isempty(duplicates)
         throw(
             ArgumentError(
-                "duplicate column names after converting keys to Symbols: " *
+                "duplicate column names (note that keys are converted to Symbols, and " *
+                "`$(ITER_DIM_NAME)`, `$(CHAIN_DIM_NAME)`, and `$(PARAM_DIM_NAME)` are " *
+                "reserved column names): " *
                 join(unique(duplicates), ", "),
             ),
         )
@@ -497,7 +499,10 @@ struct Wide{F<:ChainOrSummary,N<:NamedTuple}
         sym_ks = Symbol.(get_name.(ks))
         _check_duplicate_keys(sym_ks)
         symbol_to_keys = NamedTuple{sym_ks}(ks)
-        return new{typeof(cs),typeof(symbol_to_keys)}(cs, symbol_to_keys, parameters_only)
+        w = new{typeof(cs),typeof(symbol_to_keys)}(cs, symbol_to_keys, parameters_only)
+        # Parameter or stat names can still clash with the `iter`/`chain`/`param` columns.
+        _check_duplicate_keys(Tables.columnnames(w))
+        return w
     end
 end
 
