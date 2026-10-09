@@ -1184,7 +1184,9 @@ using Random: Xoshiro
 
         # Test with and without rng
         for args in ((rng,), ())
-            @test rand(args..., chn) isa OrderedDict{ParameterOrExtra{<:Symbol}}
+            vals = rand(args..., chn)
+            @test vals isa OrderedDict{ParameterOrExtra{<:Symbol}}
+            @test collect(keys(vals)) == [Parameter(:a), Parameter(:b), Extra("lp")]
             params = rand(args..., chn; parameters_only=true)
             @test params isa NamedTuple
             @test keys(params) == (:a, :b)
