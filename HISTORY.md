@@ -40,6 +40,10 @@ The deprecated top-level plotting functions have been removed. Please use the ve
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
 
+For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and therefore `rand(chn; parameters_only=true)`) now returns a `NamedTuple` by default instead of an `OrderedDict{Symbol}`.
+The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
+To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
+
 ## `split_interval` is now the default for `hdi` and `eti`
 
 `PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.
