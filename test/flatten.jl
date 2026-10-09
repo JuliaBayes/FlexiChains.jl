@@ -399,7 +399,9 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             chn = FlexiChain{Symbol}(5, 2, OrderedDict(Parameter(:a) => rand(5, 2)))
             for (name, dims) in ((:param, :both), (:iter, :chain), (:chain, :iter))
                 fs = FlexiChains.collapse(
-                    chn, [FlexiChains.CollapseFunctionVec(name, mean)]; dims=dims
+                    chn,
+                    [FlexiChains.CollapseFunctionVec(name, mean)];
+                    dims=dims,
                 )
                 @test_throws ArgumentError Wide(fs)
             end
