@@ -88,6 +88,13 @@ collapse(
 
 `quantile(chn, ps::AbstractVector; dims=:iter)` (or `dims=:chain`) previously returned only `missing` values; it now returns a vector of quantiles for each chain (or iteration).
 
+## PosteriorDB.jl integration
+
+A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
+Array-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single array-valued parameter (e.g. `@vn(theta)`).
+
+`FlexiChains.from_posteriordb_ref`, which returns a `FlexiChain{String}` with one key per scalar entry, is now deprecated in favour of `from_posteriordb`.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
