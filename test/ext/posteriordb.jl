@@ -59,27 +59,6 @@ using Test
         @test ext._array_shape([(1, 1) => m, (2,) => m]) === nothing
         @test ext._array_shape([nothing => m]) === nothing
     end
-
-    @testset "from_posteriordb_ref (deprecated)" begin
-        post = PosteriorDB.posterior(pdb, "eight_schools-eight_schools_centered")
-        ref = PosteriorDB.reference_posterior(post)
-
-        chn = @test_deprecated FlexiChains.from_posteriordb_ref(ref)
-        @test chn isa FlexiChain{String}
-        @test collect(FlexiChains.parameters(chn)) == [
-            "theta[1]",
-            "theta[2]",
-            "theta[3]",
-            "theta[4]",
-            "theta[5]",
-            "theta[6]",
-            "theta[7]",
-            "theta[8]",
-            "mu",
-            "tau",
-        ]
-        @test DD.parent(FlexiChains.iter_indices(chn)) == 10010:10:20000
-    end
 end
 
 end # module

@@ -49,28 +49,6 @@ function FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
 end
 
 """
-    FlexiChains.from_posteriordb_ref(
-        ref::PosteriorDB.ReferencePosterior
-    )::FlexiChain{String}
-
-Load a `PosteriorDB.ReferencePosterior` into a `FlexiChain`. The keys are stored as strings,
-which matches the storage format in PosteriorDB.jl.
-
-!!! warning
-    This function is deprecated. Please use [`FlexiChains.from_posteriordb`](@ref) instead,
-    which returns a `FlexiChain{VarName}` with array-valued parameters recombined.
-"""
-function FlexiChains.from_posteriordb_ref(ref::PosteriorDB.ReferencePosterior)
-    Base.depwarn(
-        "`FlexiChains.from_posteriordb_ref(ref)` is deprecated, use `FlexiChains.from_posteriordb(ref)` instead. Note that `from_posteriordb` returns a `FlexiChain{VarName}` rather than a `FlexiChain{String}`.",
-        :from_posteriordb_ref,
-    )
-    raw, niters, nchains, iter_indices = _load_posteriordb_ref(ref)
-    d = OrderedDict{Parameter{String},Matrix{Float64}}(Parameter(k) => v for (k, v) in raw)
-    return FlexiChain{String}(niters, nchains, d; iter_indices=iter_indices)
-end
-
-"""
 Load the raw data from a reference posterior. Returns an `OrderedDict` mapping the
 PosteriorDB names to `niters x nchains` matrices, as well as `niters`, `nchains`, and the
 iteration indices.

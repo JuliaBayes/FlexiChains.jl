@@ -36,5 +36,4 @@ summarystats(chn)
 
 ```@docs
 FlexiChains.from_posteriordb
-FlexiChains.from_posteriordb_ref
 ```

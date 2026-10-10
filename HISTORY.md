@@ -93,7 +93,7 @@ collapse(
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
 Array-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single array-valued parameter (e.g. `@vn(theta)`).
 
-`FlexiChains.from_posteriordb_ref`, which returns a `FlexiChain{String}` with one key per scalar entry, is now deprecated in favour of `from_posteriordb`.
+`FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
 ## Other non-breaking changes
 
