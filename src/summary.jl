@@ -208,11 +208,7 @@ function DD.dims(fs::FlexiSummary)
     ii = iter_indices(fs)
     ci = chain_indices(fs)
     si = stat_indices(fs)
-    ds = (
-        DD.Dim{ITER_DIM_NAME}(ii),
-        DD.Dim{CHAIN_DIM_NAME}(ci),
-        DD.Dim{STAT_DIM_NAME}(si),
-    )
+    ds = (DD.Dim{ITER_DIM_NAME}(ii), DD.Dim{CHAIN_DIM_NAME}(ci), DD.Dim{STAT_DIM_NAME}(si))
     filter(!isnothing ∘ DD.val, ds)
 end
 

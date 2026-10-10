@@ -77,6 +77,7 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
+# TODO(penelopeysm): Upstream these things.
 # convert symbol/string to VarName
 _as_varname(name::VarName) = name
 _as_varname(name::Symbol) = VarName{name}()
@@ -89,6 +90,8 @@ _varname_as(::Type{<:AbstractString}, vn::VarName) = String(Symbol(vn))
 
 # Get leaf data by applying the optic - slower fallback that always works
 function _get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
+    # TODO(penelopeysm): the following line is `AbstractPPL._unprefix_optic`. Change this
+    # once we can.
     optic, _ = _getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
     return _map_optic(optic, d, vn_leaf)
 end
@@ -105,7 +108,9 @@ function _split_parameter_leaves(vn::VarName, d::AbstractArray)
         elseif d1 isa AbstractArray{<:Union{Real,Missing}}
             # all leaves have the same dimensions, so invert the nested array structure
             # with a simple broadcast
-            return [vn_leaf => getindex.(d, i) for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)]
+            return [
+                vn_leaf => getindex.(d, i) for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)
+            ]
         else
             return [vn_leaf => _get_leaf_data(vn, d, vn_leaf) for vn_leaf in vn_leaves]
         end
@@ -133,8 +138,10 @@ scalar leaves, then convert the keys back to `Symbol`.
 Likewise for `AbstractString`-keyed chains; the keys are converted back to standard
 `String`.
 """
-function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false
-    ) where T <: Union{Symbol, AbstractString}
+function _split_varnames(
+    cs::ChainOrSummary{T};
+    collect_plot_names::Bool=false,
+) where {T<:Union{Symbol,AbstractString}}
     N = cs isa FlexiChain ? 2 : 3
     new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for (k, v) in cs._data
@@ -229,7 +236,12 @@ function _parameter_array_components(
     return output, kept_keys
 end
 # function barrier for a small performance improvement
-function _write_parameters_to_array!(output::Array{T,N}, cs; split_varnames, parameters_only) where {T, N}
+function _write_parameters_to_array!(
+    output::Array{T,N},
+    cs;
+    split_varnames,
+    parameters_only,
+) where {T,N}
     col = 0
     for (k, v) in cs._data
         if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:T}
@@ -291,7 +303,11 @@ function DD.DimArray(
     split_varnames::Bool=true,
 ) where {TKey,T}
     data, kept_keys = _parameter_array_components(
-        cs; warn, eltype_filter, parameters_only, split_varnames
+        cs;
+        warn,
+        eltype_filter,
+        parameters_only,
+        split_varnames,
     )
     dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
 
@@ -319,7 +335,11 @@ function Base.Array(
     split_varnames::Bool=true,
 ) where {TKey,T}
     data, _ = _parameter_array_components(
-        chain; warn, eltype_filter, parameters_only, split_varnames
+        chain;
+        warn,
+        eltype_filter,
+        parameters_only,
+        split_varnames,
     )
     return data
 end
@@ -381,7 +401,7 @@ Convert a `FlexiSummary` into a standard `Array`. This is the same as the conver
 See [`DimensionalData.DimArray(::FlexiChains.FlexiSummary)`](@ref) for details.
 """
 Base.Array
-    
+
 function _prepare_chain_or_summary(
     cs::ChainOrSummary;
     split_varnames::Bool=true,
