@@ -2,7 +2,7 @@ module FCChainTests
 
 using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
 using AbstractPPL: @varname, VarName
-using DimensionalData: val, At
+using DimensionalData: DimensionalData as DD, val, At
 using OffsetArrays: OffsetArray
 using OrderedCollections: OrderedDict
 using Test
@@ -418,6 +418,22 @@ using Test
                 1:(2*N_chains),
             )
         end
+    end
+
+    @testset "DD.dims" begin
+        N_iters, N_chains = 10, 2
+        dicts = fill(Dict(Parameter(:a) => 1), N_iters, N_chains)
+        chain = FlexiChain{Symbol}(
+            N_iters,
+            N_chains,
+            dicts;
+            iter_indices=FlexiChains._make_lookup(3:3:(3*N_iters)),
+            chain_indices=FlexiChains._make_lookup([2, 1]),
+        )
+        ds = DD.dims(chain)
+        @test map(DD.name, ds) == (:iter, :chain)
+        @test val(ds[1]) == FlexiChains.iter_indices(chain)
+        @test val(ds[2]) == FlexiChains.chain_indices(chain)
     end
 end
 

@@ -26,39 +26,33 @@ default.
 If `collect_plot_names` is `false`, then the dictionary will always be empty.
 """
 function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool=false)
-    vns = OrderedSet{VarName}()
     plot_names = Dict{VarName,String}()
+    N = cs isa FlexiChain ? 2 : 3
+    new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for vn in FlexiChains.parameters(cs)
         d = _get_raw_data(cs, Parameter(vn))
-        if _elems_have_fixed_vn_leaves(d)
-            # Don't need to iterate over all array elements - just check the first one.
-            # (Note that `d` could be Array{T,2} or Array{T,3} depending on whether `cs` is
-            # a chain or summary.)
+        for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, d)
+            new_data[Parameter(vn_leaf)] = leaf_data
+        end
+        if collect_plot_names && _elems_have_fixed_vn_leaves(d) && eltype(d) <: DD.DimVector
             d1 = first(d)
-            vn_leaves = AbstractPPL.varname_leaves(vn, d1)
-            for vn_leaf in vn_leaves
-                push!(vns, vn_leaf)
-            end
-            if collect_plot_names && eltype(d) <: DD.DimVector
-                dim = DD.dims(d1, 1)
-                label_type = eltype(dim)
-                if (label_type === Symbol || label_type <: AbstractString)
-                    for (vn_leaf, label) in zip(vn_leaves, dim)
-                        prettylabel = label isa Symbol ? repr(label) : label
-                        plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
-                    end
-                end
-            end
-        else
-            for i in eachindex(d)
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
-                    push!(vns, vn_leaf)
+            dim = DD.dims(d1, 1)
+            label_type = eltype(dim)
+            if (label_type === Symbol || label_type <: AbstractString)
+                vn_leaves = AbstractPPL.varname_leaves(vn, d1)
+                for (vn_leaf, label) in zip(vn_leaves, dim)
+                    prettylabel = label isa Symbol ? repr(label) : label
+                    plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
                 end
             end
         end
     end
-    return cs[[collect(vns)..., FlexiChains.extras(cs)...]], plot_names
+    for k in FlexiChains.extras(cs)
+        new_data[k] = _get_raw_data(cs, k)
+    end
+    return _replace_data(cs, VarName, new_data), plot_names
 end
+
 
 # This helper function identifies cases where we don't need to check every single Niters x
 # Nchains elements, because they all have the same structure.
@@ -83,9 +77,58 @@ function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
 end
 _elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
+# TODO(penelopeysm): Upstream these things.
+# convert symbol/string to VarName
+_as_varname(name::VarName) = name
+_as_varname(name::Symbol) = VarName{name}()
+_as_varname(name::AbstractString) = _as_varname(Symbol(name))
+
+# convert VarName to symbol or string
+_varname_as(::Type{<:VarName}, vn::VarName) = vn
+_varname_as(::Type{Symbol}, vn::VarName) = Symbol(vn)
+_varname_as(::Type{<:AbstractString}, vn::VarName) = String(Symbol(vn))
+
+# Get leaf data by applying the optic - slower fallback that always works
+function _get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
+    # TODO(penelopeysm): the following line is `AbstractPPL._unprefix_optic`. Change this
+    # once we can.
+    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
+    return _map_optic(optic, d, vn_leaf)
+end
+
+# Split a parameter into its leaves, if it has any
+function _split_parameter_leaves(vn::VarName, d::AbstractArray)
+    if _elems_have_fixed_vn_leaves(d)
+        # Don't need to iterate over all array elements - just check the first one.
+        d1 = first(d)
+        vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+        if length(vn_leaves) == 1 && only(vn_leaves) == vn
+            # Scalar-valued parameter: nothing to split.
+            return [vn => d]
+        elseif d1 isa AbstractArray{<:Union{Real,Missing}}
+            # all leaves have the same dimensions, so invert the nested array structure
+            # with a simple broadcast
+            return [
+                vn_leaf => getindex.(d, i) for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)
+            ]
+        else
+            return [vn_leaf => _get_leaf_data(vn, d, vn_leaf) for vn_leaf in vn_leaves]
+        end
+    else # leaves may have different sizes
+        vns = OrderedSet{VarName}()
+        for i in eachindex(d)
+            for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
+                push!(vns, vn_leaf)
+            end
+        end
+        return [vn_leaf => _get_leaf_data(vn, d, vn_leaf) for vn_leaf in vns]
+    end
+end
+
+
 """
     FlexiChains._split_varnames(
-        cs::ChainOrSummary{Union{Symbol,<:AbstractString}};
+        cs::ChainOrSummary{Symbol};
         collect_plot_names::Bool=false
     )
 
@@ -95,32 +138,20 @@ scalar leaves, then convert the keys back to `Symbol`.
 Likewise for `AbstractString`-keyed chains; the keys are converted back to standard
 `String`.
 """
-function _split_varnames(cs::ChainOrSummary{Symbol}; collect_plot_names::Bool=false)
-    N = cs isa FlexiChain ? 2 : 3
-    new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
-    for (k, v) in cs._data
-        new_key = k isa Parameter ? Parameter(VarName{k.name}()) : k
-        new_data[new_key] = v
-    end
-    vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
-    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names=collect_plot_names)
-    plot_names = Dict{Symbol,String}(Symbol(k) => v for (k, v) in plot_names)
-    return FlexiChains.map_parameters(k -> Symbol(k), split_cs), plot_names
-end
 function _split_varnames(
-    cs::ChainOrSummary{<:AbstractString};
+    cs::ChainOrSummary{T};
     collect_plot_names::Bool=false,
-)
+) where {T<:Union{Symbol,AbstractString}}
     N = cs isa FlexiChain ? 2 : 3
     new_data = OrderedDict{ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for (k, v) in cs._data
-        new_key = k isa Parameter ? Parameter(VarName{Symbol(k.name)}()) : k
+        new_key = k isa Parameter ? Parameter(_as_varname(k.name)) : k
         new_data[new_key] = v
     end
     vn_cs = FlexiChains._replace_data(cs, VarName, new_data)
-    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names=collect_plot_names)
-    plot_names = Dict{String,String}(String(Symbol(k)) => v for (k, v) in plot_names)
-    return FlexiChains.map_parameters(k -> String(Symbol(k)), split_cs), plot_names
+    split_cs, plot_names = _split_varnames(vn_cs; collect_plot_names)
+    plot_names = Dict(_varname_as(T, k) => v for (k, v) in plot_names)
+    return FlexiChains.map_parameters(k -> _varname_as(T, k), split_cs), plot_names
 end
 
 """
@@ -143,6 +174,97 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
         end
     end
     return cs, Dict{T,String}() # No plot names to return
+end
+
+function _parameter_array_components(
+    cs::ChainOrSummary{TKey};
+    warn::Bool=true,
+    eltype_filter::Type{T}=Any,
+    parameters_only::Bool=true,
+    split_varnames::Bool=true,
+) where {TKey,T}
+    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
+    kept_eltypes = Type[]
+    skipped_keys = ParameterOrExtra{<:TKey}[]
+
+    # Loop through data without copying to figure out eltype and size
+    for (k, v) in cs._data
+        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:eltype_filter}
+            vn = _as_varname(FlexiChains.get_name(k))
+            d1 = first(v)
+            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
+                # No need to look more at data if all have fixed leaves
+                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
+                    leaf_name = _varname_as(TKey, vn_leaf)
+                    push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
+                    push!(kept_eltypes, eltype(d1))
+                end
+            else
+                # Fall back to materializing leaves
+                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
+                    leaf_name = _varname_as(TKey, vn_leaf)
+                    if eltype(leaf_data) <: eltype_filter
+                        push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
+                        push!(kept_eltypes, eltype(leaf_data))
+                    else
+                        push!(skipped_keys, Parameter(leaf_name))
+                    end
+                end
+            end
+        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
+            push!(kept_keys, parameters_only ? FlexiChains.get_name(k) : k)
+            push!(kept_eltypes, eltype(v))
+        elseif !(parameters_only && k isa Extra)
+            push!(skipped_keys, k)
+        end
+    end
+    if warn && !isempty(skipped_keys)
+        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
+        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
+    end
+
+    s = map(length, DD.dims(cs))
+    if isempty(kept_keys)
+        @warn "no keys with values subtyping $eltype_filter found"
+        return Array{T}(undef, (s..., 0)), kept_keys
+    end
+
+    # Allocate output and loop again to copy data
+    Tout = reduce(typejoin, kept_eltypes)
+    output = Array{Tout}(undef, (s..., length(kept_keys)))
+    _write_parameters_to_array!(output, cs; split_varnames, parameters_only)
+    return output, kept_keys
+end
+# function barrier for a small performance improvement
+function _write_parameters_to_array!(
+    output::Array{T,N},
+    cs;
+    split_varnames,
+    parameters_only,
+) where {T,N}
+    col = 0
+    for (k, v) in cs._data
+        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:T}
+            vn = _as_varname(FlexiChains.get_name(k))
+            d1 = first(v)
+            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
+                for i in eachindex(d1)
+                    col += 1
+                    selectdim(output, N, col) .= getindex.(v, i)
+                end
+            else
+                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
+                    if eltype(leaf_data) <: T
+                        col += 1
+                        copyto!(selectdim(output, N, col), leaf_data)
+                    end
+                end
+            end
+        elseif eltype(v) <: T && (!parameters_only || k isa Parameter)
+            col += 1
+            copyto!(selectdim(output, N, col), v)
+        end
+    end
 end
 
 """
@@ -174,54 +296,22 @@ If `parameters_only=true` (the default), then two things happen:
   be `Union{Parameter{<:TKey},Extra}`.
 """
 function DD.DimArray(
-    chain::FlexiChain{TKey};
+    cs::ChainOrSummary{TKey};
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    chain::FlexiChain = split_varnames ? first(FlexiChains._split_varnames(chain)) : chain
-    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    ni, nc = size(chain)
-    kept_matrices = Matrix[]
-    skipped_keys = ParameterOrExtra{<:TKey}[]
-    for (k, v) in chain._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
-            k = if parameters_only && k isa Parameter
-                FlexiChains.get_name(k)
-            else
-                k
-            end
-            push!(kept_keys, k)
-            push!(kept_matrices, v)
-        else
-            if !(parameters_only && k isa Extra)
-                push!(skipped_keys, k)
-            end
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
-    end
-    np = length(kept_matrices)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    # Here we could call `stack(kept_matrices)` to do mostly the same thing. Unfortunately
-    # `stack` aggressively promotes element types, so if there are e.g. continuous
-    # and discrete parameters it will promote everything to `Float64`. We work
-    # around that by manually filling in an array.
-    kept_data = Array{eltype_filter}(undef, ni, nc, np)
-    for (i, m) in enumerate(kept_matrices)
-        kept_data[:, :, i] = m
-    end
-    # Concretise as far as possible.
-    kept_data = [x for x in kept_data]
-    dims = (
-        DD.Dim{ITER_DIM_NAME}(iter_indices(chain)),
-        DD.Dim{CHAIN_DIM_NAME}(chain_indices(chain)),
-        DD.Dim{PARAM_DIM_NAME}(kept_keys),
+    data, kept_keys = _parameter_array_components(
+        cs;
+        warn,
+        eltype_filter,
+        parameters_only,
+        split_varnames,
     )
-    return DD.DimArray(kept_data, dims)
+    dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
+
+    return DD.DimArray(data, dims)
 end
 
 """
@@ -238,14 +328,20 @@ See [`DimensionalData.DimArray(::FlexiChains.FlexiChain)`](@ref) for more detail
 conversion process and available keyword arguments.
 """
 function Base.Array(
-    chain::FlexiChain{TKey};
+    chain::ChainOrSummary{TKey};
     warn::Bool=true,
     eltype_filter::Type{T}=Any,
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    da = DD.DimArray(chain; warn, eltype_filter, parameters_only, split_varnames)
-    return parent(da)
+    data, _ = _parameter_array_components(
+        chain;
+        warn,
+        eltype_filter,
+        parameters_only,
+        split_varnames,
+    )
+    return data
 end
 
 """
@@ -291,56 +387,7 @@ non-collapsed dimensions of the summary. For example:
 - `warn::Bool=true`: whether to issue a warning if any keys are skipped due to their values
   not subtyping `eltype_filter`.
 """
-function DD.DimArray(
-    summary::FlexiSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey,T}
-    summary::FlexiSummary =
-        split_varnames ? first(FlexiChains._split_varnames(summary)) : summary
-    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    new_dims, dim_indices_to_drop = _get_summary_dims(summary)
-    kept_arrays = AbstractArray[]
-    skipped_keys = ParameterOrExtra{<:TKey}[]
-    for (k, v) in summary._data
-        if eltype(v) <: T && (!parameters_only || k isa Parameter)
-            k = if parameters_only && k isa Parameter
-                FlexiChains.get_name(k)
-            else
-                k
-            end
-            push!(kept_keys, k)
-            dropped = if isempty(dim_indices_to_drop)
-                v
-            else
-                dropdims(v; dims=dim_indices_to_drop)
-            end
-            push!(kept_arrays, dropped)
-        else
-            if !(parameters_only && k isa Extra)
-                push!(skipped_keys, k)
-            end
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $T"
-    end
-    np = length(kept_arrays)
-    np == 0 && @warn "no keys with values subtyping $T found"
-    base_shape = tuple(length.(new_dims)...)
-    kept_data = Array{eltype_filter}(undef, base_shape..., np)
-    for (i, arr) in enumerate(kept_arrays)
-        # This is equivalent to kept_data[:, :, ..., i] = arr but works
-        # for any number of dimensions
-        selectdim(kept_data, ndims(kept_data), i) .= arr
-    end
-    kept_data = [x for x in kept_data] # Concretise
-    all_dims = (new_dims..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
-    return DD.DimArray(kept_data, all_dims)
-end
+DD.DimArray
 
 """
     Base.Array(
@@ -353,16 +400,7 @@ Convert a `FlexiSummary` into a standard `Array`. This is the same as the conver
 
 See [`DimensionalData.DimArray(::FlexiChains.FlexiSummary)`](@ref) for details.
 """
-function Base.Array(
-    summary::FlexiSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey,T}
-    da = DD.DimArray(summary; warn, eltype_filter, parameters_only, split_varnames)
-    return parent(da)
-end
+Base.Array
 
 function _prepare_chain_or_summary(
     cs::ChainOrSummary;

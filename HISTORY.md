@@ -1,3 +1,7 @@
+# 0.6.42
+
+Improved the performance of `_split_varnames` (internal but widely used in many other functions), as well as the conversion of `FlexiChain` and `FlexiSummary` objects to (Dim)Arrays.
+
 # 0.6.41
 
 Improved the printing of `FlexiSummary` objects with many parameters.
