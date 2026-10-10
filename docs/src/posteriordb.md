@@ -14,7 +14,7 @@ ref = PosteriorDB.reference_posterior(post)
 chn = FlexiChains.from_posteriordb(ref)
 ```
 
-Array-valued parameters, which PosteriorDB stores as separate scalar entries (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single parameter:
+Vector-valued parameters, which PosteriorDB stores as separate scalar entries (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single parameter:
 
 ```@example posteriordb
 chn[@vn(theta), iter=1, chain=1]

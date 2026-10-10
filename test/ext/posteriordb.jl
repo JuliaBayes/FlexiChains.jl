@@ -46,18 +46,20 @@ using Test
         @test summarystats(chn) isa FlexiChains.FlexiSummary
     end
 
-    @testset "multidimensional arrays" begin
+    @testset "name parsing and vector recombination" begin
         ext = Base.get_extension(FlexiChains, :FlexiChainsPosteriorDBExt)
         @test ext._parse_stan_name("mu") == (:mu, nothing)
-        @test ext._parse_stan_name("theta[3]") == (:theta, (3,))
-        @test ext._parse_stan_name("Sigma[2,1]") == (:Sigma, (2, 1))
+        @test ext._parse_stan_name("theta[3]") == (:theta, 3)
+        @test ext._parse_stan_name("not a stan name") ==
+              (Symbol("not a stan name"), nothing)
+        @test_throws ErrorException ext._parse_stan_name("Sigma[2,1]")
         m = zeros(1, 1)
-        @test ext._array_shape([(1, 1) => m, (2, 1) => m, (1, 2) => m, (2, 2) => m]) ==
-              (2, 2)
-        # incomplete arrays are not recombined
-        @test ext._array_shape([(1,) => m, (3,) => m]) === nothing
-        @test ext._array_shape([(1, 1) => m, (2,) => m]) === nothing
-        @test ext._array_shape([nothing => m]) === nothing
+        @test ext._vector_length([1 => m, 2 => m, 3 => m]) == 3
+        # incomplete or duplicated vectors are not recombined
+        @test ext._vector_length([1 => m, 3 => m]) === nothing
+        @test ext._vector_length([2 => m, 2 => m]) === nothing
+        @test ext._vector_length([0 => m, 1 => m]) === nothing
+        @test ext._vector_length([nothing => m]) === nothing
     end
 end
 
