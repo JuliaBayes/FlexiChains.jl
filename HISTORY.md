@@ -44,6 +44,11 @@ For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and the
 The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
 To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
 
+## Tables.jl output for single-statistic summaries
+
+When converting a `FlexiSummary` with a dropped stat dimension (e.g. the output of `mean(chn)`) to a table, the statistic column is now named after the statistic (e.g. `mean`), rather than the generic `stat`.
+For example, `DataFrame(mean(chn))` now has columns `param` and `mean`.
+
 ## `split_interval` is now the default for `hdi` and `eti`
 
 `PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.
