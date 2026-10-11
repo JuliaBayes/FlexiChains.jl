@@ -26,6 +26,7 @@ Here is an overview of what is currently available:
 | Forest plots                       | ✅ [`FlexiChains.Makie.forestplot`](@ref)                                                                                                                 | 🐌                                          |
 | Ridgeline plots                    | ✅ [`FlexiChains.Makie.ridgeline`](@ref)                                                                                                                  | 🐌                                          |
 | [Pushforward plots](@ref pf-plots) | ✅ [`FlexiChains.Makie.pushforward_continuous`](@ref), [`FlexiChains.Makie.pushforward_discrete`](@ref), and [`FlexiChains.Makie.pushforward_hist`](@ref) | 🐌                                          |
+| [Predictive checks](@ref ppc-plots) | ✅ [`FlexiChains.Makie.ppc_density`](@ref) | 🐌 |
 
 All of the above functions have 'mutating' versions with a `!` suffix.
 

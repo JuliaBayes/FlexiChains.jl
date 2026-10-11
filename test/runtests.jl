@@ -24,6 +24,7 @@ else
         include("ext/posteriorstats.jl")
         include("ext/inferenceobjects.jl")
         include("plots/quantile_utils.jl")
+        include("plots/ppc.jl")
         include("plots/ref.jl")
     end
 end

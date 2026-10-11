@@ -186,6 +186,46 @@ function bin_count_matrices(
     return counts
 end
 
+"""
+Return the predictive draws of `param` as a matrix with one row per pooled draw, ordered
+chain by chain, and one column per component of `param`.
+"""
+function pooled_predictive_draws(chn::FlexiChain, param)
+    sub, _ = subset_and_split_chain(chn, param)
+    component_keys = collect(keys(sub))
+    isempty(component_keys) && throw(ArgumentError("no parameters to plot"))
+    draws_per_component = map(component_keys) do k
+        iter_by_chain = _get_raw_data(sub, k)
+        check_eltype_is_real(iter_by_chain)
+        vec(iter_by_chain)
+    end
+    return stack(draws_per_component)
+end
+
+function check_observed_length(observed, ncomponents::Integer)
+    return if length(observed) != ncomponents
+        throw(
+            ArgumentError(
+                "length of `observed` ($(length(observed))) must match the number of components of `param` ($ncomponents)",
+            ),
+        )
+    end
+end
+
+"""
+Row indices of `ndraws` pooled draws at evenly spaced positions from the first to the last
+of `npooled`. `ndraws=nothing` selects every draw.
+"""
+function evenly_spaced_draw_indices(npooled::Integer, ndraws::Integer)
+    ndraws >= 1 || throw(ArgumentError("`ndraws` must be at least 1; got $ndraws"))
+    ndraws <= npooled || throw(
+        ArgumentError("`ndraws` ($ndraws) exceeds the number of pooled draws ($npooled)"),
+    )
+    ndraws == 1 && return [1]
+    return round.(Int, LinRange(1, npooled, ndraws))
+end
+evenly_spaced_draw_indices(npooled::Integer, ::Nothing) = Base.OneTo(npooled)
+
 struct FlexiChainTrace{TKey,Tp<:ParameterOrExtra{<:TKey}}
     chn::FlexiChain{TKey}
     param::Tp
