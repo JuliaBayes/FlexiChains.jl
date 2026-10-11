@@ -661,19 +661,6 @@ Note that this always returns a vector with length equal to the number of chains
 sampling_time(chain::FlexiChain)::Vector{<:Union{Real,Missing}} =
     chain._metadata.sampling_time
 
-const _INITIAL_STATE_DOCSTRING = """
-!!! note "Returns a vector"
-
-    This function *always* returns a vector of sampler states, even if there is only one chain.
-    Consequently, if you are resuming a single-chain MCMC run like `sample(model, spl, N)`, you
-    will need to extract the sole element of the returned vector before passing it as the
-    `initial_state` keyword argument to `sample()`. Please see the ['using with Turing'](@ref
-    Saving-and-resuming-MCMC-sampling-progress) page, or [the Turing.jl documentation page
-    on
-    `initial_state`](https://turinglang.org/docs/usage/sampling-options/#saving-and-resuming-sampling),
-    for more explanation of this.
-"""
-
 """
     last_sampler_state(chain::FlexiChain)::Vector
 
@@ -682,7 +669,12 @@ keyword argument was passed to `sample`. This can be used for resuming MCMC samp
 
 If the state was not saved for a given chain, its entry in the vector will be `missing`.
 
-$(_INITIAL_STATE_DOCSTRING)
+!!! note "Returns a vector"
+
+    This function *always* returns a vector of sampler states, even if there is only one chain.
+    Consequently, if you are resuming a single-chain MCMC run like `sample(model, spl, N)`, you
+    will need to extract the sole element of the returned vector before passing it as the
+    `initial_state` keyword argument to `sample()`.
 """
 function last_sampler_state(chain::FlexiChain)::Vector
     return chain._metadata.last_sampler_state

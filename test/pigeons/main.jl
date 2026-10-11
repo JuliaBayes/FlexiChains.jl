@@ -4,6 +4,7 @@ using FlexiChains: FlexiChains, SymChain, Extra
 using BridgeStan
 using Pigeons
 using DynamicPPL
+import DifferentiationInterface # to trigger ext loading
 using Distributions
 using Random
 using Test
