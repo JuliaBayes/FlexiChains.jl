@@ -16,7 +16,7 @@ const OldVNChain = FlexiChain{AbstractPPL.VarName}
 function _convert_vnt(vnt::DynamicPPL.VarNamedTuple)::VarNames.VarNamedTuple
     new_vnt = VarNames.VarNamedTuple()
     for (vn, val) in pairs(vnt)
-        new_vn = FlexiChains._internal_to_varname(vn)
+        new_vn = FlexiChains._as_varname(vn)
         top_sym = AbstractPPL.getsym(vn)
         template = get(vnt.data, top_sym, VarNames.NoTemplate())
         new_vnt = VarNames.templated_setindex!!(new_vnt, val, new_vn, template)

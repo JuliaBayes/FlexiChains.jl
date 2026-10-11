@@ -55,8 +55,6 @@ include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
 
-# Extended in AbstractPPL extension and used in MCMCChains extension
-_internal_to_varname(sym::Symbol) = VarName{sym}()
 _maybe_promote_key(::Type{Tnew}) where {Tnew} = Tnew
 _maybe_promote_key(::Type{<:VarName}) = VarName
 
