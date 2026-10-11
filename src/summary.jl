@@ -199,26 +199,20 @@ Returns a tuple of two elements:
   passed to `dropdims`.
 """
 function _get_summary_dims(fs::FlexiSummary)
-    new_dims = DD.Dim[]
-    dims_to_keep = Int[]
+    ds = DD.dims(fs)
+    alldims = (ITER_DIM_NAME, CHAIN_DIM_NAME, STAT_DIM_NAME)
+    dim_indices_to_drop = DD.dimnum(alldims, DD.otherdims(alldims, ds))
+    return collect(ds), dim_indices_to_drop
+end
+
+function DD.dims(fs::FlexiSummary)
     ii = iter_indices(fs)
     ci = chain_indices(fs)
     si = stat_indices(fs)
-    if ii !== nothing
-        push!(dims_to_keep, 1)
-        push!(new_dims, DD.Dim{ITER_DIM_NAME}(ii))
-    end
-    if ci !== nothing
-        push!(dims_to_keep, 2)
-        push!(new_dims, DD.Dim{CHAIN_DIM_NAME}(ci))
-    end
-    if si !== nothing
-        push!(dims_to_keep, 3)
-        push!(new_dims, DD.Dim{STAT_DIM_NAME}(si))
-    end
-    dim_indices_to_drop = tuple(setdiff(1:3, dims_to_keep)...)
-    return new_dims, dim_indices_to_drop
+    ds = (DD.Dim{ITER_DIM_NAME}(ii), DD.Dim{CHAIN_DIM_NAME}(ci), DD.Dim{STAT_DIM_NAME}(si))
+    filter(!isnothing ∘ DD.val, ds)
 end
+
 """
     _raw_to_user_data(summary::FlexiSummary, data::AbstractArray; stack=nothing)
 
@@ -507,14 +501,13 @@ collapse(chn, [CollapseFunctionVec(mean), CollapseFunctionVec(std)]; dims=:iter)
 ```
 
 Positional and keyword arguments passed to the shortcut constructors are forwarded to the
-underlying function. Sometimes the inferred statistic name is not what you want (for example,
-if you calculate several quantiles). In this case, you can pass the name as the first
-argument:
+underlying function.
+
+Sometimes the inferred statistic name is not what you want (for example, if you calculate
+several quantiles). In this case, you can pass a `Symbol` as the first argument to be used
+as the name, as illustrated by `:q5` and `:q95` below.
 
 ```julia
-using FlexiChains: CollapseFunctionVec
-using Statistics: quantile
-
 collapse(chn, [
     CollapseFunctionVec(mean),
     CollapseFunctionVec(std),
@@ -652,6 +645,32 @@ macro _forward_stat(make_collapse_func, func)
             return collapse(
                 chn,
                 [$(esc(make_collapse_func))($(esc(func)); kwargs...)];
+                dims=dims,
+                split_varnames=split_varnames,
+                warn=warn,
+                drop_stat_dim=true,
+            )
+        end
+    end
+end
+
+"""
+    @_forward_diagnostic(func)
+
+As [`@_forward_stat`](@ref), but for MCMC diagnostics.
+"""
+macro _forward_diagnostic(func)
+    return quote
+        function $(esc(func))(
+            chn::FlexiChain{TKey};
+            dims::Symbol=:both,
+            warn::Bool=true,
+            split_varnames::Bool=true,
+            kwargs...,
+        ) where {TKey}
+            return collapse(
+                chn,
+                [(Symbol($(esc(func))), ChainDimAware(x -> $(esc(func))(x; kwargs...)))];
                 dims=dims,
                 split_varnames=split_varnames,
                 warn=warn,

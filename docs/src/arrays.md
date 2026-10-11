@@ -102,7 +102,7 @@ da = DimArray(fs)
 ```@docs
 FlexiChains.FlexiChain(::AbstractArray{T,3}, key_spec) where {T}
 DimensionalData.DimArray(::FlexiChains.FlexiChain)
+DimensionalData.DimArray
 Base.Array(::FlexiChains.FlexiChain)
-DimensionalData.DimArray(::FlexiChains.FlexiSummary)
-Base.Array(::FlexiChains.FlexiSummary)
+Base.Array
 ```

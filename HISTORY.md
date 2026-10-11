@@ -109,6 +109,10 @@ A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforw
 
 The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
 
+# 0.6.42
+
+Improved the performance of `_split_varnames` (internal but widely used in many other functions), as well as the conversion of `FlexiChain` and `FlexiSummary` objects to (Dim)Arrays.
+
 # 0.6.41
 
 Improved the printing of `FlexiSummary` objects with many parameters.
