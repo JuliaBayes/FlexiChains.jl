@@ -743,7 +743,7 @@ function _stack_arrays(
 end
 
 """
-    _raw_to_user_data(chain::FlexiChain, data::Matrix; stack=nothing)
+    _raw_to_user_data(chain::FlexiChain, data::Matrix; stack::Bool=false)
 
 Convert `data`, which is a raw matrix of samples, to a `DimensionalData.DimArray` using the
 indices stored in in the `FlexiChain`. This is the format that users expect to obtain when

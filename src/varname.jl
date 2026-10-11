@@ -131,7 +131,7 @@ function Base.getindex(
     vn::VarName;
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 )
     raw = _get_raw_data(fchain, Parameter(vn))
     return _raw_to_user_data(fchain, raw; name=string(Parameter(vn)), stack=stack)[
@@ -159,7 +159,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 )
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
     user_data = _raw_to_user_data(
@@ -241,7 +241,7 @@ function Base.getindex(
     prefixed::Prefixed;
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 )
     vn, optic = prefixed_get_key_and_optic(Set(FlexiChains.parameters(fchain)), prefixed)
     # We could use get_raw_data here, but we don't need to since we already calculated the
@@ -277,7 +277,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 )
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
     vn, optic = prefixed_get_key_and_optic(Set(FlexiChains.parameters(fs)), prefixed)
