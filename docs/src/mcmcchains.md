@@ -1,4 +1,4 @@
-# [Converting to/from MCMCChains](@id integrations-mcmcchains)
+# [MCMCChains.jl](@id integrations-mcmcchains)
 
 You can convert FlexiChain objects to and from `MCMCChains.Chains`.
 

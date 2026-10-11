@@ -91,7 +91,7 @@ makedocs(;
             "advancedhmc.md",
             "arviz.md",
             "custom_sampler.md",
-            "MCMCChains.jl" => ["mcmcchains.md", "migration.md"],
+            "mcmcchains.md",
             "montecarlomeasurements.md",
             "pairplots.md",
             "parallelmcmc.md",
