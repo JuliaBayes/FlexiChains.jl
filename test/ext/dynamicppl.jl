@@ -363,7 +363,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
             @test_throws "not found in chain" returned(xy(), chn)
         end
 
-        @testset "stacks DimArray return values" begin
+        @testset "stacks Array return values" begin
             @model function return_dimarray()
                 x ~ Normal()
                 return DD.DimArray(randn(2, 3), (:a, :b))

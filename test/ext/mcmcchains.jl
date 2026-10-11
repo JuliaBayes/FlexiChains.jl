@@ -80,9 +80,9 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
         # Mostly to test that it works; the VarName test above is responsible for checking
         # all the other fields.
         niters, nchains, nparams = 10, 3, 5
-        rand_da() = DimArray(rand(nparams), Dim{:param}(1:nparams))
+        rand_array() = rand(nparams)
         dict_of_arrays = Dict{ParameterOrExtra{Symbol},Matrix}(
-            Parameter(:params) => [rand_da() for _ in 1:niters, _ in 1:nchains],
+            Parameter(:params) => [rand_array() for _ in 1:niters, _ in 1:nchains],
             Extra(:lp) => rand(niters, nchains),
         )
         chn = FlexiChain{Symbol}(niters, nchains, dict_of_arrays)

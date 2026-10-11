@@ -518,13 +518,17 @@ end
 Returns a `DimMatrix` of the model's return values, re-evaluated using the parameters in
 each iteration of the chain.
 
-If the return value is a `DimArray`, the dimensions will be stacked.
+If the return value is an `AbstractArray`, the dimensions will be stacked.
 """
 function DynamicPPL.returned(
     model::DynamicPPL.Model,
     chain::FlexiChain{<:VarName},
 )::DD.DimArray
-    return FlexiChains._raw_to_user_data(chain, map(first, reevaluate(model, chain)))
+    return FlexiChains._raw_to_user_data(
+        chain,
+        map(first, reevaluate(model, chain));
+        stack=true,
+    )
 end
 
 """
