@@ -742,13 +742,6 @@ function _stack_arrays(
     end
 end
 
-const _STACK_DEPWARN_MSG = (
-    "Implicit stacking of `DimArray` elements will be removed in a" *
-    " future release of FlexiChains. Please either pass `stack=true`" *
-    " to explicitly opt-in, or `stack=false` to disable. The default" *
-    " will change to `false` in a future version."
-)
-
 """
     _raw_to_user_data(chain::FlexiChain, data::Matrix; stack=nothing)
 
@@ -758,16 +751,20 @@ indexing into a `FlexiChain`.
 
 The `stack` keyword argument controls stacking of array-valued elements:
 
-- `nothing` (default): auto-stack `DimArray` elements (deprecated; will change to `false`).
+- `false (default)`: never stack; return a `DimArray` whose elements are arrays.
 - `true`: stack all `AbstractArray` elements into a higher-dimensional `DimArray` as long as
   they are all the same size
-- `false`: never stack; return a `DimArray` whose elements are arrays.
 
 !!! important
     This function performs no checks to make sure that the lengths of the indices stored in
 the chain line up with the size of the matrix.
 """
-function _raw_to_user_data(chain::FlexiChain, mat::Matrix; name=DD.NoName(), stack=nothing)
+function _raw_to_user_data(
+    chain::FlexiChain,
+    mat::Matrix;
+    name=DD.NoName(),
+    stack::Bool=false,
+)
     dimmat = DD.DimMatrix(mat, _default_dims(chain); name=name)
     return _raw_to_user_data(chain, dimmat; name=name, stack=stack)
 end
@@ -775,20 +772,15 @@ function _raw_to_user_data(
     ::FlexiChain,
     dimmat::DD.DimMatrix;
     name=DD.NoName(),
-    stack=nothing,
+    stack::Bool=false,
 )
     if !(eltype(dimmat) <: AbstractArray)
         return DD.rebuild(dimmat; name=name)
     end
-    if stack === nothing
-        is_dimmat = eltype(dimmat) <: DD.DimArray
-        is_dimmat && @warn _STACK_DEPWARN_MSG
-        stack = is_dimmat
-    end
-    return if stack === false
-        DD.rebuild(dimmat; name=name)
-    else
+    return if stack
         _stack_arrays(dimmat; name=name)
+    else
+        DD.rebuild(dimmat; name=name)
     end
 end
 

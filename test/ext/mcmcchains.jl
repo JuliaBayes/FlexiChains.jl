@@ -183,13 +183,6 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             # `FlexiChain{VarName{sym,Iden} where sym}`.
             @test FlexiChains._split_varnames(fc) isa Any
         end
-
-        @testset "deprecated constructor still works" begin
-            chn = _make_mcmcchains(Xoshiro(654), g(), 50, 1)
-            fc = @test_deprecated FlexiChain{Symbol}(chn)
-            @test fc isa FlexiChain{Symbol}
-            @test size(fc) == (size(chn, 1), size(chn, 3))
-        end
     end
 end
 

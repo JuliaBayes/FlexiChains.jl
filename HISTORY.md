@@ -28,6 +28,11 @@ The keyword arguments of the plotting functions to create pushforward visualisat
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
   - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
 
+## Stacking of array-valued parameters
+
+Previously, if you had a parameter whose value was a `DimArray`, accessing its data (i.e., `chain[key]`) would automatically stack the parameter's dimensions with the iteration and chain dimensions.
+This behaviour has been removed now; you must explicitly request stacking by passing `stack=true` to `getindex`, i.e., `chain[key, stack=true]`.
+
 ## Removal of deprecated functions
 
 The deprecated top-level plotting functions have been removed.
