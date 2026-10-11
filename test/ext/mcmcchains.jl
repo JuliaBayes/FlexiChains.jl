@@ -86,7 +86,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             Extra(:lp) => rand(niters, nchains),
         )
         chn = FlexiChain{Symbol}(niters, nchains, dict_of_arrays)
-        @test size(chn[:params]) == (niters, nchains, nparams)
+        @test size(chn[:params, stack=true]) == (niters, nchains, nparams)
 
         mc = MCMCChains.Chains(chn)
         mc_params = MCMCChains.get_sections(mc, :parameters)
