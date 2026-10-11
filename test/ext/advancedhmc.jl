@@ -31,8 +31,8 @@ using Test
     @test chn isa FlexiChain{Symbol}
     @test size(chn) == (niters, 1)
     @test only(FlexiChains.parameters(chn)) == :params
-    @test chn[:params] isa DimArray{Float64,3}
-    @test size(chn[:params]) == (niters, 1, nparams)
+    @test chn[:params, stack=true] isa DimArray{Float64,3}
+    @test size(chn[:params, stack=true]) == (niters, 1, nparams)
 end
 
 end # module

@@ -126,9 +126,9 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         @test harmmean(chain) isa FlexiSummary
         @test harmmean(chain; dims=:iter) isa FlexiSummary
         @test harmmean(chain; dims=:chain) isa FlexiSummary
-        @test mad(chain) isa FlexiSummary
-        @test mad(chain; dims=:iter) isa FlexiSummary
-        @test mad(chain; dims=:chain) isa FlexiSummary
+        @test mad(chain; normalize=false) isa FlexiSummary
+        @test mad(chain; dims=:iter, normalize=false) isa FlexiSummary
+        @test mad(chain; dims=:chain, normalize=false) isa FlexiSummary
         @test iqr(chain) isa FlexiSummary
         @test iqr(chain; dims=:iter) isa FlexiSummary
         @test iqr(chain; dims=:chain) isa FlexiSummary

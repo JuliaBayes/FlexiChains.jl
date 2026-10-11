@@ -95,7 +95,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             @test Symbol("params[$i]") in keys(mc_params)
         end
         # MCMCChains is niters x nparams x nchains
-        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params]
+        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params, stack=true]
         @test mc[:lp] == chn[:lp]
     end
 
