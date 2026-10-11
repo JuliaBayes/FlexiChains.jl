@@ -125,15 +125,6 @@ function _infer_key_type(key_spec::Tuple)
     return T
 end
 
-# I can't seem to get Base.@deprecate to work
-function FlexiChains.FlexiChain{Symbol}(chains::MCMCChains.Chains)
-    Base.depwarn(
-        "`FlexiChain{Symbol}(chains::MCMCChains.Chains)` is deprecated, use `FlexiChains.from_mcmcchains(chains)` instead.",
-        :FlexiChain,
-    )
-    return FlexiChains.from_mcmcchains(chains)
-end
-
 ############################
 # Conversion to MCMCChains #
 ############################

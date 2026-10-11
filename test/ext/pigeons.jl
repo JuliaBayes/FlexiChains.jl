@@ -10,6 +10,8 @@ using Random
 using Test
 
 @testset "PigeonsExt" begin
+    @info "Testing Pigeons extension"
+
     @testset "Callable struct" begin
         struct MyLogPotential
             n_trials::Int

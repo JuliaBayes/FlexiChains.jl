@@ -28,14 +28,13 @@ The keyword arguments of the plotting functions to create pushforward visualisat
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
   - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
 
-## Removal of deprecated plotting functions
+## Deprecated functions
 
-The deprecated top-level plotting functions have been removed. Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
+The deprecated top-level plotting functions have been removed.
+Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
 
   - `FlexiChains.traceplot`, `FlexiChains.mixeddensity`, `FlexiChains.meanplot`, `FlexiChains.rankplot`, and `FlexiChains.autocorplot` (and their mutating versions) are now `FlexiChains.Plots.traceplot` etc.
   - `FlexiChains.mtraceplot`, `FlexiChains.mmixeddensity`, `FlexiChains.mmeanplot`, `FlexiChains.mrankplot`, and `FlexiChains.mautocorplot` (and their mutating versions) are now `FlexiChains.Makie.traceplot` etc.
-
-## `values_at` and `parameters_at`
 
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
@@ -43,6 +42,9 @@ Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=..
 For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and therefore `rand(chn; parameters_only=true)`) now returns a `NamedTuple` by default instead of an `OrderedDict{Symbol}`.
 The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
 To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
+
+`FlexiChains.FlexiChain(::MCMCChains.Chains)` has been removed; please use
+`FlexiChains.from_mcmcchains` instead.
 
 ## Tables.jl output for single-statistic summaries
 

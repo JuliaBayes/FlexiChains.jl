@@ -671,10 +671,8 @@ If the state was not saved for a given chain, its entry in the vector will be `m
 
 !!! note "Returns a vector"
 
-    This function *always* returns a vector of sampler states, even if there is only one chain.
-    Consequently, if you are resuming a single-chain MCMC run like `sample(model, spl, N)`, you
-    will need to extract the sole element of the returned vector before passing it as the
-    `initial_state` keyword argument to `sample()`.
+    This function *always* returns a vector of sampler states, even if there is only one
+    chain.
 """
 function last_sampler_state(chain::FlexiChain)::Vector
     return chain._metadata.last_sampler_state

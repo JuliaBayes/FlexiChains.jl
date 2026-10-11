@@ -12,7 +12,7 @@ This works with any model that Pigeons supports, including DynamicPPL models and
 
     There are a few tricky things to be aware of here.
 
-    Firstly, if you are using Turing with FlexiChains, it's very likely that you are using FlexiChains v0.6.
+    **Firstly, if you are using Turing with FlexiChains, it's very likely that you are using FlexiChains v0.6.**
     You should check this by inspecting your Project.toml or Manifest.toml: if this is indeed the case, please refer to [the v0.6 documentation](https://juliabayes.org/FlexiChains.jl/v0.6/pigeons).
 
     Secondly, although Pigeons has had a compatibility patch for DynamicPPL 0.41/0.42 merged, this has not yet been released.
