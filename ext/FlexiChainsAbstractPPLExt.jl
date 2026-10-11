@@ -262,6 +262,39 @@ function FC._split_varnames(
     return FC._replace_data(cs, VarName, new_data), plot_names
 end
 
+function FC._split_parameter_leaves(vn::VarName, d::AbstractArray)
+    if FC._elems_have_fixed_vn_leaves(d)
+        # Don't need to iterate over all array elements - just check the first one.
+        d1 = first(d)
+        vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+        if length(vn_leaves) == 1 && only(vn_leaves) == vn
+            # Scalar-valued parameter: nothing to split.
+            return [vn => d]
+        elseif d1 isa AbstractArray{<:Union{Real,Missing}}
+            # all leaves have the same dimensions, so invert the nested array structure
+            # with a simple broadcast
+            return [
+                vn_leaf => getindex.(d, i) for (i, vn_leaf) in zip(eachindex(d1), vn_leaves)
+            ]
+        else
+            return [vn_leaf => FC._get_leaf_data(vn, d, vn_leaf) for vn_leaf in vn_leaves]
+        end
+    else # leaves may have different sizes
+        vns = OrderedSet{VarName}()
+        for i in eachindex(d)
+            for vn_leaf in VarNames.varname_leaves(vn, d[i])
+                push!(vns, vn_leaf)
+            end
+        end
+        return [vn_leaf => FC._get_leaf_data(vn, d, vn_leaf) for vn_leaf in vns]
+    end
+end
+# Get leaf data by applying the optic - slower fallback that always works
+function FC._get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
+    optic, _ = FC._getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
+    return FC._map_optic(optic, d, vn_leaf)
+end
+
 _internal_to_optic(@nospecialize x) = x
 _internal_to_optic(di::AbstractPPL.DynamicIndex) = VarNames.DynamicIndex(di.expr, di.f)
 _internal_to_optic(::AbstractPPL.Iden) = VarNames.Iden()
