@@ -28,7 +28,7 @@ The keyword arguments of the plotting functions to create pushforward visualisat
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
   - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
 
-## Deprecated functions
+## Removal of deprecated functions
 
 The deprecated top-level plotting functions have been removed.
 Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
@@ -100,7 +100,12 @@ Autocorrelation is always computed within each chain; by default the per-chain v
 Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
 `dims=:iter` computes a separate correlation matrix for each chain.
 
-Both functions are exported.
+## PosteriorDB.jl integration
+
+A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
+Vector-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single vector-valued parameter (e.g. `@vn(theta)`).
+
+`FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
 ## Other non-breaking changes
 
