@@ -136,7 +136,7 @@ end
 """
     Base.getindex(
         fchain::FlexiChain{TKey}, key::ParameterOrExtra{<:TKey};
-        iter=Colon(), chain=Colon(), stack=nothing
+        iter=Colon(), chain=Colon(), stack::Bool=false
     ) where {TKey}
 
 Unambiguously access the data corresponding to the given `key` in the chain.
@@ -151,7 +151,7 @@ function Base.getindex(
     key::ParameterOrExtra{<:TKey};
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey}
     return _raw_to_user_data(
         fchain,
@@ -169,7 +169,7 @@ end
         [iter=Colon(),]
         [chain=Colon(),]
         [stat=Colon(),]
-        stack=nothing
+        stack::Bool=false,
     ) where {TKey}
 
 Unambiguously access the data corresponding to the given `key` in the summary.
@@ -185,7 +185,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey,TIIdx,TCIdx}
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
     user_data = _raw_to_user_data(fs, _get_raw_data(fs, key); name=string(key), stack=stack)
@@ -195,7 +195,7 @@ end
 """
     Base.getindex(
         chain::FlexiChain, sym_key::Symbol;
-        iter=Colon(), chain=Colon(), stack=nothing
+        iter=Colon(), chain=Colon(), stack::Bool=false
     )
 
 The least verbose method to index into a `FlexiChain` is using `Symbol`.
@@ -219,7 +219,7 @@ function Base.getindex(
     sym_key::Symbol;
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey}
     k = _resolve_getindex_key(TKey, keys(fchain), sym_key)
     return fchain[k, iter=iter, chain=chain, stack=stack]
@@ -231,7 +231,7 @@ function Base.getindex(
     sym_key::Symbol;
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 )
     k = _resolve_getindex_key(Symbol, keys(fchain), sym_key)
     return fchain[k, iter=iter, chain=chain, stack=stack]
@@ -243,7 +243,7 @@ end
         [iter=Colon(),]
         [chain=Colon(),]
         [stat=Colon(),]
-        stack=nothing
+        stack::Bool=false,
     ) where {TKey}
 
 Index into a summary using an unambiguous `Symbol` key. This requires that the summary has a
@@ -258,7 +258,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey}
     k = _resolve_getindex_key(TKey, keys(fs), sym_key)
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
@@ -272,7 +272,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 )
     k = _resolve_getindex_key(Symbol, keys(fs), sym_key)
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
@@ -287,7 +287,7 @@ end
 """
     Base.getindex(
         fchain::FlexiChain{TKey}, parameter_name::TKey;
-        iter=Colon(), chain=Colon(), stack=nothing
+        iter=Colon(), chain=Colon(), stack::Bool=false
     ) where {TKey}
 
 Convenience method for retrieving parameters. Equal to `chain[Parameter(parameter_name)]`.
@@ -299,7 +299,7 @@ function Base.getindex(
     parameter_name::TKey;
     iter=Colon(),
     chain=Colon(),
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey}
     return fchain[Parameter(parameter_name), iter=iter, chain=chain, stack=stack]
 end
@@ -310,7 +310,7 @@ end
         [iter=Colon(),]
         [chain=Colon(),]
         [stat=Colon(),]
-        stack=nothing
+        stack::Bool=false,
     ) where {TKey}
 
 Convenience method for retrieving parameters. Equal to `summary[Parameter(parameter_name)]`.
@@ -323,7 +323,7 @@ function Base.getindex(
     iter=_UNSPECIFIED_KWARG,
     chain=_UNSPECIFIED_KWARG,
     stat=_UNSPECIFIED_KWARG,
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey}
     relevant_kwargs = _check_summary_kwargs(fs, iter, chain, stat)
     user_data = _raw_to_user_data(

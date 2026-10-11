@@ -463,21 +463,10 @@ column.
 
 ## Example (`FlexiChain`)
 
-```julia
-using Turing, FlexiChains, DataFrames
-
-@model function f()
-    x ~ Normal()
-    b ~ Bernoulli()
-end
-chn = sample(f(), Prior(), MCMCThreads(), 10, 2; chain_type=VNChain)
-
-df = DataFrame(Wide(chn))
-```
-
-returns a DataFrame that looks like the following. Each parameter is a different column, and
-the `iter` and `chain` dimensions are represented as separate columns as well; `iter` varies
-faster than `chain`.
+Suppose we have a `chn::FlexiChain` with 2 parameters, `x::Float64` and `b::Bool`, 10
+iterations and 2 chains. Then `DataFrame(Wide(chn))` will return a DataFrame that looks like
+the following. Each parameter is a different column, and the `iter` and `chain` dimensions
+are represented as separate columns as well; `iter` varies faster than `chain`.
 
 !!! note
     Because all parameter names must be converted to `Symbol` for column names, this
@@ -563,21 +552,11 @@ indicating the parameter name.
 
 ## Example
 
-```julia
-using Turing, FlexiChains, DataFrames
-
-@model function f()
-    x ~ Normal()
-    b ~ Bernoulli()
-end
-chn = sample(f(), Prior(), MCMCThreads(), 10, 2; chain_type=VNChain)
-
-df = DataFrame(Long(chn))
-```
-
-returns a DataFrame that looks like the following. The `iter` and `chain` dimensions are
-represented as separate columns as before, but now the parameter names are stacked into a
-single `param` column, and the values are stacked into a single `value` column.
+Suppose we have a `chn::FlexiChain` with 2 parameters, `x::Float64` and `b::Bool`, 10
+iterations and 2 chains. Then `DataFrame(Long(chn))` will return a DataFrame that looks like
+the following. The `iter` and `chain` dimensions are represented as separate columns as
+before, but now the parameter names are stacked into a single `param` column, and the values
+are stacked into a single `value` column.
 
 The `iter` column varies faster than the `chain` column, which in turn varies faster than
 the `param` column.

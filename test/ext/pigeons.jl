@@ -1,14 +1,21 @@
 module FlexiChainsPigeonsExtTests
 
+# 1.10 can't use [sources], so have to manually add
+using Pkg
+Pkg.add(url="https://github.com/Julia-Tempering/Pigeons.jl", rev="main")
+
 using FlexiChains: FlexiChains, SymChain, Extra
 using BridgeStan
 using Pigeons
 using DynamicPPL
+import DifferentiationInterface # to trigger ext loading
 using Distributions
 using Random
 using Test
 
 @testset "PigeonsExt" begin
+    @info "Testing Pigeons extension"
+
     @testset "Callable struct" begin
         struct MyLogPotential
             n_trials::Int

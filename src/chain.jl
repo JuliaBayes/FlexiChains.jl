@@ -661,19 +661,6 @@ Note that this always returns a vector with length equal to the number of chains
 sampling_time(chain::FlexiChain)::Vector{<:Union{Real,Missing}} =
     chain._metadata.sampling_time
 
-const _INITIAL_STATE_DOCSTRING = """
-!!! note "Returns a vector"
-
-    This function *always* returns a vector of sampler states, even if there is only one chain.
-    Consequently, if you are resuming a single-chain MCMC run like `sample(model, spl, N)`, you
-    will need to extract the sole element of the returned vector before passing it as the
-    `initial_state` keyword argument to `sample()`. Please see the ['using with Turing'](@ref
-    Saving-and-resuming-MCMC-sampling-progress) page, or [the Turing.jl documentation page
-    on
-    `initial_state`](https://turinglang.org/docs/usage/sampling-options/#saving-and-resuming-sampling),
-    for more explanation of this.
-"""
-
 """
     last_sampler_state(chain::FlexiChain)::Vector
 
@@ -682,7 +669,10 @@ keyword argument was passed to `sample`. This can be used for resuming MCMC samp
 
 If the state was not saved for a given chain, its entry in the vector will be `missing`.
 
-$(_INITIAL_STATE_DOCSTRING)
+!!! note "Returns a vector"
+
+    This function *always* returns a vector of sampler states, even if there is only one
+    chain.
 """
 function last_sampler_state(chain::FlexiChain)::Vector
     return chain._metadata.last_sampler_state
@@ -752,15 +742,8 @@ function _stack_arrays(
     end
 end
 
-const _STACK_DEPWARN_MSG = (
-    "Implicit stacking of `DimArray` elements will be removed in a" *
-    " future release of FlexiChains. Please either pass `stack=true`" *
-    " to explicitly opt-in, or `stack=false` to disable. The default" *
-    " will change to `false` in a future version."
-)
-
 """
-    _raw_to_user_data(chain::FlexiChain, data::Matrix; stack=nothing)
+    _raw_to_user_data(chain::FlexiChain, data::Matrix; stack::Bool=false)
 
 Convert `data`, which is a raw matrix of samples, to a `DimensionalData.DimArray` using the
 indices stored in in the `FlexiChain`. This is the format that users expect to obtain when
@@ -768,16 +751,20 @@ indexing into a `FlexiChain`.
 
 The `stack` keyword argument controls stacking of array-valued elements:
 
-- `nothing` (default): auto-stack `DimArray` elements (deprecated; will change to `false`).
+- `false (default)`: never stack; return a `DimArray` whose elements are arrays.
 - `true`: stack all `AbstractArray` elements into a higher-dimensional `DimArray` as long as
   they are all the same size
-- `false`: never stack; return a `DimArray` whose elements are arrays.
 
 !!! important
     This function performs no checks to make sure that the lengths of the indices stored in
 the chain line up with the size of the matrix.
 """
-function _raw_to_user_data(chain::FlexiChain, mat::Matrix; name=DD.NoName(), stack=nothing)
+function _raw_to_user_data(
+    chain::FlexiChain,
+    mat::Matrix;
+    name=DD.NoName(),
+    stack::Bool=false,
+)
     dimmat = DD.DimMatrix(mat, _default_dims(chain); name=name)
     return _raw_to_user_data(chain, dimmat; name=name, stack=stack)
 end
@@ -785,20 +772,15 @@ function _raw_to_user_data(
     ::FlexiChain,
     dimmat::DD.DimMatrix;
     name=DD.NoName(),
-    stack=nothing,
+    stack::Bool=false,
 )
     if !(eltype(dimmat) <: AbstractArray)
         return DD.rebuild(dimmat; name=name)
     end
-    if stack === nothing
-        is_dimmat = eltype(dimmat) <: DD.DimArray
-        is_dimmat && @warn _STACK_DEPWARN_MSG
-        stack = is_dimmat
-    end
-    return if stack === false
-        DD.rebuild(dimmat; name=name)
-    else
+    return if stack
         _stack_arrays(dimmat; name=name)
+    else
+        DD.rebuild(dimmat; name=name)
     end
 end
 

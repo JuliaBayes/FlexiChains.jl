@@ -12,22 +12,90 @@ using VarNames: VarNames
 
 const OldVNChain = FlexiChain{AbstractPPL.VarName}
 
-### compatibility shim to allow Turing to sample into new VNChain if desired
-function _convert_vnt(vnt::DynamicPPL.VarNamedTuple)::VarNames.VarNamedTuple
-    new_vnt = VarNames.VarNamedTuple()
-    for (vn, val) in pairs(vnt)
-        new_vn = FlexiChains._as_varname(vn)
-        top_sym = AbstractPPL.getsym(vn)
-        template = get(vnt.data, top_sym, VarNames.NoTemplate())
-        new_vnt = VarNames.templated_setindex!!(new_vnt, val, new_vn, template)
-    end
-    return new_vnt
+### Converting between OldVNChain (what Turing samples into) and VNChain
+
+# Convert skeletal VarNamedTuples (as stored in a chain's `_structures`) between the
+# DynamicPPL and VarNames versions. Both packages use the same layout for skeletons: a
+# NamedTuple whose values are either nested skeletons, or arrays (in place of
+# PartialArrays) whose elements are either `nothing` or nested skeletons.
+_upgrade_skeleton(vnt::DynamicPPL.VarNamedTuple) =
+    VarNames.VarNamedTuple(map(_upgrade_skeleton, vnt.data))
+_upgrade_skeleton(arr::AbstractArray) = map(_upgrade_skeleton, arr)
+_upgrade_skeleton(x) = x
+_downgrade_skeleton(vnt::VarNames.VarNamedTuple) =
+    DynamicPPL.VarNamedTuple(map(_downgrade_skeleton, vnt.data))
+_downgrade_skeleton(arr::AbstractArray) = map(_downgrade_skeleton, arr)
+_downgrade_skeleton(x) = x
+
+# Convert a VarNames.VarName to an AbstractPPL.VarName. This is the reverse of
+# `FlexiChains._as_varname(::AbstractPPL.VarName)`.
+_downgrade_optic(@nospecialize x) = x
+_downgrade_optic(di::VarNames.DynamicIndex) = AbstractPPL.DynamicIndex(di.expr, di.f)
+_downgrade_optic(::VarNames.Iden) = AbstractPPL.Iden()
+_downgrade_optic(p::VarNames.Property{sym}) where {sym} =
+    AbstractPPL.Property{sym}(_downgrade_optic(p.child))
+function _downgrade_optic(i::VarNames.Index)
+    ix = map(_downgrade_optic, i.ix)
+    kw = map(_downgrade_optic, i.kw)
+    return AbstractPPL.Index(ix, kw, _downgrade_optic(i.child))
 end
-function to_vnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
-    return _convert_vnt(vnt), (;)
+function _downgrade_varname(vn::VarNames.VarName{sym}) where {sym}
+    return AbstractPPL.VarName{sym}(_downgrade_optic(VarNames.getoptic(vn)))
 end
-function to_vnt_and_stats(pws::DynamicPPL.ParamsWithStats)
-    return _convert_vnt(pws.params), pws.stats
+
+function _convert_chain(
+    chain::FlexiChain,
+    ::Type{TKey},
+    convert_key,
+    convert_skeleton,
+) where {TKey}
+    new_data = OrderedDict{ParameterOrExtra{<:TKey},Matrix}(
+        (k isa Parameter ? Parameter(convert_key(k.name)) : k) => v for
+        (k, v) in chain._data
+    )
+    return FlexiChain{TKey}(
+        FlexiChains.niters(chain),
+        FlexiChains.nchains(chain),
+        new_data;
+        structures=map(convert_skeleton, chain._structures),
+        iter_indices=FlexiChains.iter_indices(chain),
+        chain_indices=FlexiChains.chain_indices(chain),
+        sampling_time=FlexiChains.sampling_time(chain),
+        last_sampler_state=FlexiChains.last_sampler_state(chain),
+    )
+end
+
+"""
+    FlexiChains.upgrade(chain::FlexiChain{AbstractPPL.VarName})::VNChain
+
+Convert a chain keyed by AbstractPPL's `VarName` (which is what Turing.jl samples into)
+to a `VNChain`, i.e. a chain keyed by FlexiChains' own `VarName`.
+
+The data and metadata are unchanged. If the chain stores skeletal `VarNamedTuple`s (as
+chains from Turing.jl do), these are converted too, so that functions like
+[`FlexiChains.parameters_at`](@ref) still return `VarNamedTuple`s.
+
+See also [`FlexiChains.downgrade`](@ref) for the reverse operation.
+"""
+function FlexiChains.upgrade(chain::OldVNChain)
+    return _convert_chain(
+        chain,
+        VarNames.VarName,
+        FlexiChains._as_varname,
+        _upgrade_skeleton,
+    )
+end
+
+"""
+    FlexiChains.downgrade(chain::VNChain)::FlexiChain{AbstractPPL.VarName}
+
+Convert a `VNChain` back to a chain keyed by AbstractPPL's `VarName`, which is the type of
+chain that DynamicPPL.jl and Turing.jl functions (such as `predict` or `returned`) expect.
+
+This is the reverse of [`FlexiChains.upgrade`](@ref).
+"""
+function FlexiChains.downgrade(chain::FlexiChains.VNChain)
+    return _convert_chain(chain, VarName, _downgrade_varname, _downgrade_skeleton)
 end
 
 ##################
@@ -450,13 +518,17 @@ end
 Returns a `DimMatrix` of the model's return values, re-evaluated using the parameters in
 each iteration of the chain.
 
-If the return value is a `DimArray`, the dimensions will be stacked.
+If the return value is an `AbstractArray`, the dimensions will be stacked.
 """
 function DynamicPPL.returned(
     model::DynamicPPL.Model,
     chain::FlexiChain{<:VarName},
 )::DD.DimArray
-    return FlexiChains._raw_to_user_data(chain, map(first, reevaluate(model, chain)))
+    return FlexiChains._raw_to_user_data(
+        chain,
+        map(first, reevaluate(model, chain));
+        stack=true,
+    )
 end
 
 """

@@ -80,13 +80,13 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
         # Mostly to test that it works; the VarName test above is responsible for checking
         # all the other fields.
         niters, nchains, nparams = 10, 3, 5
-        rand_da() = DimArray(rand(nparams), Dim{:param}(1:nparams))
+        rand_array() = rand(nparams)
         dict_of_arrays = Dict{ParameterOrExtra{Symbol},Matrix}(
-            Parameter(:params) => [rand_da() for _ in 1:niters, _ in 1:nchains],
+            Parameter(:params) => [rand_array() for _ in 1:niters, _ in 1:nchains],
             Extra(:lp) => rand(niters, nchains),
         )
         chn = FlexiChain{Symbol}(niters, nchains, dict_of_arrays)
-        @test size(chn[:params]) == (niters, nchains, nparams)
+        @test size(chn[:params, stack=true]) == (niters, nchains, nparams)
 
         mc = MCMCChains.Chains(chn)
         mc_params = MCMCChains.get_sections(mc, :parameters)
@@ -95,7 +95,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             @test Symbol("params[$i]") in keys(mc_params)
         end
         # MCMCChains is niters x nparams x nchains
-        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params]
+        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params, stack=true]
         @test mc[:lp] == chn[:lp]
     end
 
@@ -182,13 +182,6 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             # This used to error prior to v0.6.31 because `fc` would be a
             # `FlexiChain{VarName{sym,Iden} where sym}`.
             @test FlexiChains._split_varnames(fc) isa Any
-        end
-
-        @testset "deprecated constructor still works" begin
-            chn = _make_mcmcchains(Xoshiro(654), g(), 50, 1)
-            fc = @test_deprecated FlexiChain{Symbol}(chn)
-            @test fc isa FlexiChain{Symbol}
-            @test size(fc) == (size(chn, 1), size(chn, 3))
         end
     end
 end

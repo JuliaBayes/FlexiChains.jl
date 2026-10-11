@@ -446,12 +446,6 @@ using Random: Xoshiro
                           DD.lookup(DD.dims(dimarr, DD.X))
                     @test result[1, 1, :] == parent(dimarr)
                 end
-                @testset "default (no stack kwarg) emits deprecation warning" begin
-                    result =
-                        @test_logs((:warn, FlexiChains._STACK_DEPWARN_MSG), chain[:dimarr],)
-                    @test result isa DD.DimArray{Float64,3}
-                    @test size(result) == (Niters, Nchains, 3)
-                end
             end
 
             @testset "stack=true with mismatched sizes errors" begin

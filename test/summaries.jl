@@ -126,9 +126,9 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         @test harmmean(chain) isa FlexiSummary
         @test harmmean(chain; dims=:iter) isa FlexiSummary
         @test harmmean(chain; dims=:chain) isa FlexiSummary
-        @test mad(chain) isa FlexiSummary
-        @test mad(chain; dims=:iter) isa FlexiSummary
-        @test mad(chain; dims=:chain) isa FlexiSummary
+        @test mad(chain; normalize=false) isa FlexiSummary
+        @test mad(chain; dims=:iter, normalize=false) isa FlexiSummary
+        @test mad(chain; dims=:chain, normalize=false) isa FlexiSummary
         @test iqr(chain) isa FlexiSummary
         @test iqr(chain; dims=:iter) isa FlexiSummary
         @test iqr(chain; dims=:chain) isa FlexiSummary
@@ -637,7 +637,6 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 @testset "DimArray parameter" begin
                     @test m[:dimarr, stack=false] == dimarr
                     @test m[:dimarr, stack=true] == dimarr
-                    # no warning because there is no stacking going on
                     @test m[:dimarr] == dimarr
                 end
             end
@@ -682,11 +681,6 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                     @test size(result) == (Nchains, 3)
                     @test DD.dims(result) isa Tuple{DD.Dim{:chain},DD.X}
                     @test result[1, :] == parent(dimarr)
-
-                    result =
-                        @test_logs((:warn, FlexiChains._STACK_DEPWARN_MSG), m[:dimarr],)
-                    @test result isa DD.DimArray{Float64,2}
-                    @test size(result) == (Nchains, 3)
                 end
             end
 
@@ -719,13 +713,6 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                     @test result isa DD.DimArray{Float64,3}
                     @test size(result) == (Nchains, 2, 3)
                     @test DD.dims(result) isa Tuple{DD.Dim{:chain},DD.Dim{:stat},DD.X}
-
-                    result = @test_logs(
-                        (:warn, FlexiChains._STACK_DEPWARN_MSG),
-                        ms[:dimarr, stat=DD.At(:mean)],
-                    )
-                    @test result isa DD.DimArray{Float64,2}
-                    @test size(result) == (Nchains, 3)
                 end
             end
         end

@@ -214,7 +214,7 @@ function DD.dims(fs::FlexiSummary)
 end
 
 """
-    _raw_to_user_data(summary::FlexiSummary, data::AbstractArray; stack=nothing)
+    _raw_to_user_data(summary::FlexiSummary, data::AbstractArray; stack::Bool=false)
 
 Convert `data`, which is a raw 3D array of samples, to either:
 
@@ -233,7 +233,7 @@ function _raw_to_user_data(
     fs::FlexiSummary{TKey,TIIdx,TCIdx,TSIdx},
     arr::Array{<:Any,3};
     name=DD.NoName(),
-    stack=nothing,
+    stack::Bool=false,
 ) where {TKey,TIIdx,TCIdx,TSIdx}
     new_dims, dim_indices_to_drop = _get_summary_dims(fs)
     dropped_arr = dropdims(arr; dims=dim_indices_to_drop)

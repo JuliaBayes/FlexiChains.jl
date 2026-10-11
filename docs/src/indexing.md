@@ -136,7 +136,7 @@ To specify a single key, you can use:
   - a parameter name (e.g. for a `FlexiChain{T}`, an object of type `T`);
   - a `VarName` or sub-`VarName`, for a `FlexiChain{VarName}` (i.e. `VNChain`);
   - a `FlexiChains.Extra` for non-parameter keys;
-  - a `Symbol`, as long as it [refers to an unambiguous key](@ref symbol-indexing);
+  - a `Symbol`, as long as it refers to an unambiguous key;
   - a `FlexiChains.Parameter` (this is mentioned for completeness; as a user you probably don't need to do this)
 
 On the other hand, you could specify multiple keys via:

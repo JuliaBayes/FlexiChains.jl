@@ -28,14 +28,18 @@ The keyword arguments of the plotting functions to create pushforward visualisat
   - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
   - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
 
-## Removal of deprecated plotting functions
+## Stacking of array-valued parameters
 
-The deprecated top-level plotting functions have been removed. Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
+Previously, if you had a parameter whose value was a `DimArray`, accessing its data (i.e., `chain[key]`) would automatically stack the parameter's dimensions with the iteration and chain dimensions.
+This behaviour has been removed now; you must explicitly request stacking by passing `stack=true` to `getindex`, i.e., `chain[key, stack=true]`.
+
+## Removal of deprecated functions
+
+The deprecated top-level plotting functions have been removed.
+Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
 
   - `FlexiChains.traceplot`, `FlexiChains.mixeddensity`, `FlexiChains.meanplot`, `FlexiChains.rankplot`, and `FlexiChains.autocorplot` (and their mutating versions) are now `FlexiChains.Plots.traceplot` etc.
   - `FlexiChains.mtraceplot`, `FlexiChains.mmixeddensity`, `FlexiChains.mmeanplot`, `FlexiChains.mrankplot`, and `FlexiChains.mautocorplot` (and their mutating versions) are now `FlexiChains.Makie.traceplot` etc.
-
-## `values_at` and `parameters_at`
 
 The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
 Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
@@ -43,6 +47,9 @@ Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=..
 For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and therefore `rand(chn; parameters_only=true)`) now returns a `NamedTuple` by default instead of an `OrderedDict{Symbol}`.
 The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
 To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
+
+`FlexiChains.FlexiChain(::MCMCChains.Chains)` has been removed; please use
+`FlexiChains.from_mcmcchains` instead.
 
 ## Tables.jl output for single-statistic summaries
 
@@ -98,7 +105,12 @@ Autocorrelation is always computed within each chain; by default the per-chain v
 Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
 `dims=:iter` computes a separate correlation matrix for each chain.
 
-Both functions are exported.
+## PosteriorDB.jl integration
+
+A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
+Vector-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single vector-valued parameter (e.g. `@vn(theta)`).
+
+`FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
 ## Other non-breaking changes
 

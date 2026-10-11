@@ -49,8 +49,8 @@ const _LOGPRIOR_KEY = Extra(:logprior)
 const _LOGLIKELIHOOD_KEY = Extra(:loglikelihood)
 
 # Extended in PosteriorDB extension (but not exported)
-function from_posteriordb_ref end
-@public from_posteriordb_ref
+function from_posteriordb end
+@public from_posteriordb
 include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
@@ -61,6 +61,11 @@ _maybe_promote_key(::Type{<:VarName}) = VarName
 # Extended in MCMCChains extension
 function from_mcmcchains end
 @public from_mcmcchains
+
+# Extended in DynamicPPL extension
+function upgrade end
+function downgrade end
+@public upgrade, downgrade
 
 # Extended in Pigeons extension
 function from_pigeons end
