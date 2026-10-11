@@ -5,7 +5,7 @@ module FlexiChainsAbstractPPLExt
 using FlexiChains: FlexiChains, FlexiChain, FlexiSummary
 using AbstractPPL: AbstractPPL, VarName, @varname
 using VarNames: VarNames
-using OrderedCollections: OrderedSet
+using OrderedCollections: OrderedSet, OrderedDict
 using DimensionalData: DimensionalData
 
 const FC = FlexiChains
@@ -233,38 +233,33 @@ function FC._split_varnames(
     cs::FC.ChainOrSummary{<:VarName};
     collect_plot_names::Bool=false,
 )
-    vns = OrderedSet{VarName}()
     plot_names = Dict{VarName,String}()
+    N = cs isa FlexiChain ? 2 : 3
+    new_data = OrderedDict{FC.ParameterOrExtra{<:VarName},Array{<:Any,N}}()
     for vn in FC.parameters(cs)
         d = FC._get_raw_data(cs, FC.Parameter(vn))
-        if FC._elems_have_fixed_vn_leaves(d)
-            # Don't need to iterate over all array elements - just check the first one.
-            # (Note that `d` could be Array{T,2} or Array{T,3} depending on whether `cs` is
-            # a chain or summary.)
+        for (vn_leaf, leaf_data) in FC._split_parameter_leaves(vn, d)
+            new_data[FC.Parameter(vn_leaf)] = leaf_data
+        end
+        if collect_plot_names &&
+           FC._elems_have_fixed_vn_leaves(d) &&
+           eltype(d) <: DD.DimVector
             d1 = first(d)
-            vn_leaves = AbstractPPL.varname_leaves(vn, d1)
-            for vn_leaf in vn_leaves
-                push!(vns, vn_leaf)
-            end
-            if collect_plot_names && eltype(d) <: DD.DimVector
-                dim = DD.dims(d1, 1)
-                label_type = eltype(dim)
-                if (label_type === Symbol || label_type <: AbstractString)
-                    for (vn_leaf, label) in zip(vn_leaves, dim)
-                        prettylabel = label isa Symbol ? repr(label) : label
-                        plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
-                    end
-                end
-            end
-        else
-            for i in eachindex(d)
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
-                    push!(vns, vn_leaf)
+            dim = DD.dims(d1, 1)
+            label_type = eltype(dim)
+            if (label_type === Symbol || label_type <: AbstractString)
+                vn_leaves = AbstractPPL.varname_leaves(vn, d1)
+                for (vn_leaf, label) in zip(vn_leaves, dim)
+                    prettylabel = label isa Symbol ? repr(label) : label
+                    plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
                 end
             end
         end
     end
-    return cs[[collect(vns)..., FC.extras(cs)...]], plot_names
+    for k in FC.extras(cs)
+        new_data[k] = FC._get_raw_data(cs, k)
+    end
+    return FC._replace_data(cs, VarName, new_data), plot_names
 end
 
 _internal_to_optic(@nospecialize x) = x
