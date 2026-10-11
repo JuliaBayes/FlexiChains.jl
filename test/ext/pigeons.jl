@@ -1,5 +1,9 @@
 module FlexiChainsPigeonsExtTests
 
+# 1.10 can't use [sources], so have to manually add
+using Pkg
+Pkg.add(url="https://github.com/Julia-Tempering/Pigeons.jl", rev="main")
+
 using FlexiChains: FlexiChains, SymChain, Extra
 using BridgeStan
 using Pigeons
