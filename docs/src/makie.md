@@ -410,9 +410,40 @@ FM.ppc_density(
 )
 ```
 
+A density overlay shows whether the predictive distribution has roughly the right shape, but not whether each observation sits where the model says it should.
+[`ppc_pit_ecdf`](@ref FlexiChains.Makie.ppc_pit_ecdf) checks this calibration.
+For each observation it computes the PIT value, i.e. the fraction of predictive draws that fall below the observation; for a calibrated model these values are uniformly distributed.
+The plot shows the empirical CDF of the PIT values minus the uniform CDF, which is a flat line at zero for a calibrated model.
+
+A uniformity test is run on the PIT values, and its p-value is shown in the top-left corner next to the threshold it is compared with (`1 - prob`, where `prob` defaults to `0.99`).
+If the p-value is below the threshold, the PIT values responsible are marked in red, which shows where along the PIT scale the model is miscalibrated.
+
+```@example pushforward
+FM.ppc_pit_ecdf(ppd, @varname(bill_length_mm), observed)
+```
+
+!!! note
+
+    The uniformity test is undefined when an observation lies outside the range of all its predictive draws, and `ppc_pit_ecdf` throws an error listing such observations.
+
+PIT values computed elsewhere, for example LOO-PIT values from PosteriorStats.jl, can be passed directly as `ppc_pit_ecdf(pit_values)`.
+
+Both plots have mutating versions, so they can be placed side by side in one figure:
+
+```@example pushforward
+fig = Figure(; size=(900, 350))
+ax1 = Axis(fig[1, 1]; xlabel="bill length (mm)", ylabel="density")
+FM.ppc_density!(ax1, ppd, @varname(bill_length_mm); observed=observed)
+ax2 = Axis(fig[1, 2]; xlabel="PIT", ylabel="ECDF difference")
+FM.ppc_pit_ecdf!(ax2, ppd, @varname(bill_length_mm), observed)
+fig
+```
+
 ```@docs
 FlexiChains.Makie.ppc_density
 FlexiChains.Makie.ppc_density!
+FlexiChains.Makie.ppc_pit_ecdf
+FlexiChains.Makie.ppc_pit_ecdf!
 ```
 
 ## [Customisation](@id makie-customisation)

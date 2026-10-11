@@ -147,6 +147,15 @@ function make_small_predictive_chain(rng)
 end
 small_predictive_chn = make_small_predictive_chain(StableRNG(404))
 
+# pit: standard normal predictive draws, with observations that are calibrated (standard
+# normal) or underdispersed; and integer-valued draws and observations with ties
+pit_chn = FlexiChain{Symbol}(randn(StableRNG(505), 500, 2, 40), :y_pred)
+const PIT_OBSERVED_CALIBRATED = randn(StableRNG(8), 40)
+const PIT_OBSERVED_UNDERDISPERSED = 0.4 .* randn(StableRNG(8), 40)
+pit_int_chn = FlexiChain{Symbol}(rand(StableRNG(606), 0:20, 150, 2, 40), :y_pred)
+const PIT_OBSERVED_INT = rand(StableRNG(9), 0:20, 40)
+const PRECOMPUTED_PIT = rand(StableRNG(10), 60)
+
 const REFTEST_SPECS = [
     # MakieExt
     RefTestSpec(MakieBE(), "mtraceplot", () -> FC.Makie.traceplot(chn)),
@@ -290,6 +299,31 @@ const REFTEST_SPECS = [
         MakieBE(),
         "ppc_density_all_draws",
         () -> FC.Makie.ppc_density(small_predictive_chn, :y_pred; ndraws=nothing),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_pit_ecdf_calibrated",
+        () -> FC.Makie.ppc_pit_ecdf(pit_chn, :y_pred, PIT_OBSERVED_CALIBRATED),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_pit_ecdf_miscalibrated",
+        () -> FC.Makie.ppc_pit_ecdf(pit_chn, :y_pred, PIT_OBSERVED_UNDERDISPERSED),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_pit_ecdf_integer",
+        () -> FC.Makie.ppc_pit_ecdf(
+            pit_int_chn,
+            :y_pred,
+            PIT_OBSERVED_INT;
+            rng=StableRNG(1),
+        ),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_pit_ecdf_precomputed",
+        () -> FC.Makie.ppc_pit_ecdf(PRECOMPUTED_PIT),
     ),
 ]
 
