@@ -1,6 +1,8 @@
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+Pigeons = "0eb8d820-af6a-4919-95ae-11206f830c31"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
@@ -81,3 +83,4 @@ julia = "1.10"
 
 [sources]
 FlexiChains = {path = ".."}
+Pigeons = {rev = "main", url = "https://github.com/Julia-Tempering/Pigeons.jl"}
