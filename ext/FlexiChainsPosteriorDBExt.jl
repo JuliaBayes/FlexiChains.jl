@@ -2,7 +2,7 @@ module FlexiChainsPosteriorDBExt
 
 using PosteriorDB
 using OrderedCollections: OrderedDict
-using FlexiChains: FlexiChains, FlexiChain, Parameter, VarName, VarNames
+using FlexiChains: FlexiChains, FlexiChain, Parameter, VarName
 
 """
     FlexiChains.from_posteriordb(
@@ -13,9 +13,8 @@ Load a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
 
 PosteriorDB stores vector-valued parameters as separate scalar entries, using Stan's naming
 convention (e.g. `theta[1]`, ..., `theta[8]`). These are recombined into a single
-vector-valued parameter (e.g. `@vn(theta)`, where each draw is a `Vector{Float64}`). If the
-entries for a given parameter do not form a complete vector, they are instead kept as
-separate scalar parameters with indexed `VarName`s (e.g. `@vn(theta[1])`).
+vector-valued parameter (e.g. `@vn(theta)`, where each draw is a `Vector{Float64}`). An
+error is thrown if the entries for a given parameter do not form a complete, 1-based vector.
 
 No reference posterior in PosteriorDB currently contains matrix-valued parameters (e.g.
 `Sigma[1,2]`), so these are not supported: an error is thrown if one is encountered.
@@ -32,13 +31,10 @@ function FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
 
     d = OrderedDict{Parameter{<:VarName},Matrix}()
     for (sym, entries) in groups
-        len = _vector_length(entries)
+        len = _vector_length(sym, entries)
         if len === nothing
-            # Scalar, or something that cannot be reassembled into a vector: keep each
-            # entry as a separate parameter.
-            for (idx, vals) in entries
-                d[Parameter(_make_varname(sym, idx))] = vals
-            end
+            # Scalar parameter: there is exactly one entry, with no index.
+            d[Parameter(VarName{sym}())] = only(entries).second
         else
             vecs = [Vector{Float64}(undef, len) for _ in 1:niters, _ in 1:nchains]
             for (idx, vals) in entries, c in 1:nchains, i in 1:niters
@@ -108,25 +104,22 @@ function _parse_stan_name(name::AbstractString)
     return (sym, parse(Int, idx))
 end
 
-function _make_varname(sym::Symbol, idx::Union{Nothing,Int})
-    return if idx === nothing
-        VarName{sym}()
-    else
-        VarName{sym}(VarNames.Index((idx,), (;)))
-    end
-end
-
 """
 Given a list of `index => values` for a single base symbol, determine the length of the
-vector that they form. Returns `nothing` if the entries are not indexed, or if they do not
-form a complete, 1-based vector with each element appearing exactly once.
+vector that they form. Returns `nothing` if the (single) entry is not indexed, i.e. the
+parameter is a scalar. Throws an error if the indices do not form a complete, 1-based vector
+with each element appearing exactly once.
 """
-function _vector_length(entries)
+function _vector_length(sym::Symbol, entries)
     idxs = map(first, entries)
-    any(isnothing, idxs) && return nothing
-    len = maximum(idxs)
-    (minimum(idxs) >= 1 && length(idxs) == len && allunique(idxs)) || return nothing
-    return len
+    all(isnothing, idxs) && return nothing
+    if any(isnothing, idxs) || sort(Vector{Int}(idxs)) != 1:length(idxs)
+        error(
+            "PosteriorDB entries for parameter `$sym` do not form a complete, 1-based " *
+            "vector (got indices $(idxs)). Please open an issue on FlexiChains.jl.",
+        )
+    end
+    return length(idxs)
 end
 
 end # module

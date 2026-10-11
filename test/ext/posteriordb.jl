@@ -54,12 +54,13 @@ using Test
               (Symbol("not a stan name"), nothing)
         @test_throws ErrorException ext._parse_stan_name("Sigma[2,1]")
         m = zeros(1, 1)
-        @test ext._vector_length([1 => m, 2 => m, 3 => m]) == 3
-        # incomplete or duplicated vectors are not recombined
-        @test ext._vector_length([1 => m, 3 => m]) === nothing
-        @test ext._vector_length([2 => m, 2 => m]) === nothing
-        @test ext._vector_length([0 => m, 1 => m]) === nothing
-        @test ext._vector_length([nothing => m]) === nothing
+        @test ext._vector_length(:x, [1 => m, 2 => m, 3 => m]) == 3
+        @test ext._vector_length(:x, [nothing => m]) === nothing
+        # incomplete, duplicated, zero-based, or mixed scalar/indexed entries error
+        @test_throws ErrorException ext._vector_length(:x, [1 => m, 3 => m])
+        @test_throws ErrorException ext._vector_length(:x, [2 => m, 2 => m])
+        @test_throws ErrorException ext._vector_length(:x, [0 => m, 1 => m])
+        @test_throws ErrorException ext._vector_length(:x, [nothing => m, 1 => m])
     end
 end
 
