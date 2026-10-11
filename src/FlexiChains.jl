@@ -62,6 +62,11 @@ _maybe_promote_key(::Type{<:VarName}) = VarName
 function from_mcmcchains end
 @public from_mcmcchains
 
+# Extended in DynamicPPL extension
+function upgrade end
+function downgrade end
+@public upgrade, downgrade
+
 # Extended in Pigeons extension
 function from_pigeons end
 @public from_pigeons

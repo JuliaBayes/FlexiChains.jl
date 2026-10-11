@@ -12,6 +12,7 @@ using PosteriorStats: PosteriorStats
 using Random: Random, Xoshiro
 using StableRNGs: StableRNG
 using Test
+using VarNames: VarNames
 
 const OldVNChain = FlexiChains.FlexiChain{DynamicPPL.VarName}
 _LOGPRIOR_KEY = Extra(:logprior)
@@ -623,6 +624,56 @@ _LOGJOINT_KEY = Extra(:logjoint)
             first_params = FlexiChains.parameters_at(chn; iter=1, chain=1)
             @test first_params == first_values.params
         end
+    end
+
+    @testset "upgrading to VNChain" begin
+        @model function g()
+            x ~ Normal()
+            y ~ MvNormal(zeros(2), I)
+            # needs a template to reconstruct
+            m = Matrix{Float64}(undef, 2, 2)
+            m[1, 2] ~ Normal()
+            # nested skeleton inside an array
+            s = [(a=0.0,), (a=0.0,)]
+            s[2].a ~ Normal()
+            return nothing
+        end
+        model = g()
+        ps = [DynamicPPL.ParamsWithStats(InitFromPrior(), model) for _ in 1:10, _ in 1:2]
+        old_chn = AbstractMCMC.from_samples(OldVNChain, ps)
+        new_chn = FlexiChains.upgrade(old_chn)
+
+        @test new_chn isa FlexiChains.VNChain
+        @test FlexiChains.parameters(new_chn) ==
+              map(FlexiChains._as_varname, FlexiChains.parameters(old_chn))
+        @test FlexiChains.extras(new_chn) == FlexiChains.extras(old_chn)
+        for (old_k, new_k) in zip(keys(old_chn), keys(new_chn))
+            @test old_chn[old_k] == new_chn[new_k]
+        end
+        @test new_chn[VarNames.@varname(m[1, 2])] == old_chn[@varname(m[1, 2])]
+        @test new_chn[VarNames.@varname(s[2].a)] == old_chn[@varname(s[2].a)]
+        @test FlexiChains.iter_indices(new_chn) == FlexiChains.iter_indices(old_chn)
+        @test FlexiChains.chain_indices(new_chn) == FlexiChains.chain_indices(old_chn)
+
+        for i in 1:10, j in 1:2
+            old_params = FlexiChains.parameters_at(old_chn; iter=i, chain=j)
+            new_params = FlexiChains.parameters_at(new_chn; iter=i, chain=j)
+            @test new_params isa VarNames.VarNamedTuple
+            @test new_params[VarNames.@varname(m[1, 2])] == old_params[@varname(m[1, 2])]
+            @test new_params[VarNames.@varname(s[2].a)] == old_params[@varname(s[2].a)]
+            @test new_params[VarNames.@varname(y)] == old_params[@varname(y)]
+        end
+
+        # Round trip
+        back_chn = FlexiChains.downgrade(new_chn)
+        @test back_chn isa OldVNChain
+        @test FlexiChains.parameters(back_chn) == FlexiChains.parameters(old_chn)
+        for k in keys(old_chn)
+            @test back_chn[k] == old_chn[k]
+        end
+        @test back_chn._structures == old_chn._structures
+        # The downgraded chain works with DynamicPPL functions
+        @test DynamicPPL.returned(model, back_chn) == DynamicPPL.returned(model, old_chn)
     end
 end
 
