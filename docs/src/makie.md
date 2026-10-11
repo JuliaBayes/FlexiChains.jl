@@ -391,6 +391,30 @@ FlexiChains.Makie.pushforward_hist
 FlexiChains.Makie.pushforward_hist!
 ```
 
+## [Predictive checks](@id ppc-plots)
+
+The plots in this section compare predictive draws with the observations.
+They reuse the posterior predictive draws `ppd` and the observed bill lengths `observed` from the [pushforward example above](@ref pf-plots).
+
+[`ppc_density`](@ref FlexiChains.Makie.ppc_density) draws one kernel density curve per predictive draw, with the density of the observations on top.
+Unlike `pushforward_hist`, which summarises the draws as quantile bands per bin, it shows how much the predictive distribution varies from draw to draw, and it needs no choice of bins.
+
+By default, 50 of the pooled draws are shown, selected at evenly spaced positions so that the figure is the same every time; this can be changed with the `ndraws` keyword argument.
+
+```@example pushforward
+FM.ppc_density(
+    ppd,
+    @varname(bill_length_mm);
+    observed=observed,
+    axis=(; xlabel="bill length (mm)"),
+)
+```
+
+```@docs
+FlexiChains.Makie.ppc_density
+FlexiChains.Makie.ppc_density!
+```
+
 ## [Customisation](@id makie-customisation)
 
 As described in the [general interface section above](@ref makie-interface), all of the above functions accept keyword arguments to control the appearance of the plot.

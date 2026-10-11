@@ -140,6 +140,13 @@ end
 const HIST_OBSERVED = exp.(0.5 .* randn(StableRNG(7), 40))  # observed data for overlay
 hist_chn = make_hist_chain(StableRNG(303))
 
+function make_small_predictive_chain(rng)
+    N_iters, N_chains, N_params = 10, 2, 40
+    arr = exp.(0.5 .* randn(rng, N_iters, N_chains, N_params))
+    return FlexiChain{Symbol}(arr, :y_pred)
+end
+small_predictive_chn = make_small_predictive_chain(StableRNG(404))
+
 const REFTEST_SPECS = [
     # MakieExt
     RefTestSpec(MakieBE(), "mtraceplot", () -> FC.Makie.traceplot(chn)),
@@ -270,6 +277,19 @@ const REFTEST_SPECS = [
             nbins=20,
             observed=HIST_OBSERVED,
         ),
+    ),
+
+    # Predictive checks
+    RefTestSpec(MakieBE(), "ppc_density", () -> FC.Makie.ppc_density(hist_chn, :y_pred)),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_density_observed",
+        () -> FC.Makie.ppc_density(hist_chn, :y_pred; observed=HIST_OBSERVED),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_density_all_draws",
+        () -> FC.Makie.ppc_density(small_predictive_chn, :y_pred; ndraws=nothing),
     ),
 ]
 

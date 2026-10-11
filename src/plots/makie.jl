@@ -20,6 +20,8 @@ export traceplot,
     pushforward_discrete!,
     pushforward_hist,
     pushforward_hist!,
+    ppc_density,
+    ppc_density!,
     ridgeline,
     ridgeline!,
     forestplot,
@@ -91,6 +93,12 @@ function pushforward_hist end
 
 """Mutating version of [`FlexiChains.Makie.pushforward_hist`](@ref)."""
 function pushforward_hist! end
+
+function ppc_density end
+
+"""Mutating version of [`FlexiChains.Makie.ppc_density`](@ref)."""
+function ppc_density! end
+
 function ridgeline end
 
 """
