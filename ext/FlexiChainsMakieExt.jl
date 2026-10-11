@@ -5,6 +5,7 @@ using Makie
 using Makie: ColorTypes
 using StatsBase: StatsBase
 using KernelDensity: KernelDensity
+using Random: Random
 
 const FC = FlexiChains
 const MakieGrids = Union{Makie.GridPosition,Makie.GridSubposition}
@@ -126,6 +127,7 @@ include("FlexiChainsMakieExt/pushforward_continuous.jl")
 include("FlexiChainsMakieExt/pushforward_discrete.jl")
 include("FlexiChainsMakieExt/pushforward_hist.jl")
 include("FlexiChainsMakieExt/ppc_density.jl")
+include("FlexiChainsMakieExt/ppc_pit_ecdf.jl")
 include("FlexiChainsMakieExt/density.jl")
 include("FlexiChainsMakieExt/hist.jl")
 include("FlexiChainsMakieExt/mixeddensity.jl")

@@ -22,6 +22,8 @@ export traceplot,
     pushforward_hist!,
     ppc_density,
     ppc_density!,
+    ppc_pit_ecdf,
+    ppc_pit_ecdf!,
     ridgeline,
     ridgeline!,
     forestplot,
@@ -98,6 +100,11 @@ function ppc_density end
 
 """Mutating version of [`FlexiChains.Makie.ppc_density`](@ref)."""
 function ppc_density! end
+
+function ppc_pit_ecdf end
+
+"""Mutating version of [`FlexiChains.Makie.ppc_pit_ecdf`](@ref)."""
+function ppc_pit_ecdf! end
 
 function ridgeline end
 
