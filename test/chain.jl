@@ -2,6 +2,7 @@ module FCChainTests
 
 using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
 using VarNames: @varname, VarName
+import DimensionalData as DD
 using DimensionalData: val, At
 using OffsetArrays: OffsetArray
 using OrderedCollections: OrderedDict

@@ -380,28 +380,31 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
     @testset "DD.dims" begin
         ii = FlexiChains.iter_indices(chain)
         ci = FlexiChains.chain_indices(chain)
+        cf_mean = CollapseFunctionVec(mean)
+        cf_std = CollapseFunctionVec(std)
+
         @testset "dims=:iter" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:iter)
+            fs = FlexiChains.collapse(chain, [cf_mean, cf_std]; dims=:iter)
             ds = DD.dims(fs)
             @test map(DD.name, ds) == (:chain, :stat)
             @test DD.val(ds[1]) == ci
             @test parent(DD.val(ds[2])) == [:mean, :std]
         end
         @testset "dims=:chain" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:chain)
+            fs = FlexiChains.collapse(chain, [cf_mean, cf_std]; dims=:chain)
             ds = DD.dims(fs)
             @test map(DD.name, ds) == (:iter, :stat)
             @test DD.val(ds[1]) == ii
             @test parent(DD.val(ds[2])) == [:mean, :std]
         end
         @testset "dims=:both" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:both)
+            fs = FlexiChains.collapse(chain, [cf_mean, cf_std]; dims=:both)
             ds = DD.dims(fs)
             @test map(DD.name, ds) == (:stat,)
             @test parent(DD.val(ds[1])) == [:mean, :std]
         end
         @testset "drop_stat_dim=true" begin
-            fs = FlexiChains.collapse(chain, [mean]; dims=:iter, drop_stat_dim=true)
+            fs = FlexiChains.collapse(chain, [cf_mean]; dims=:iter, drop_stat_dim=true)
             ds = DD.dims(fs)
             @test map(DD.name, ds) == (:chain,)
             @test DD.val(ds[1]) == ci

@@ -90,9 +90,9 @@ _varname_as(::Type{<:AbstractString}, vn::VarName) = String(Symbol(vn))
 
 # Get leaf data by applying the optic - slower fallback that always works
 function _get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
-    # TODO(penelopeysm): the following line is `AbstractPPL._unprefix_optic`. Change this
+    # TODO(penelopeysm): the following line is `VarNames._unprefix_optic`. Change this
     # once we can.
-    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
+    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, VarNames.Iden(), vn_leaf)
     return _map_optic(optic, d, vn_leaf)
 end
 
@@ -101,7 +101,7 @@ function _split_parameter_leaves(vn::VarName, d::AbstractArray)
     if _elems_have_fixed_vn_leaves(d)
         # Don't need to iterate over all array elements - just check the first one.
         d1 = first(d)
-        vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+        vn_leaves = collect(VarNames.varname_leaves(vn, d1))
         if length(vn_leaves) == 1 && only(vn_leaves) == vn
             # Scalar-valued parameter: nothing to split.
             return [vn => d]
@@ -117,7 +117,7 @@ function _split_parameter_leaves(vn::VarName, d::AbstractArray)
     else # leaves may have different sizes
         vns = OrderedSet{VarName}()
         for i in eachindex(d)
-            for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
+            for vn_leaf in VarNames.varname_leaves(vn, d[i])
                 push!(vns, vn_leaf)
             end
         end
@@ -194,7 +194,7 @@ function _parameter_array_components(
             d1 = first(v)
             if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
                 # No need to look more at data if all have fixed leaves
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
+                for vn_leaf in VarNames.varname_leaves(vn, d1)
                     leaf_name = _varname_as(TKey, vn_leaf)
                     push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
                     push!(kept_eltypes, eltype(d1))
