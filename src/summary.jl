@@ -827,3 +827,127 @@ function StatsBase.summarystats(
         warn=warn,
     )
 end
+
+"""
+    StatsBase.autocor(
+        chain::FlexiChain{TKey};
+        lags::AbstractVector{<:Integer}=[1, 5, 10, 50],
+        demean::Bool=true,
+        dims::Symbol=:both,
+        warn::Bool=true,
+        split_varnames::Bool=true,
+    ) where {TKey}
+
+Calculate the autocorrelation of each key in the `chain` at each of the given `lags`.
+
+The result is a `FlexiSummary` with one statistic per lag, named `:lag1`, `:lag5`, and so
+on. Autocorrelation is always computed within each chain separately, since consecutive
+samples from different chains are unrelated. The `dims` keyword argument controls how the
+per-chain results are combined:
+
+- `:both` (the default): the per-chain autocorrelations are averaged, giving a single value
+  per key and lag.
+- `:iter`: the autocorrelation is reported separately for each chain.
+- `:chain` is not supported, since autocorrelation across chains at a single iteration is
+  not meaningful.
+
+If a lag is greater than or equal to the number of iterations, the autocorrelation at that
+lag cannot be computed and is reported as `missing`. If the autocorrelation cannot be
+computed for a key at any lag (for example because the key is not real-valued), that key is
+skipped and a warning is issued (which can be suppressed by setting `warn=false`).
+
+The `demean` keyword argument is forwarded to [`StatsBase.autocor`](@extref); if `true`,
+the mean of each chain is subtracted before computing the autocorrelation.
+
+The `split_varnames` keyword argument, if `true`, will first split up variables in the
+chain such that each key corresponds to a single scalar value. This is only supported
+for chains with `TKey<:VarName` or `TKey==Symbol`; for other key types this will be a
+no-op as long as the data already contain scalar values for every key, but will error if
+the data contain non-scalar values.
+"""
+function StatsBase.autocor(
+    chain::FlexiChain{TKey};
+    lags::AbstractVector{<:Integer}=[1, 5, 10, 50],
+    demean::Bool=true,
+    dims::Symbol=:both,
+    warn::Bool=true,
+    split_varnames::Bool=true,
+) where {TKey}
+    allunique(lags) || throw(ArgumentError("`lags` must not contain duplicates"))
+    all(>=(0), lags) || throw(ArgumentError("`lags` must be non-negative"))
+    funcs = map(lags) do lag
+        # `StatsBase.autocor` treats each column of a matrix as a separate series, and
+        # returns a `(nlags, nchains)` matrix.
+        per_chain = m -> vec(StatsBase.autocor(m, [lag]; demean=demean))
+        CollapseFunction(
+            Symbol("lag", lag),
+            m -> Statistics.mean(per_chain(m)),
+            nothing,
+            per_chain,
+        )
+    end
+    return collapse(chain, funcs; dims=dims, warn=warn, split_varnames=split_varnames)
+end
+
+"""
+    Statistics.cor(
+        chain::FlexiChain{TKey};
+        dims::Symbol=:both,
+        warn::Bool=true,
+        split_varnames::Bool=true,
+    ) where {TKey}
+
+Calculate the Pearson correlation matrix between all parameters in the `chain`.
+
+Unlike the other summary functions, this does not return a `FlexiSummary`, since the result
+is a matrix over pairs of parameters rather than a value for each parameter. Instead, it
+returns a `DimensionalData.DimArray`:
+
+- With `dims=:both` (the default), samples from all chains are pooled together, and the
+  result has dimensions `(:$(PARAM_DIM_NAME), :$(PARAM_DIM_NAME))`.
+- With `dims=:iter`, a separate correlation matrix is computed for each chain, and the
+  result has dimensions `(:$(CHAIN_DIM_NAME), :$(PARAM_DIM_NAME), :$(PARAM_DIM_NAME))`.
+- `dims=:chain` is not supported, since correlations across chains at a single iteration
+  are not meaningful.
+
+Both `:$(PARAM_DIM_NAME)` dimensions are indexed by the parameter keys, so the correlation
+between parameters `x` and `y` can be obtained with `c[At(x), At(y)]`.
+
+Only parameters (not extras) are included. The `split_varnames` keyword argument, if
+`true`, will first split up array-valued parameters such that each key corresponds to a
+single scalar value. Parameters whose values are not `Real` are skipped with a warning
+(which can be suppressed by setting `warn=false`).
+"""
+function Statistics.cor(
+    chain::FlexiChain{TKey};
+    dims::Symbol=:both,
+    warn::Bool=true,
+    split_varnames::Bool=true,
+) where {TKey}
+    if dims == :chain
+        throw(
+            ArgumentError(
+                "`cor` does not support `dims=:chain`, since correlations across chains " *
+                "at a single iteration are not meaningful",
+            ),
+        )
+    elseif dims != :both && dims != :iter
+        throw(ArgumentError("`dims` must be `:iter` or `:both`"))
+    end
+    dimarr = DD.DimArray(
+        chain;
+        warn=warn,
+        eltype_filter=Real,
+        parameters_only=true,
+        split_varnames=split_varnames,
+    )
+    data = parent(dimarr)
+    ni, nc, np = size(data)
+    param_dim = DD.dims(dimarr, PARAM_DIM_NAME)
+    return if dims == :both
+        DD.DimArray(Statistics.cor(reshape(data, ni * nc, np)), (param_dim, param_dim))
+    else
+        per_chain = stack((Statistics.cor(data[:, c, :]) for c in 1:nc); dims=1)
+        DD.DimArray(per_chain, (DD.dims(dimarr, CHAIN_DIM_NAME), param_dim, param_dim))
+    end
+end

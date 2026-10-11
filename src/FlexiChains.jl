@@ -74,10 +74,10 @@ function _faithful_sample_array end
 export Wide, Long
 using DimensionalData: At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
 export At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
-using Statistics: mean, median, std, var, quantile
-export mean, median, std, var, quantile
-using StatsBase: summarystats, mad
-export summarystats, mad
+using Statistics: mean, median, std, var, quantile, cor
+export mean, median, std, var, quantile, cor
+using StatsBase: summarystats, mad, autocor
+export summarystats, mad, autocor
 using MCMCDiagnosticTools:
     ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
 export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi

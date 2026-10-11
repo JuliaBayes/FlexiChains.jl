@@ -88,6 +88,18 @@ collapse(
 
 `quantile(chn, ps::AbstractVector; dims=:iter)` (or `dims=:chain`) previously returned only `missing` values; it now returns a vector of quantiles for each chain (or iteration).
 
+## New summary functions: `autocor` and `cor`
+
+`autocor(chain; lags=[1, 5, 10, 50])` calculates the autocorrelation of each parameter at the given lags.
+It returns a `FlexiSummary` with one statistic per lag, named `lag1`, `lag5`, and so on.
+Autocorrelation is always computed within each chain; by default the per-chain values are averaged, and `dims=:iter` reports them separately for each chain.
+
+`cor(chain)` calculates the Pearson correlation matrix between all parameters.
+Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
+`dims=:iter` computes a separate correlation matrix for each chain.
+
+Both functions are exported.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).

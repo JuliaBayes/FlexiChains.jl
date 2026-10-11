@@ -19,7 +19,7 @@ using MCMCDiagnosticTools: ess, rhat, mcse
 using OrderedCollections: OrderedDict
 using Random: Random, randn
 using Statistics
-using StatsBase: geomean, harmmean, mad, iqr
+using StatsBase: geomean, harmmean, mad, iqr, autocor
 using Test
 
 const ENABLED_SUMMARY_FUNCS = [mean, median, minimum, maximum, std, var, sum, prod]
@@ -1083,6 +1083,149 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         @test se isa FlexiSummary{Symbol}
         @test !haskey(se, Parameter(:a))
         @test haskey(se, Extra("c"))
+    end
+    @testset "autocor" begin
+        rng = Random.MersenneTwister(12)
+        niter, nchain = 100, 3
+        # AR(1) series so that the autocorrelation is non-trivial
+        xs = zeros(niter, nchain)
+        for c in 1:nchain
+            xs[1, c] = randn(rng)
+            for i in 2:niter
+                xs[i, c] = 0.8 * xs[i-1, c] + randn(rng)
+            end
+        end
+        ys = rand(rng, 1:10, niter, nchain)
+        strs = fill("hi", niter, nchain)
+        chn = FlexiChain{Symbol}(
+            niter,
+            nchain,
+            OrderedDict(Parameter(:x) => xs, Parameter(:y) => ys, Extra("s") => strs),
+        )
+        lags = [1, 5, 10]
+        # StatsBase.autocor on a matrix returns an (nlags, nchains) matrix
+        expected_per_chain = autocor(xs, lags)
+
+        @testset "dims=:both averages over chains" begin
+            ac = @test_logs (:warn, r"skipping key") autocor(chn; lags=lags)
+            @test ac isa FlexiSummary{Symbol}
+            @test parent(FlexiChains.stat_indices(ac)) == [:lag1, :lag5, :lag10]
+            @test ac[:x] ≈ vec(mean(expected_per_chain; dims=2))
+            @test ac[:x, stat=:lag5] ≈ mean(expected_per_chain[2, :])
+            @test ac[:y] ≈ vec(mean(autocor(ys, lags); dims=2))
+            @test !haskey(ac, Extra("s"))
+        end
+
+        @testset "dims=:iter is per chain" begin
+            ac = autocor(chn; lags=lags, dims=:iter, warn=false)
+            @test FlexiChains.chain_indices(ac) !== nothing
+            @test parent(FlexiChains.stat_indices(ac)) == [:lag1, :lag5, :lag10]
+            for c in 1:nchain
+                @test ac[:x, chain=DD.At(c)] ≈ expected_per_chain[:, c]
+                @test ac[:x, chain=DD.At(c), stat=:lag10] ≈ autocor(xs[:, c], [10])[1]
+            end
+        end
+
+        @testset "dims=:chain unsupported" begin
+            @test_throws ArgumentError autocor(chn; dims=:chain, warn=false)
+        end
+
+        @testset "default lags and demean" begin
+            ac = autocor(chn; warn=false)
+            @test parent(FlexiChains.stat_indices(ac)) == [:lag1, :lag5, :lag10, :lag50]
+            @test ac[:x, stat=:lag50] ≈ mean(autocor(xs, [50])[1, :])
+            ac_nd = autocor(chn; lags=[1], demean=false, warn=false)
+            @test ac_nd[:x, stat=:lag1] ≈ mean(autocor(xs, [1]; demean=false)[1, :])
+            @test !(ac_nd[:x, stat=:lag1] ≈ ac[:x, stat=:lag1])
+        end
+
+        @testset "lag too long gives missing" begin
+            ac = autocor(chn; lags=[1, 500], warn=false)
+            @test ac[:x, stat=:lag1] isa Float64
+            @test ac[:x, stat=:lag500] === missing
+        end
+
+        @testset "invalid lags" begin
+            @test_throws ArgumentError autocor(chn; lags=[1, 1], warn=false)
+            @test_throws ArgumentError autocor(chn; lags=[-1], warn=false)
+        end
+
+        @testset "VarName chain splits array-valued parameters" begin
+            vs = [randn(rng, 2) for _ in 1:niter, _ in 1:nchain]
+            vchn = FlexiChain{VarName}(niter, nchain, Dict(Parameter(@varname(v)) => vs))
+            ac = autocor(vchn; lags=[1])
+            @test haskey(ac, Parameter(@varname(v[1])))
+            @test haskey(ac, Parameter(@varname(v[2])))
+            v2 = map(x -> x[2], vs)
+            @test ac[@varname(v[2]), stat=:lag1] ≈ mean(autocor(v2, [1])[1, :])
+        end
+    end
+
+    @testset "cor" begin
+        rng = Random.MersenneTwister(7)
+        niter, nchain = 50, 3
+        as = randn(rng, niter, nchain)
+        bs = 2 .* as .+ randn(rng, niter, nchain)
+        cs = rand(rng, 1:5, niter, nchain)
+        strs = fill("s", niter, nchain)
+        chn = FlexiChain{Symbol}(
+            niter,
+            nchain,
+            OrderedDict(
+                Parameter(:a) => as,
+                Parameter(:b) => bs,
+                Parameter(:c) => cs,
+                Parameter(:str) => strs,
+                Extra("e") => as,
+            ),
+        )
+
+        @testset "dims=:both pools chains" begin
+            c = @test_logs (:warn, r"skipping keys") cor(chn)
+            @test c isa DD.DimArray
+            @test size(c) == (3, 3)
+            @test DD.name.(DD.dims(c)) == (:param, :param)
+            @test collect(DD.lookup(c, 1)) == [:a, :b, :c]
+            @test collect(DD.lookup(c, 2)) == [:a, :b, :c]
+            @test parent(c) ≈ cor(hcat(vec(as), vec(bs), vec(cs)))
+            @test c[DD.At(:a), DD.At(:b)] ≈ cor(vec(as), vec(bs))
+            @test c[DD.At(:a), DD.At(:a)] ≈ 1.0
+            # strongly correlated by construction
+            @test c[DD.At(:a), DD.At(:b)] > 0.8
+        end
+
+        @testset "dims=:iter is per chain" begin
+            c = cor(chn; dims=:iter, warn=false)
+            @test size(c) == (nchain, 3, 3)
+            @test DD.name.(DD.dims(c)) == (:chain, :param, :param)
+            @test collect(DD.lookup(c, :chain)) == collect(FlexiChains.chain_indices(chn))
+            for k in 1:nchain
+                @test parent(c)[k, :, :] ≈ cor(hcat(as[:, k], bs[:, k], cs[:, k]))
+                @test c[chain=DD.At(k)][DD.At(:a), DD.At(:b)] ≈ cor(as[:, k], bs[:, k])
+            end
+        end
+
+        @testset "unsupported dims" begin
+            @test_throws ArgumentError cor(chn; dims=:chain, warn=false)
+            @test_throws ArgumentError cor(chn; dims=:foo, warn=false)
+        end
+
+        @testset "VarName chain splits array-valued parameters" begin
+            vs = [randn(rng, 2) for _ in 1:niter, _ in 1:nchain]
+            vchn = FlexiChain{VarName}(
+                niter,
+                nchain,
+                OrderedDict(Parameter(@varname(x)) => as, Parameter(@varname(v)) => vs),
+            )
+            c = cor(vchn)
+            @test collect(DD.lookup(c, 1)) == [@varname(x), @varname(v[1]), @varname(v[2])]
+            v1 = map(first, vs)
+            @test c[DD.At(@varname(x)), DD.At(@varname(v[1]))] ≈ cor(vec(as), vec(v1))
+            # without splitting, the vector-valued parameter is not Real and is skipped
+            c2 = cor(vchn; split_varnames=false, warn=false)
+            @test size(c2) == (1, 1)
+            @test collect(DD.lookup(c2, 1)) == [@varname(x)]
+        end
     end
 end
 

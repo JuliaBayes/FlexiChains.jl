@@ -122,6 +122,47 @@ StatsBase.iqr(::FlexiChains.FlexiChain; kwargs...)
 There are also similar overloads for `PosteriorStats.hdi` and `PosteriorStats.eti`, which calculate highest density intervals and equal-tailed intervals, respectively.
 Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
 
+## Autocorrelation
+
+[`autocor`](@ref StatsBase.autocor) calculates the autocorrelation of each parameter at one or more lags.
+Since there is one value per lag, the result is a `FlexiSummary` with one statistic per lag, named `lag1`, `lag5`, and so on:
+
+```@example stats
+ac = autocor(chain; lags=[1, 2, 5])
+```
+
+Autocorrelation is always calculated within each chain, since consecutive samples from different chains are unrelated.
+By default (`dims=:both`) the per-chain results are averaged; with `dims=:iter` they are reported separately for each chain:
+
+```@example stats
+autocor(chain; lags=[1, 2, 5], dims=:iter)[@varname(f)]
+```
+
+```@docs
+StatsBase.autocor(::FlexiChains.FlexiChain; kwargs...)
+```
+
+## Correlations between parameters
+
+[`cor`](@ref Statistics.cor) calculates the Pearson correlation matrix between all parameters in the chain.
+Because the result is a matrix over _pairs_ of parameters, rather than one value per parameter, it is returned as a `DimArray` with two `param` dimensions instead of a `FlexiSummary`:
+
+```@example stats
+c = cor(chain)
+```
+
+Both dimensions are indexed by the parameter names, so the correlation between two parameters can be looked up with `At`:
+
+```@example stats
+c[At(@varname(f)), At(@varname(v[1]))]
+```
+
+Passing `dims=:iter` computes a separate correlation matrix for each chain, adding a leading `chain` dimension to the result.
+
+```@docs
+Statistics.cor(::FlexiChains.FlexiChain; kwargs...)
+```
+
 ## Custom statistics
 
 There are two scenarios where the above are not enough:
