@@ -1,3 +1,7 @@
+# Unreleased
+
+Added `FlexiChains.Makie.ppc_density` (and its mutating version `ppc_density!`), which plots one kernel density curve per predictive draw and optionally overlays the density of the observations.
+
 # 0.6.42
 
 Improved the performance of `_split_varnames` (internal but widely used in many other functions), as well as the conversion of `FlexiChain` and `FlexiSummary` objects to (Dim)Arrays.

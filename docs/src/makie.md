@@ -391,6 +391,28 @@ FlexiChains.Makie.pushforward_hist
 FlexiChains.Makie.pushforward_hist!
 ```
 
+## [Predictive checks](@id ppc-plots)
+
+The plots in this section follow the same idea as the `pushforward` plots above, namely that if our model fits the data well, we should be able to use it to predict new data that look reasonably similarly to those we first observed.
+
+We'll continue with the penguin example from above and reuse the predictive draws in `ppd`.
+
+[`ppc_density`](@ref FlexiChains.Makie.ppc_density) plots a density per predictive draw (i.e., a hypothetical sample of penguins' `bill_length`s, based on the parameters in that draw), and overlays the `bill_length`s of the "real" penguins.
+
+```@example pushforward
+FM.ppc_density(
+    ppd,
+    @varname(bill_length_mm);
+    observed=observed,
+    axis=(; xlabel="bill length (mm)"),
+)
+```
+
+```@docs
+FlexiChains.Makie.ppc_density
+FlexiChains.Makie.ppc_density!
+```
+
 ## [Customisation](@id makie-customisation)
 
 As described in the [general interface section above](@ref makie-interface), all of the above functions accept keyword arguments to control the appearance of the plot.
