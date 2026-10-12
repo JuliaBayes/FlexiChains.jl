@@ -26,15 +26,11 @@ using StableRNGs: StableRNG
         @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=1)) == 1
         @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=nothing)) ==
               N_iters * N_chains
+        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=61)) == N_iters * N_chains
         @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=7, observed=observed)) == 8
     end
 
     @testset "errors" begin
-        @test_throws "`n_draws` (61) exceeds the number of pooled draws (60)" FC.Makie.ppc_density(
-            chn,
-            :y_pred;
-            n_draws=61,
-        )
         @test_throws "length of `observed` (29) must match the number of components of `param` (30)" FC.Makie.ppc_density(
             chn,
             :y_pred;
@@ -42,7 +38,7 @@ using StableRNGs: StableRNG
         )
         int_chn =
             FlexiChain{Symbol}(rand(rng, 1:10, N_iters, N_chains, N_components), :y_pred)
-        @test_throws "use `pushforward_hist` for discrete outcomes" FC.Makie.ppc_density(
+        @test_throws "`ppc_density` does not support integer-valued draws, use `pushforward_hist`" FC.Makie.ppc_density(
             int_chn,
             :y_pred,
         )

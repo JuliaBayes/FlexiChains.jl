@@ -48,7 +48,8 @@ function FC.Makie.ppc_density!(
     isnothing(observed) || FC.PlotUtils.check_observed_length(observed, n_components)
 
     p = nothing
-    for i in FC.PlotUtils.evenly_spaced_draw_indices(n_pooled, min(n_draws, n_pooled))
+    n_plotted = isnothing(n_draws) ? n_pooled : min(n_draws, n_pooled)
+    for i in FC.PlotUtils.evenly_spaced_draw_indices(n_pooled, n_plotted)
         kd = KernelDensity.kde(view(draws, i, :))
         p = Makie.lines!(
             ax,

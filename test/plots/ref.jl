@@ -289,7 +289,7 @@ const REFTEST_SPECS = [
     RefTestSpec(
         MakieBE(),
         "ppc_density_all_draws",
-        () -> FC.Makie.ppc_density(small_predictive_chn, :y_pred; ndraws=nothing),
+        () -> FC.Makie.ppc_density(small_predictive_chn, :y_pred; n_draws=nothing),
     ),
 ]
 
