@@ -393,13 +393,11 @@ FlexiChains.Makie.pushforward_hist!
 
 ## [Predictive checks](@id ppc-plots)
 
-The plots in this section compare predictive draws with the observations.
-They reuse the posterior predictive draws `ppd` and the observed bill lengths `observed` from the [pushforward example above](@ref pf-plots).
+The plots in this section follow the same idea as the `pushforward` plots above, namely that if our model fits the data well, we should be able to use it to predict new data that look reasonably similarly to those we first observed.
 
-[`ppc_density`](@ref FlexiChains.Makie.ppc_density) draws one kernel density curve per predictive draw, with the density of the observations on top.
-Unlike `pushforward_hist`, which summarises the draws as quantile bands per bin, it shows how much the predictive distribution varies from draw to draw, and it needs no choice of bins.
+We'll continue with the penguin example from above and reuse the predictive draws in `ppd`.
 
-By default, 50 of the pooled draws are shown, selected at evenly spaced positions so that the figure is the same every time; this can be changed with the `ndraws` keyword argument.
+[`ppc_density`](@ref FlexiChains.Makie.ppc_density) plots a density per predictive draw (i.e., a hypothetical sample of penguins' `bill_length`s, based on the parameters in that draw), and overlays the `bill_length`s of the "real" penguins.
 
 ```@example pushforward
 FM.ppc_density(
