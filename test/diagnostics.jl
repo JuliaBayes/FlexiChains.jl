@@ -4,7 +4,11 @@ using FlexiChains:
     FlexiChains, FlexiChain, FlexiSummary, Parameter, Extra, VarName, @varname
 import DimensionalData as DD
 using MCMCDiagnosticTools:
-    MCMCDiagnosticTools, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
+    MCMCDiagnosticTools, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
+using MLJBase: MLJBase, Pipeline, predict_mode
+using MLJDecisionTreeInterface: DecisionTreeClassifier
+using StableRNGs: StableRNG
+using Statistics: mean
 using Test
 
 @testset verbose = true "diagnostics.jl" begin
@@ -239,6 +243,116 @@ using Test
         @testset "Symbol shorthand gives same result" begin
             @test bfmi(chain, :hamiltonian_energy) ==
                   bfmi(chain, Extra(:hamiltonian_energy))
+        end
+    end
+
+    @testset "rstar" begin
+        N_iters, N_chains = 100, 3
+        # Fix the classifier's seed so that results only depend on the rng passed to rstar
+        prob_clf = DecisionTreeClassifier(; rng=123)
+        det_clf = Pipeline(DecisionTreeClassifier(; rng=123); operation=predict_mode)
+
+        @testset "converged chains give R* ≈ 1" begin
+            # Identical, constant draws: the classifier cannot distinguish chains
+            chain = FlexiChain{Symbol}(
+                N_iters,
+                N_chains,
+                Dict(
+                    Parameter(:a) => fill(4.0, N_iters, N_chains),
+                    Parameter(:b) => fill(-1.0, N_iters, N_chains),
+                ),
+            )
+            dist = rstar(StableRNG(1), prob_clf, chain)
+            @test dist isa MCMCDiagnosticTools.Distributions.Distribution
+            @test isapprox(mean(dist), 1; atol=0.1)
+            val = rstar(StableRNG(1), det_clf, chain)
+            @test val isa Real
+            @test isapprox(val, 1; atol=0.2)
+        end
+
+        @testset "non-converged chains give R* > 1" begin
+            # Each chain is centred at a very different location
+            as = randn(StableRNG(2), N_iters, N_chains) .+ [0.0 100.0 -100.0]
+            chain = FlexiChain{Symbol}(N_iters, N_chains, Dict(Parameter(:a) => as))
+            val = rstar(StableRNG(1), det_clf, chain)
+            @test val > 1.5
+            dist = rstar(StableRNG(1), prob_clf, chain)
+            @test mean(dist) > 1.5
+        end
+
+        @testset "matches MCMCDiagnosticTools on the raw array" begin
+            as = randn(StableRNG(3), N_iters, N_chains)
+            bs = randn(StableRNG(4), N_iters, N_chains)
+            chain = FlexiChain{Symbol}(
+                N_iters,
+                N_chains,
+                Dict(Parameter(:a) => as, Parameter(:b) => bs),
+            )
+            raw = Array(chain)
+            @test rstar(StableRNG(5), det_clf, chain) ==
+                  MCMCDiagnosticTools.rstar(StableRNG(5), det_clf, raw)
+        end
+
+        @testset "rng argument is optional" begin
+            chain = FlexiChain{Symbol}(
+                N_iters,
+                N_chains,
+                Dict(Parameter(:a) => fill(4.0, N_iters, N_chains)),
+            )
+            val = rstar(det_clf, chain)
+            @test val isa Real
+            @test isapprox(val, 1; atol=0.2)
+        end
+
+        @testset "array-valued params and VarName chain" begin
+            xs = [randn(2) for _ in 1:N_iters, _ in 1:N_chains]
+            ys = randn(N_iters, N_chains)
+            chain = FlexiChain{VarName}(
+                N_iters,
+                N_chains,
+                Dict(Parameter(@varname(x)) => xs, Parameter(@varname(y)) => ys),
+            )
+            val = rstar(StableRNG(1), det_clf, chain)
+            @test val isa Real
+            # Should be the same as calling on the flattened array (3 columns)
+            raw = Array(chain)
+            @test size(raw) == (N_iters, N_chains, 3)
+            @test val == MCMCDiagnosticTools.rstar(StableRNG(1), det_clf, raw)
+        end
+
+        @testset "non-Real params skipped with warning" begin
+            chain = FlexiChain{Symbol}(
+                N_iters,
+                N_chains,
+                Dict(
+                    Parameter(:a) => randn(N_iters, N_chains),
+                    Parameter(:str) => fill("hello", N_iters, N_chains),
+                    Extra(:energy) => randn(N_iters, N_chains),
+                ),
+            )
+            val = @test_logs (:warn, r"str.*Real") rstar(StableRNG(1), det_clf, chain)
+            @test val isa Real
+            @test_logs rstar(StableRNG(1), det_clf, chain; warn=false)
+            # Extras are not used as features
+            chain_a =
+                FlexiChain{Symbol}(N_iters, N_chains, Dict(Parameter(:a) => chain[:a]))
+            @test rstar(StableRNG(1), det_clf, chain; warn=false) ==
+                  rstar(StableRNG(1), det_clf, chain_a)
+        end
+
+        @testset "keyword arguments are forwarded" begin
+            as = randn(StableRNG(6), N_iters, N_chains)
+            chain = FlexiChain{Symbol}(N_iters, N_chains, Dict(Parameter(:a) => as))
+            raw = Array(chain)
+            @test rstar(StableRNG(1), det_clf, chain; subset=0.5, split_chains=1) ==
+                  MCMCDiagnosticTools.rstar(
+                StableRNG(1),
+                det_clf,
+                raw;
+                subset=0.5,
+                split_chains=1,
+            )
+            @test_throws ArgumentError rstar(StableRNG(1), det_clf, chain; subset=1.5)
         end
     end
 end
