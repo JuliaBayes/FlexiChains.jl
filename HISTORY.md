@@ -105,6 +105,12 @@ Autocorrelation is always computed within each chain; by default the per-chain v
 Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
 `dims=:iter` computes a separate correlation matrix for each chain.
 
+## New diagnostic: `rstar`
+
+`rstar([rng,] classifier, chain)` computes the R* convergence diagnostic of Lambert & Vehtari (2022), by forwarding the chain's `Real`-valued parameters to `MCMCDiagnosticTools.rstar`.
+The `classifier` must be an MLJ model; depending on whether it is probabilistic or deterministic, either a distribution of R* or a single R* value is returned.
+No new dependencies are required, since MCMCDiagnosticTools already depends on MLJModelInterface.
+
 ## PosteriorDB.jl integration
 
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.

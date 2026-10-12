@@ -1,3 +1,4 @@
+using Random: Random
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
 # Convert the output of `MCMCDiagnosticTools.gelmandiag` into a FlexiSummary
@@ -160,4 +161,43 @@ For chains sampled with Turing.jl's HMC/NUTS, the energy key is `:hamiltonian_en
 """
 function MCMCDiagnosticTools.bfmi(chain::FlexiChain, energy_key)
     return MCMCDiagnosticTools.bfmi(chain[energy_key])
+end
+
+"""
+    MCMCDiagnosticTools.rstar(
+        [rng::Random.AbstractRNG,]
+        classifier,
+        chain::FlexiChain;
+        warn::Bool=true,
+        kwargs...
+    )
+
+Compute the ``R^*`` convergence diagnostic of the chain using the given MLJ `classifier`.
+Returns a distribution of ``R^*`` values for probabilistic classifiers, or a single value
+for deterministic ones; values close to 1 indicate convergence.
+
+All `Real`-valued parameters are used; array-valued parameters are automatically split into
+their constituent scalars. Non-`Real`-valued keys are skipped with a warning (which can be
+suppressed via `warn=false`).
+
+Other keyword arguments are forwarded to [`MCMCDiagnosticTools.rstar`](@extref).
+
+```julia
+using MLJDecisionTreeInterface
+rstar(DecisionTreeClassifier(), chain)
+```
+"""
+function MCMCDiagnosticTools.rstar(
+    rng::Random.AbstractRNG,
+    classifier,
+    chain::FlexiChain;
+    warn::Bool=true,
+    kwargs...,
+)
+    dimarr = DD.DimArray(chain; warn=warn, eltype_filter=Real, parameters_only=true)
+    return MCMCDiagnosticTools.rstar(rng, classifier, parent(dimarr); kwargs...)
+end
+
+function MCMCDiagnosticTools.rstar(classifier, chain::FlexiChain; kwargs...)
+    return MCMCDiagnosticTools.rstar(Random.default_rng(), classifier, chain; kwargs...)
 end
