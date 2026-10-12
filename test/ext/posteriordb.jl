@@ -24,6 +24,13 @@ using Test
                 @test length(FlexiChains.parameters(FlexiChains._split_varnames(chn)[1])) ==
                       length(keys(PosteriorDB.load(ref)[1]))
             end
+            # check that this method gives the same thing
+            chn2 = FlexiChains.from_posteriordb(pdb, n)
+            if isnothing(ref)
+                @test chn2 === nothing
+            else
+                @test FlexiChains.has_same_data(ref, chn2)
+            end
         end
     end
 
