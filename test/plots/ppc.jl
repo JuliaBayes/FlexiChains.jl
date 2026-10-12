@@ -22,18 +22,18 @@ using StableRNGs: StableRNG
 
     @testset "number of curves" begin
         ncurves(fap) = count(p -> p isa Makie.Lines, fap.axis.scene.plots)
-        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; ndraws=7)) == 7
-        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; ndraws=1)) == 1
-        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; ndraws=nothing)) ==
+        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=7)) == 7
+        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=1)) == 1
+        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=nothing)) ==
               N_iters * N_chains
-        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; ndraws=7, observed=observed)) == 8
+        @test ncurves(FC.Makie.ppc_density(chn, :y_pred; n_draws=7, observed=observed)) == 8
     end
 
     @testset "errors" begin
-        @test_throws "`ndraws` (61) exceeds the number of pooled draws (60)" FC.Makie.ppc_density(
+        @test_throws "`n_draws` (61) exceeds the number of pooled draws (60)" FC.Makie.ppc_density(
             chn,
             :y_pred;
-            ndraws=61,
+            n_draws=61,
         )
         @test_throws "length of `observed` (29) must match the number of components of `param` (30)" FC.Makie.ppc_density(
             chn,
