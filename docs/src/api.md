@@ -47,6 +47,12 @@ Note that, although the dictionaries themselves may have loose types, the key ty
 `FlexiSummary` objects should always be constructed by summarising a `FlexiChain`.
 If for some reason you need to construct one from scratch, please refer to the source code (and do let me know, so that I can make this part of the public API).
 
+To demonstrate some of FlexiChains's functionality, the docs use this:
+
+```@docs
+FlexiChains.EXAMPLE_CHAIN
+```
+
 ## Parameters and Extras
 
 ```@docs
