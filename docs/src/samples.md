@@ -134,6 +134,10 @@ If you only want parameters, pass the `parameters_only=true` keyword argument:
 rand(chn, parameters_only=true)
 ```
 
+For weighted sampling with replacement, pass `weights=StatsBase.Weights(w)`.
+The vector `w` supplies one weight per sample, in iteration order within each chain,
+with the chains concatenated in their stored order.
+
 # Using `VarNamedTuple`s
 
 All of the above functions, when run with Turing-sampled chains, return `VarNamedTuple`s or containers thereof.
