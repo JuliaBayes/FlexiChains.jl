@@ -5,8 +5,7 @@ using MCMCDiagnosticTools: MCMCDiagnosticTools
 
 Return a `FlexiSummary` with the fraction of adjacent values that differ (`!=`) for
 each parameter in each chain. The denominator is the number of transitions, `niters - 1`.
-A single value gives `NaN`. For empty chains, set `split_varnames=false` to retain
-parameter keys with `NaN` rates, since splitting omits parameters without samples.
+A single value gives `NaN`.
 
 Array-valued parameters are split into scalar components by default. Set
 `split_varnames=false` to compare whole parameter values instead. The `warn` keyword
