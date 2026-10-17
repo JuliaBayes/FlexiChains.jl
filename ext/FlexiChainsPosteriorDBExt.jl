@@ -44,6 +44,8 @@ end
 function FlexiChains.from_posteriordb(db::PosteriorDB.PosteriorDatabase, model_name::String)
     post = PosteriorDB.posterior(db, model_name)
     ref = PosteriorDB.reference_posterior(post)
+    ref === nothing &&
+        throw(ArgumentError("Posterior `$model_name` has no reference posterior."))
     return FlexiChains.from_posteriordb(ref)
 end
 

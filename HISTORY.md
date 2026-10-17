@@ -112,6 +112,8 @@ Vector-valued parameters, which PosteriorDB stores as separate scalar entries us
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
+`from_posteriordb(db, model_name)` now reports a clear error when the posterior has no reference draws.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).

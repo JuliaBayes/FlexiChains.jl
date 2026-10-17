@@ -25,11 +25,12 @@ using Test
                       length(keys(PosteriorDB.load(ref)[1]))
             end
             # check that this method gives the same thing
-            chn2 = FlexiChains.from_posteriordb(pdb, n)
             if isnothing(ref)
-                @test chn2 === nothing
+                message = "Posterior `$n` has no reference posterior."
+                @test_throws message FlexiChains.from_posteriordb(pdb, n)
             else
-                @test FlexiChains.has_same_data(ref, chn2)
+                chn2 = FlexiChains.from_posteriordb(pdb, n)
+                @test FlexiChains.has_same_data(chn, chn2)
             end
         end
     end
