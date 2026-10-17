@@ -105,6 +105,10 @@ Autocorrelation is always computed within each chain; by default the per-chain v
 Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
 `dims=:iter` computes a separate correlation matrix for each chain.
 
+`changerate` now accepts a `dims` keyword.
+Its default behaviour, `dims=:both`, is to now compute per-chain changerates and average them across chains, like `autocor` above.
+To restore the old behaviour, specify `dims=:iter`.
+
 ## PosteriorDB.jl integration
 
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
@@ -112,7 +116,6 @@ Vector-valued parameters, which PosteriorDB stores as separate scalar entries us
 There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, model::String)`, which directly loads the reference posterior for the given model (or throws if it does not have a reference posterior).
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
-
 
 ## Other non-breaking changes
 
@@ -122,6 +125,12 @@ There is no difference in their behaviour.
 A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforward_continuous`, and `pushforward_discrete`. It sets the alpha values of the outer- and innermost quantile bands drawn by these functions.
 
 The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
+
+# 0.6.43
+
+Added `changerate` to compute per-chain parameter change rates.
+
+Added a `weights` keyword to `rand` for weighted sampling from chains.
 
 # 0.6.42
 

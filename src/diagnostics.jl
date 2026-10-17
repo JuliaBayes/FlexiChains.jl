@@ -1,5 +1,55 @@
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
+"""
+    changerate(
+        chain::FlexiChain;
+        dims::Symbol=:both,
+        warn::Bool=true,
+        split_varnames::Bool=true,
+    )
+
+Calculate the number of adjacent values that differ for each key in the `chain`, divided by
+the number of transitions, i.e., `niters - 1`.
+
+Change rates are always computed within each chain separately, since consecutive samples
+from different chains are unrelated.
+
+The `dims` keyword argument controls how the per-chain results are combined:
+
+- `:both` (the default): the per-chain change rates are averaged, giving a single value
+  per key.
+- `:iter`: the change rate is reported separately for each chain.
+- `:chain` is not supported, since a change rate across chains at a single iteration is
+  not meaningful.
+"""
+function changerate(
+    chain::FlexiChain;
+    dims::Symbol=:both,
+    warn::Bool=true,
+    split_varnames::Bool=true,
+)
+    per_chain = m -> map(_changerate, eachcol(m))
+    cf = CollapseFunction(
+        :changerate,
+        m -> Statistics.mean(per_chain(m)),
+        nothing,
+        per_chain,
+    )
+    return collapse(
+        chain,
+        [cf];
+        dims=dims,
+        warn=warn,
+        split_varnames=split_varnames,
+        drop_stat_dim=true,
+    )
+end
+
+function _changerate(x::AbstractVector)
+    length(x) < 2 && return NaN
+    return count(i -> x[i] != x[i-1], (firstindex(x)+1):lastindex(x)) / (length(x) - 1)
+end
+
 # Convert the output of `MCMCDiagnosticTools.gelmandiag` into a FlexiSummary
 function _gelmandiag_summary(::Type{TKey}, kept_keys, psrf, psrfci) where {TKey}
     data = OrderedDict{ParameterOrExtra{<:TKey},Array{Float64,3}}()

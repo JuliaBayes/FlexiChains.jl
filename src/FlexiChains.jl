@@ -84,6 +84,7 @@ export summarystats, mad, autocor
 using MCMCDiagnosticTools:
     ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
 export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
+export changerate
 
 """
     VNChain

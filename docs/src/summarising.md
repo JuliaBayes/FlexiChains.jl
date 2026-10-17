@@ -163,6 +163,14 @@ Passing `dims=:iter` computes a separate correlation matrix for each chain, addi
 Statistics.cor(::FlexiChains.FlexiChain; kwargs...)
 ```
 
+## Change rates
+
+Change rates count transitions separately within each chain.
+
+```@docs
+changerate
+```
+
 ## Custom statistics
 
 There are two scenarios where the above are not enough:
