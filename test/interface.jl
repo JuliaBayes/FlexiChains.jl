@@ -16,6 +16,7 @@ using OrderedCollections: OrderedDict
 using AbstractMCMC: AbstractMCMC
 using Test
 using Random: Xoshiro
+using StatsBase: Weights, sample
 
 @testset verbose = true "interface.jl" begin
     @info "Testing interface.jl"
@@ -1205,6 +1206,26 @@ using Random: Xoshiro
         @testset "reproducibility" begin
             @test rand(Xoshiro(468), chn) == rand(Xoshiro(468), chn)
             @test rand(Xoshiro(468), chn, 2) == rand(Xoshiro(468), chn, 2)
+        end
+
+        @testset "weighted sampling" begin
+            values = reshape(1:6, 3, 2)
+            weighted = FlexiChain{Symbol}(
+                3,
+                2,
+                Dict(Parameter(:a) => values, Extra("lp") => -values),
+            )
+            w = Weights([0, 1, 3, 0, 2, 4])
+            draws = rand(Xoshiro(8675309), weighted, 2, 3; weights=w)
+            indices = sample(Xoshiro(8675309), 1:6, w, (2, 3))
+            @test getindex.(draws, Ref(Parameter(:a))) == indices
+            @test getindex.(draws, Ref(Extra("lp"))) == -indices
+            @test rand(Xoshiro(8675309), weighted, 2, 3; weights=Weights(2 .* w)) == draws
+
+            pointmass = Weights([0, 0, 0, 1, 0, 0])
+            @test rand(weighted; weights=pointmass) ==
+                  Dict(Parameter(:a) => 4, Extra("lp") => -4)
+            @test rand(weighted; weights=pointmass, parameters_only=true) == Dict(:a => 4)
         end
     end
 
