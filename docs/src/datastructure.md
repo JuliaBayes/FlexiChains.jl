@@ -23,7 +23,7 @@ chain = FlexiChain{VarName}(N_iters, N_chains, values)
 Each key in a chain can be either a [`Parameter{<:T}`](@ref FlexiChains.Parameter) or an [`Extra`](@ref FlexiChains.Extra).
 Each `Parameter` or `Extra` itself carries a *name*, which can be retrieved with [`FlexiChains.get_name`](@ref).
 For a `Parameter{T}`, the name must be a `T`.
-For an `Extra`, the name can in theory be anything, but in practice is most commonly `Symbol`.
+For an `Extra`, the name must be a `Symbol`, regardless of the parameter key type.
 
 You can list all keys, all parameters, or all extras:
 
