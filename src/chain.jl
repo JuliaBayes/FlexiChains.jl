@@ -94,7 +94,7 @@ Base.show(io::IO, p::Parameter) = print(io, "Parameter(", repr(p.name), ")")
 
 """
     FlexiChains.get_name(p::Parameter{T})::T
-    FlexiChains.get_name(e::Extra{T})::T
+    FlexiChains.get_name(e::Extra)::Symbol
 
 Unwrap the `Parameter` or `Extra` to get its name.
 """
@@ -108,20 +108,17 @@ Convert the *name* of a `Parameter` to a `Symbol`. This is shorthand for
 Base.Symbol(p::Parameter) = Symbol(get_name(p))
 
 """
-    Extra{T}(name::T)
+    Extra(name::Symbol)
 
 A key in a `FlexiChain` that is not a parameter. This is used to store per-draw information,
 such as the log-density associated with the draw.
 
-Unlike `Parameter`, which must follow the key type of the `FlexiChain`, there is no
-constraint on the type of an `Extra`. That is to say, a `FlexiChain{TKey}` can have *any*
-`Extra` key, regardless of what type the `Extra` wraps. However, in practice, `Extra`s will
-typically wrap `Symbol`s.
+The name must be a `Symbol`, regardless of the parameter key type of the `FlexiChain`.
 
 To obtain the name of a `Extra`, use [`FlexiChains.get_name`](@ref).
 """
-struct Extra{T}
-    name::T
+struct Extra
+    name::Symbol
 end
 Base.show(io::IO, e::Extra) = print(io, "Extra(", repr(e.name), ")")
 get_name(e::Extra) = e.name
@@ -318,7 +315,7 @@ struct FlexiChain{TKey,TMetadata<:FlexiChainMetadata} <: AbstractMCMC.AbstractCh
     using FlexiChains: FlexiChain, Parameter, Extra
 
     d = fill(
-        Dict(Parameter(:x) => rand(), Extra("y") => rand()), 200, 3
+        Dict(Parameter(:x) => rand(), Extra(:y) => rand()), 200, 3
     )
     chn = FlexiChain{Symbol}(200, 3, d)
     ```
@@ -410,7 +407,7 @@ struct FlexiChain{TKey,TMetadata<:FlexiChainMetadata} <: AbstractMCMC.AbstractCh
 
     d = Dict(
         Parameter(:x) => rand(200, 3),
-        Extra("y") => rand(200, 3),
+        Extra(:y) => rand(200, 3),
     )
     chn = FlexiChain{Symbol}(200, 3, d)
     ```

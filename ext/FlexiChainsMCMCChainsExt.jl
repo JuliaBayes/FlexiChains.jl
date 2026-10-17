@@ -20,7 +20,7 @@ const MCSamplerStateKey = :samplerstate
 Convert an `MCMCChains.Chains` object to a `FlexiChain`.
 
 If `key_spec` is not provided, parameters in the `:parameters` section are stored as
-`Parameter{Symbol}` keys and all other sections (e.g. `:internals`) as `Extra{Symbol}` keys,
+`Parameter{Symbol}` keys and all other sections (e.g. `:internals`) as `Extra` keys,
 giving a `FlexiChain{Symbol}`.
 
 If `key_spec` is provided, it is passed directly to the `FlexiChain` from-array constructor.

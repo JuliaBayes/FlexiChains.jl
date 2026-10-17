@@ -2,6 +2,8 @@
 
 v0.7 is a fairly large breaking change in FlexiChains.
 
+`Extra` is no longer parametric. Its name must be a `Symbol`, regardless of the chain's parameter key type.
+
 ## New types
 
 FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
