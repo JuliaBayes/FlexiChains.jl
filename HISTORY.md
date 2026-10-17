@@ -109,10 +109,10 @@ Since the result is a matrix over pairs of parameters, it is returned as a `DimA
 
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
 Vector-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single vector-valued parameter (e.g. `@vn(theta)`).
+There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, model::String)`, which directly loads the reference posterior for the given model (or throws if it does not have a reference posterior).
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
-`from_posteriordb(db, model_name)` now reports a clear error when the posterior has no reference draws.
 
 ## Other non-breaking changes
 

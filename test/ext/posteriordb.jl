@@ -26,8 +26,7 @@ using Test
             end
             # check that this method gives the same thing
             if isnothing(ref)
-                message = "Posterior `$n` has no reference posterior."
-                @test_throws message FlexiChains.from_posteriordb(pdb, n)
+                @test_throws ArgumentError FlexiChains.from_posteriordb(pdb, n)
             else
                 chn2 = FlexiChains.from_posteriordb(pdb, n)
                 @test FlexiChains.has_same_data(chn, chn2)
