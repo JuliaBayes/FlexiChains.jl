@@ -447,12 +447,6 @@ using StatsBase: Weights, sample
                           DD.lookup(DD.dims(dimarr, DD.X))
                     @test result[1, 1, :] == parent(dimarr)
                 end
-                @testset "default (no stack kwarg) emits deprecation warning" begin
-                    result =
-                        @test_logs((:warn, FlexiChains._STACK_DEPWARN_MSG), chain[:dimarr],)
-                    @test result isa DD.DimArray{Float64,3}
-                    @test size(result) == (Niters, Nchains, 3)
-                end
             end
 
             @testset "stack=true with mismatched sizes errors" begin
@@ -624,6 +618,10 @@ using StatsBase: Weights, sample
         @testset "parameters_at" begin
             for i in 1:Ni
                 d = FlexiChains.parameters_at(c; iter=i, chain=1)
+                @test d isa NamedTuple
+                @test d == (; a=c[Parameter(:a)][i])
+                d = FlexiChains.parameters_at(c, OrderedDict; iter=i, chain=1)
+                @test d isa OrderedDict{Symbol}
                 @test length(d) == 1
                 @test d[:a] == c[Parameter(:a)][i]
                 d = FlexiChains.parameters_at(c, NamedTuple; iter=i, chain=1)
@@ -636,7 +634,7 @@ using StatsBase: Weights, sample
 
             @testset "default kwargs (all iters/chains)" begin
                 d = FlexiChains.parameters_at(c)
-                @test d isa DD.DimMatrix{<:OrderedDict{Symbol}}
+                @test d isa DD.DimMatrix{<:NamedTuple}
                 @test size(d) == (Ni, Nc)
                 for i in 1:Ni, j in 1:Nc
                     @test d[i, j] == FlexiChains.parameters_at(c; iter=i, chain=j)
@@ -646,12 +644,12 @@ using StatsBase: Weights, sample
             @testset "with ranges of indices" begin
                 iters = 1:5
                 d = FlexiChains.parameters_at(c; iter=iters, chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 for i in iters
                     @test d[i] == FlexiChains.parameters_at(c; iter=i, chain=1)
                 end
                 d = FlexiChains.parameters_at(c; iter=iters, chain=:)
-                @test d isa DD.DimMatrix{<:OrderedDict{Symbol}}
+                @test d isa DD.DimMatrix{<:NamedTuple}
                 for i in iters, j in 1:Nc
                     @test d[i, j] == FlexiChains.parameters_at(c; iter=i, chain=j)
                 end
@@ -660,7 +658,7 @@ using StatsBase: Weights, sample
             @testset "with vector indices" begin
                 iters = [5, 6]
                 d = FlexiChains.parameters_at(c; iter=iters, chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 for i in iters
                     @test d[At(i)] == FlexiChains.parameters_at(c; iter=i, chain=1)
                 end
@@ -668,7 +666,7 @@ using StatsBase: Weights, sample
 
             @testset "with Not() selector" begin
                 d = FlexiChains.parameters_at(c; iter=Not(3), chain=1)
-                @test d isa DD.DimVector{<:OrderedDict{Symbol}}
+                @test d isa DD.DimVector{<:NamedTuple}
                 @test size(d, 1) == Ni - 1
                 for i in [1, 2, 4, 5, 6, 7, 8, 9, 10]
                     @test d[At(i)] == FlexiChains.parameters_at(c; iter=i, chain=1)
@@ -726,18 +724,6 @@ using StatsBase: Weights, sample
                 @test FlexiChains.parameters_at(cs, OrderedDict; iter=1, chain=1) isa
                       OrderedDict
             end
-        end
-
-        @testset "deprecated positional API" begin
-            # Positional arguments should still work but emit a deprecation warning
-            d = @test_deprecated FlexiChains.values_at(c, 1, 1)
-            @test d == FlexiChains.values_at(c; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.values_at(c, 1, 1, NamedTuple)
-            @test d == FlexiChains.values_at(c, NamedTuple; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.parameters_at(c, 1, 1)
-            @test d == FlexiChains.parameters_at(c; iter=1, chain=1)
-            d = @test_deprecated FlexiChains.parameters_at(c, 1, 1, NamedTuple)
-            @test d == FlexiChains.parameters_at(c, NamedTuple; iter=1, chain=1)
         end
     end
 
@@ -1187,14 +1173,18 @@ using StatsBase: Weights, sample
 
     @testset "rand" begin
         N_iters, N_chains = 10, 3
-        d = Dict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra("lp") => -3.0)
+        d = OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra("lp") => -3.0)
         chn = FlexiChain{Symbol}(N_iters, N_chains, fill(d, N_iters, N_chains))
         rng = Xoshiro(468)
 
         # Test with and without rng
         for args in ((rng,), ())
-            @test rand(args..., chn) isa OrderedDict{ParameterOrExtra{<:Symbol}}
-            @test rand(args..., chn; parameters_only=true) isa OrderedDict{Symbol}
+            vals = rand(args..., chn)
+            @test vals isa OrderedDict{ParameterOrExtra{<:Symbol}}
+            @test collect(keys(vals)) == [Parameter(:a), Parameter(:b), Extra("lp")]
+            params = rand(args..., chn; parameters_only=true)
+            @test params isa NamedTuple
+            @test keys(params) == (:a, :b)
             @test rand(args..., chn, 5) isa
                   Vector{<:OrderedDict{ParameterOrExtra{<:Symbol}}}
             @test size(rand(args..., chn, 5)) == (5,)
@@ -1213,19 +1203,19 @@ using StatsBase: Weights, sample
             weighted = FlexiChain{Symbol}(
                 3,
                 2,
-                Dict(Parameter(:a) => values, Extra("lp") => -values),
+                OrderedDict(Parameter(:a) => values, Extra(:lp) => -values),
             )
             w = Weights([0, 1, 3, 0, 2, 4])
             draws = rand(Xoshiro(8675309), weighted, 2, 3; weights=w)
             indices = sample(Xoshiro(8675309), 1:6, w, (2, 3))
             @test getindex.(draws, Ref(Parameter(:a))) == indices
-            @test getindex.(draws, Ref(Extra("lp"))) == -indices
+            @test getindex.(draws, Ref(Extra(:lp))) == -indices
             @test rand(Xoshiro(8675309), weighted, 2, 3; weights=Weights(2 .* w)) == draws
 
             pointmass = Weights([0, 0, 0, 1, 0, 0])
             @test rand(weighted; weights=pointmass) ==
-                  Dict(Parameter(:a) => 4, Extra("lp") => -4)
-            @test rand(weighted; weights=pointmass, parameters_only=true) == Dict(:a => 4)
+                  OrderedDict(Parameter(:a) => 4, Extra(:lp) => -4)
+            @test rand(weighted; weights=pointmass, parameters_only=true) == (; a=4)
         end
     end
 

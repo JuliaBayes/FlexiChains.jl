@@ -1,8 +1,9 @@
 module FCChainTests
 
 using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
-using AbstractPPL: @varname, VarName
-using DimensionalData: DimensionalData as DD, val, At
+using VarNames: @varname, VarName
+import DimensionalData as DD
+using DimensionalData: val, At
 using OffsetArrays: OffsetArray
 using OrderedCollections: OrderedDict
 using Test

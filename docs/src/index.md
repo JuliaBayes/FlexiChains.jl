@@ -35,7 +35,8 @@ This is in contrast to many other representations which flatten all samples into
 
 ### Diverse input sources
 
-FlexiChains is the default chain type for [Turing.jl](@ref integrations-turing) since v0.45 of Turing.
+FlexiChains is the default chain type for [Turing.jl](@ref integrations-turing).
+Note that if you are using Turing with FlexiChains, you probably want to look at [the FlexiChains v0.6 docs](https://juliabayes.github.io/FlexiChains.jl/v0.6/) instead, since Turing is using that version.
 
 You can also construct a FlexiChain from a variety of other sources, including
 [ParallelMCMC.jl](@ref integrations-parallelmcmc),

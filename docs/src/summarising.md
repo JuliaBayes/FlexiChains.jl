@@ -19,7 +19,8 @@ If at least one statistic is successfully computed for a key, that key will be i
 To give a flavour of how this works, here is an example of a model that generates parameters of different types:
 
 ```@example stats
-using FlexiChains, Turing
+using FlexiChains, Distributions, LinearAlgebra
+using DynamicPPL: @model, @varname
 
 @model function f()
     f ~ Normal()               # float
@@ -27,7 +28,7 @@ using FlexiChains, Turing
     s := "a string"            # string
 end
 
-chain = sample(f(), MH(), MCMCThreads(), 20, 3; chain_type=VNChain)
+chain = FlexiChains._make_prior_chain(f(), 20, 3)
 ```
 
 Over the course of this page we will see what happens to each of these parameters when we try to compute summary statistics.
@@ -79,6 +80,7 @@ Sometimes you may only want to calculate a single statistic.
 
 The following functions are all overloaded to accept `FlexiChain` objects.
 In all cases, they can be called with `dims=:both`, `dims=:iter`, or `dims=:chain` to specify the dimension over which to compute the statistic; the default is `dims=:both`.
+The only exceptions are the MCMC diagnostics `ess`, `rhat`, and `mcse`, which do not support `dims=:chain` (since computing them across chains at a single iteration is not meaningful).
 
 All of these functions return a `FlexiSummary` where the `:stat` dimension has already been collapsed.
 That means that if you want to access the mean of a variable `@varname(a)` you don't need to further use the `stat` dimension:
@@ -120,6 +122,47 @@ StatsBase.iqr(::FlexiChains.FlexiChain; kwargs...)
 There are also similar overloads for `PosteriorStats.hdi` and `PosteriorStats.eti`, which calculate highest density intervals and equal-tailed intervals, respectively.
 Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
 
+## Autocorrelation
+
+[`autocor`](@ref StatsBase.autocor) calculates the autocorrelation of each parameter at one or more lags.
+Since there is one value per lag, the result is a `FlexiSummary` with one statistic per lag, named `lag1`, `lag5`, and so on:
+
+```@example stats
+ac = autocor(chain; lags=[1, 2, 5])
+```
+
+Autocorrelation is always calculated within each chain, since consecutive samples from different chains are unrelated.
+By default (`dims=:both`) the per-chain results are averaged; with `dims=:iter` they are reported separately for each chain:
+
+```@example stats
+autocor(chain; lags=[1, 2, 5], dims=:iter)[@varname(f)]
+```
+
+```@docs
+StatsBase.autocor(::FlexiChains.FlexiChain; kwargs...)
+```
+
+## Correlations between parameters
+
+[`cor`](@ref Statistics.cor) calculates the Pearson correlation matrix between all parameters in the chain.
+Because the result is a matrix over _pairs_ of parameters, rather than one value per parameter, it is returned as a `DimArray` with two `param` dimensions instead of a `FlexiSummary`:
+
+```@example stats
+c = cor(chain)
+```
+
+Both dimensions are indexed by the parameter names, so the correlation between two parameters can be looked up with `At`:
+
+```@example stats
+c[At(@varname(f)), At(@varname(v[1]))]
+```
+
+Passing `dims=:iter` computes a separate correlation matrix for each chain, adding a leading `chain` dimension to the result.
+
+```@docs
+Statistics.cor(::FlexiChains.FlexiChain; kwargs...)
+```
+
 ## Change rates
 
 Change rates count transitions separately within each chain.
@@ -142,6 +185,19 @@ In both cases, you can directly use [`FlexiChains.collapse`] to achieve this.
 FlexiChains.collapse
 ```
 
+The statistics passed to `collapse` must be wrapped in a `FlexiChains.CollapseFunction`, which specifies how to compute the statistic for each choice of `dims`.
+
+```@docs
+FlexiChains.CollapseFunction
+```
+
+In most cases, you can construct one using the following shortcuts:
+
+```@docs
+FlexiChains.CollapseFunctionVec
+FlexiChains.CollapseFunctionDiagnostic
+```
+
 As an example, suppose you have a statistic that calculates the sum of the mean and standard deviation.
 (This is of course quite contrived: if you have a _real_ example, again, please do open an issue!)
 
@@ -155,21 +211,22 @@ function mean_std_sum(x::AbstractVector{<:Real})
 end
 ```
 
-As noted in the docstring of [`FlexiChains.collapse`](@ref), the function you provide must accept a vector argument and return a single value.
-Of course, it can also have other methods, but this is the one which `collapse` uses.
+This function maps a vector to a single value, so we can use [`FlexiChains.CollapseFunctionVec`](@ref) to turn it into a `CollapseFunction`.
+When collapsing over both dimensions, it will be applied to all the samples for a variable stacked together into a single vector; when collapsing over only one dimension, it will be applied to each chain (`dims=:iter`) or each iteration (`dims=:chain`) separately.
 
 Now we can use `collapse` to apply this function to all variables in the chain.
-The second argument is a vector, which in this case will only contain our one function:
+The second argument is a vector, which in this case will only contain our one statistic:
 
 ```@example stats
-custom_stat = FlexiChains.collapse(chain, [mean_std_sum]; dims=:both)
+custom_stat =
+    FlexiChains.collapse(chain, [FlexiChains.CollapseFunctionVec(mean_std_sum)]; dims=:both)
 ```
 
 There are two things worth mentioning, which we will note in passing here without demonstrating (since they are also covered in the docstring):
 
  1. If there is only one function provided, you can additionally pass `drop_stat_dim=true` to remove the `:stat` dimension from the result, much like what `mean(chain)` et al. do.
 
- 2. The name of the statistic is inferred from the function. Sometimes this doesn't work out nicely, for example if you pass an anonymous function. In this case you can provide a tuple of `(:name, function)` instead of just the function.
+ 2. The name of the statistic is inferred from the underlying function. Sometimes this doesn't work out nicely, for example if you pass an anonymous function. In this case you can pass the name as the first argument, e.g. `FlexiChains.CollapseFunctionVec(:name, f)`.
 
 ## Merging summaries
 

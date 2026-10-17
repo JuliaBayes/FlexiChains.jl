@@ -65,7 +65,8 @@ However, the general principles are applicable to any `FlexiChain` object.
 We'll make a model with different types of parameters (continuous, discrete, and vector-valued).
 
 ```@example plotsjl
-using FlexiChains, StatsPlots, Turing
+using FlexiChains, StatsPlots, Distributions, LinearAlgebra
+using DynamicPPL: @model, @varname
 
 import FlexiChains.Plots as FP # For the plotting functions.
 
@@ -75,16 +76,7 @@ import FlexiChains.Plots as FP # For the plotting functions.
     z ~ MvNormal(zeros(2), I)
 end
 
-chn = sample(
-    f(),
-    MH(),
-    MCMCThreads(),
-    1000,
-    3;
-    discard_initial=100,
-    chain_type=VNChain,
-    progress=false,
-)
+chn = FlexiChains._make_prior_chain(f(), 1000, 3)
 ```
 
 ## Default plot

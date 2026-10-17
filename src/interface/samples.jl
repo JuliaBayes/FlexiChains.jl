@@ -75,8 +75,8 @@ argument. Possible options are:
   `VarNamedTuple`, and consequently the output of `parameters_at` will be a `VarNamedTuple`
   per iteration.
 
-  For chains that do not have a stored `structure`, the default output will be an
-  `OrderedDict`.
+  For chains that do not have a stored `structure`, the default output will be a
+  `NamedTuple` if the key type is `Symbol`, and an `OrderedDict` otherwise.
 
 - `Tout <: AbstractDict`: returns a dictionary mapping `TKey` to their values.
 
@@ -98,18 +98,6 @@ for f in (:values_at, :parameters_at)
         function $f(chn::FlexiChain, ::Type{Tout}=Nothing; iter=:, chain=:) where {Tout}
             return $_f(chn, iter, chain, Tout)
         end
-        function $f(chn::FlexiChain, iter, chain, ::Type{Tout}=Nothing) where {Tout}
-            Base.depwarn(
-                "Positional `iter` and `chain` arguments to `" *
-                $(string(f)) *
-                "` are deprecated and will be removed in a future version. " *
-                "Please use keyword arguments instead: `" *
-                $(string(f)) *
-                "(chn[, Tout]; iter=..., chain=...)`.",
-                $(QuoteNode(f)),
-            )
-            return $_f(chn, iter, chain, Tout)
-        end
     end
 end
 
@@ -128,6 +116,28 @@ function reconstruct_values(chn::FlexiChain{TKey}, iter, chain, structure) where
         k => chn[k, iter=iter, chain=chain] for k in keys(chn)
     )
 end
+function FlexiChains.reconstruct_values(
+    chn::FlexiChain{<:VarName},
+    i,
+    j,
+    structure::VarNamedTuple,
+)
+    vnt = VarNamedTuple()
+    nt = NamedTuple()
+    for param_or_extra in keys(chn)
+        val = chn[param_or_extra][i, j]
+        if param_or_extra isa Parameter
+            ismissing(val) && continue
+            vn = param_or_extra.name
+            top_sym = VarNames.getsym(vn)
+            template = get(structure.data, top_sym, VarNames.NoTemplate())
+            vnt = VarNames.templated_setindex!!(vnt, val, vn, template)
+        elseif param_or_extra isa Extra
+            nt = merge(nt, (; Symbol(param_or_extra.name) => val))
+        end
+    end
+    return VarNames.Draw(vnt, nt)
+end
 
 """
     reconstruct_parameters(chn::FlexiChain{T}, iter, chain, structure) where {T}
@@ -143,6 +153,29 @@ function reconstruct_parameters(chn::FlexiChain{TKey}, iter, chain, structure) w
     return OrderedDict{TKey,Any}(
         k => chn[Parameter(k), iter=iter, chain=chain] for k in FlexiChains.parameters(chn)
     )
+end
+# For `Symbol` keys, a `NamedTuple` is isomorphic to `OrderedDict{Symbol}` but more
+# ergonomic, so we return that by default.
+function reconstruct_parameters(chn::FlexiChain{Symbol}, iter, chain, ::Nothing)
+    return NamedTuple(
+        k => chn[Parameter(k), iter=iter, chain=chain] for k in FlexiChains.parameters(chn)
+    )
+end
+function FlexiChains.reconstruct_parameters(
+    chn::FlexiChain{<:VarName},
+    i,
+    j,
+    structure::VarNamedTuple,
+)
+    vnt = VarNamedTuple()
+    for vn in FlexiChains.parameters(chn)
+        val = chn[Parameter(vn)][i, j]
+        ismissing(val) && continue
+        top_sym = VarNames.getsym(vn)
+        template = get(structure.data, top_sym, VarNames.NoTemplate())
+        vnt = VarNames.templated_setindex!!(vnt, val, vn, template)
+    end
+    return vnt
 end
 
 # This eval block is quite nasty, but the alternative of duplicating all this code was even

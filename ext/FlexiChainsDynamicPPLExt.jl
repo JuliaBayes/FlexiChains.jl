@@ -1,26 +1,118 @@
 module FlexiChainsDynamicPPLExt
 
-using FlexiChains:
-    FlexiChains, FlexiChain, VarName, Parameter, Extra, ParameterOrExtra, VNChain
+using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra, ParameterOrExtra
 using AbstractMCMC: AbstractMCMC
-using AbstractPPL: AbstractPPL
+using AbstractPPL: AbstractPPL, VarName
 using DimensionalData: DimensionalData as DD
 using Distributions: Distributions
 using DynamicPPL: DynamicPPL, UnlinkAll, TransformedValue, NoTransform, VarNamedTuple
 using OrderedCollections: OrderedDict
 using Random: Random
+using VarNames: VarNames
+
+const OldVNChain = FlexiChain{AbstractPPL.VarName}
+
+### Converting between OldVNChain (what Turing samples into) and VNChain
+
+# Convert skeletal VarNamedTuples (as stored in a chain's `_structures`) between the
+# DynamicPPL and VarNames versions. Both packages use the same layout for skeletons: a
+# NamedTuple whose values are either nested skeletons, or arrays (in place of
+# PartialArrays) whose elements are either `nothing` or nested skeletons.
+_upgrade_skeleton(vnt::DynamicPPL.VarNamedTuple) =
+    VarNames.VarNamedTuple(map(_upgrade_skeleton, vnt.data))
+_upgrade_skeleton(arr::AbstractArray) = map(_upgrade_skeleton, arr)
+_upgrade_skeleton(x) = x
+_downgrade_skeleton(vnt::VarNames.VarNamedTuple) =
+    DynamicPPL.VarNamedTuple(map(_downgrade_skeleton, vnt.data))
+_downgrade_skeleton(arr::AbstractArray) = map(_downgrade_skeleton, arr)
+_downgrade_skeleton(x) = x
+
+# Convert a VarNames.VarName to an AbstractPPL.VarName. This is the reverse of
+# `FlexiChains._as_varname(::AbstractPPL.VarName)`.
+_downgrade_optic(@nospecialize x) = x
+_downgrade_optic(di::VarNames.DynamicIndex) = AbstractPPL.DynamicIndex(di.expr, di.f)
+_downgrade_optic(::VarNames.Iden) = AbstractPPL.Iden()
+_downgrade_optic(p::VarNames.Property{sym}) where {sym} =
+    AbstractPPL.Property{sym}(_downgrade_optic(p.child))
+function _downgrade_optic(i::VarNames.Index)
+    ix = map(_downgrade_optic, i.ix)
+    kw = map(_downgrade_optic, i.kw)
+    return AbstractPPL.Index(ix, kw, _downgrade_optic(i.child))
+end
+function _downgrade_varname(vn::VarNames.VarName{sym}) where {sym}
+    return AbstractPPL.VarName{sym}(_downgrade_optic(VarNames.getoptic(vn)))
+end
+
+function _convert_chain(
+    chain::FlexiChain,
+    ::Type{TKey},
+    convert_key,
+    convert_skeleton,
+) where {TKey}
+    new_data = OrderedDict{ParameterOrExtra{<:TKey},Matrix}(
+        (k isa Parameter ? Parameter(convert_key(k.name)) : k) => v for
+        (k, v) in chain._data
+    )
+    return FlexiChain{TKey}(
+        FlexiChains.niters(chain),
+        FlexiChains.nchains(chain),
+        new_data;
+        structures=map(convert_skeleton, chain._structures),
+        iter_indices=FlexiChains.iter_indices(chain),
+        chain_indices=FlexiChains.chain_indices(chain),
+        sampling_time=FlexiChains.sampling_time(chain),
+        last_sampler_state=FlexiChains.last_sampler_state(chain),
+    )
+end
+
+"""
+    FlexiChains.upgrade(chain::FlexiChain{AbstractPPL.VarName})::VNChain
+
+Convert a chain keyed by AbstractPPL's `VarName` (which is what Turing.jl samples into)
+to a `VNChain`, i.e. a chain keyed by FlexiChains' own `VarName`.
+
+The data and metadata are unchanged. If the chain stores skeletal `VarNamedTuple`s (as
+chains from Turing.jl do), these are converted too, so that functions like
+[`FlexiChains.parameters_at`](@ref) still return `VarNamedTuple`s.
+
+See also [`FlexiChains.downgrade`](@ref) for the reverse operation.
+"""
+function FlexiChains.upgrade(chain::OldVNChain)
+    return _convert_chain(
+        chain,
+        VarNames.VarName,
+        FlexiChains._as_varname,
+        _upgrade_skeleton,
+    )
+end
+
+"""
+    FlexiChains.downgrade(chain::VNChain)::FlexiChain{AbstractPPL.VarName}
+
+Convert a `VNChain` back to a chain keyed by AbstractPPL's `VarName`, which is the type of
+chain that DynamicPPL.jl and Turing.jl functions (such as `predict` or `returned`) expect.
+
+This is the reverse of [`FlexiChains.upgrade`](@ref).
+"""
+function FlexiChains.downgrade(chain::FlexiChains.VNChain)
+    return _convert_chain(chain, VarName, _downgrade_varname, _downgrade_skeleton)
+end
 
 ##################
 # bundle_samples #
 ##################
+function to_oldvnt_and_stats(pws::DynamicPPL.ParamsWithStats)
+    return (pws.params, pws.stats)
+end
+function to_oldvnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
+    return (vnt, (;))
+end
 function AbstractMCMC.bundle_samples(
-    # TODO(penelopeysm): When VarNamedTuple is moved into AbstractPPL, this can go back
-    # into src/ rather than the extension.
     transitions::AbstractVector,
     @nospecialize(m::AbstractMCMC.AbstractModel),
     @nospecialize(s::AbstractMCMC.AbstractSampler),
     last_sampler_state::Any,
-    chain_type::Type{FlexiChain{VarName}};
+    chain_type::Type{OldVNChain};
     save_state=false,
     stats=missing,
     discard_initial::Int=0,
@@ -28,7 +120,7 @@ function AbstractMCMC.bundle_samples(
     _kwargs...,
 )::FlexiChain{VarName}
     niters = length(transitions)
-    vnts_and_stats = map(FlexiChains.to_vnt_and_stats, transitions)
+    vnts_and_stats = map(to_oldvnt_and_stats, transitions)
     dicts = map(vnts_and_stats) do (vnt, stat)
         d = OrderedDict{ParameterOrExtra{<:VarName},Any}(
             Parameter(vn) => val for (vn, val) in pairs(vnt)
@@ -66,7 +158,7 @@ function AbstractMCMC.bundle_samples(
     )
 end
 
-function FlexiChains.reconstruct_values(chn::VNChain, i, j, structure::VarNamedTuple)
+function FlexiChains.reconstruct_values(chn::OldVNChain, i, j, structure::VarNamedTuple)
     vnt = DynamicPPL.VarNamedTuple()
     nt = NamedTuple()
     for param_or_extra in keys(chn)
@@ -84,7 +176,7 @@ function FlexiChains.reconstruct_values(chn::VNChain, i, j, structure::VarNamedT
     return DynamicPPL.ParamsWithStats(vnt, nt)
 end
 
-function FlexiChains.reconstruct_parameters(chn::VNChain, i, j, structure::VarNamedTuple)
+function FlexiChains.reconstruct_parameters(chn::OldVNChain, i, j, structure::VarNamedTuple)
     vnt = DynamicPPL.VarNamedTuple()
     for vn in FlexiChains.parameters(chn)
         val = chn[Parameter(vn)][i, j]
@@ -96,13 +188,6 @@ function FlexiChains.reconstruct_parameters(chn::VNChain, i, j, structure::VarNa
     return vnt
 end
 
-# Overload so that you can construct a VNChain from a 3D array and have it include
-# structures, so that `rand(chn)` returns a more convenient ParamsWithStats rather than a
-# Dict.
-#
-# We only need a skeletal VarNamedTuple. Because all our variables will be top-level
-# symbols, the skeletal VarNamedTuple will be empty, so we don't need to actually construct
-# anything.
 function FlexiChains._make_structures_from_array(::Type{VarName}, niters::Int, nchains::Int)
     return fill(DynamicPPL.VarNamedTuple(), niters, nchains)
 end
@@ -114,16 +199,16 @@ end
 
 """
     AbstractMCMC.from_samples(
-        ::Type{<:VNChain},
+        ::Type{<:OldVNChain},
         params_and_stats::AbstractMatrix{<:DynamicPPL.ParamsWithStats}
-    )::VNChain
+    )::OldVNChain
 
-Convert a matrix of [`DynamicPPL.ParamsWithStats`](@extref) to a `VNChain`.
+Convert a matrix of [`DynamicPPL.ParamsWithStats`](@extref) to a `OldVNChain`.
 """
 function AbstractMCMC.from_samples(
-    ::Type{<:VNChain},
+    ::Type{<:OldVNChain},
     params_and_stats::AbstractMatrix{<:DynamicPPL.ParamsWithStats},
-)::VNChain
+)::OldVNChain
     # Just need to convert the `ParamsWithStats` to Dicts of ParameterOrExtra.
     dicts = map(params_and_stats) do ps
         # Parameters
@@ -138,7 +223,7 @@ function AbstractMCMC.from_samples(
     end
     # And get the structures.
     structures = map(ps -> DynamicPPL.skeleton(ps.params), params_and_stats)
-    return VNChain(
+    return OldVNChain(
         size(params_and_stats, 1),
         size(params_and_stats, 2),
         dicts;
@@ -147,33 +232,33 @@ function AbstractMCMC.from_samples(
 end
 """
     AbstractMCMC.from_samples(
-        ::Type{<:VNChain},
+        ::Type{<:OldVNChain},
         params_and_stats::AbstractMatrix{<:DynamicPPL.VarNamedTuple}
-    )::VNChain
+    )::OldVNChain
 
 Convert a matrix of [`DynamicPPL.VarNamedTuple`](@extref
-DynamicPPL.VarNamedTuples.VarNamedTuple) to a `VNChain`.
+DynamicPPL.VarNamedTuples.VarNamedTuple) to a `OldVNChain`.
 """
 function AbstractMCMC.from_samples(
-    ::Type{<:VNChain},
+    ::Type{<:OldVNChain},
     vnts::AbstractMatrix{<:DynamicPPL.VarNamedTuple},
-)::VNChain
+)::OldVNChain
     pwss = map(vnts) do vnt
         DynamicPPL.ParamsWithStats(vnt, (;))
     end
-    return AbstractMCMC.from_samples(VNChain, pwss)
+    return AbstractMCMC.from_samples(OldVNChain, pwss)
 end
 
 """
     AbstractMCMC.to_samples(
         ::Type{DynamicPPL.ParamsWithStats},
-        chain::VNChain,
+        chain::OldVNChain,
         [model::DynamicPPL.Model]
     )::DimensionalData.DimMatrix{DynamicPPL.ParamsWithStats}
 
-Convert a `VNChain` to a `DimMatrix` of [`DynamicPPL.ParamsWithStats`](@extref).
+Convert a `OldVNChain` to a `DimMatrix` of [`DynamicPPL.ParamsWithStats`](@extref).
 
-The axes of the `DimMatrix` are the same as those of the input `VNChain`.
+The axes of the `DimMatrix` are the same as those of the input `OldVNChain`.
 """
 function AbstractMCMC.to_samples(
     ::Type{DynamicPPL.ParamsWithStats},
@@ -258,14 +343,6 @@ function AbstractMCMC.to_samples(
     return map(pws -> pws.params, pwss)
 end
 
-# This method will make `bundle_samples` 'just work'
-function FlexiChains.to_vnt_and_stats(pws::DynamicPPL.ParamsWithStats)
-    return (pws.params, pws.stats)
-end
-function FlexiChains.to_vnt_and_stats(vnt::DynamicPPL.VarNamedTuple)
-    return (vnt, (;))
-end
-
 ############################
 # InitFromParams extension #
 ############################
@@ -316,7 +393,7 @@ is, if a variable is not found in the `FlexiChain`, the fallback strategy is use
 generate its value. This is necessary for `predict`.
 """
 struct InitFromFlexiChain{
-    C<:FlexiChains.VNChain,
+    C<:OldVNChain,
     S<:Union{DynamicPPL.AbstractInitStrategy,Nothing},
 } <: DynamicPPL.AbstractInitStrategy
     chain::C
@@ -331,7 +408,7 @@ struct InitFromFlexiChain{
         iter_index::Int,
         chain_index::Int,
         fallback::S=nothing,
-    ) where {C<:FlexiChains.VNChain,S<:Union{DynamicPPL.AbstractInitStrategy,Nothing}}
+    ) where {C<:OldVNChain,S<:Union{DynamicPPL.AbstractInitStrategy,Nothing}}
         top_syms =
             Set{Symbol}(AbstractPPL.getsym(vn) for vn in FlexiChains.parameters(chain))
         return new{C,S}(
@@ -441,13 +518,17 @@ end
 Returns a `DimMatrix` of the model's return values, re-evaluated using the parameters in
 each iteration of the chain.
 
-If the return value is a `DimArray`, the dimensions will be stacked.
+If the return value is an `AbstractArray`, the dimensions will be stacked.
 """
 function DynamicPPL.returned(
     model::DynamicPPL.Model,
     chain::FlexiChain{<:VarName},
 )::DD.DimArray
-    return FlexiChains._raw_to_user_data(chain, map(first, reevaluate(model, chain)))
+    return FlexiChains._raw_to_user_data(
+        chain,
+        map(first, reevaluate(model, chain));
+        stack=true,
+    )
 end
 
 """
@@ -683,7 +764,7 @@ end
 ##############
 
 """
-Make a `VNChain` of samples from the prior distribution of the model.
+Make a `OldVNChain` of samples from the prior distribution of the model.
 """
 function FlexiChains._make_prior_chain(
     rng::Random.AbstractRNG,
@@ -702,7 +783,7 @@ function FlexiChains._make_prior_chain(
         ) for _ in 1:n_iters, _ in 1:n_chains
     ]
     return if make_chain
-        AbstractMCMC.from_samples(VNChain, ps)
+        AbstractMCMC.from_samples(OldVNChain, ps)
     else
         ps
     end
@@ -723,7 +804,7 @@ function FlexiChains._make_prior_chain(
 end
 
 """
-Generate a `VNChain` of samples from the posterior distribution of the model, via importance
+Generate a `OldVNChain` of samples from the posterior distribution of the model, via importance
 sampling (this is relatively inefficient, but simple to code).
 """
 function FlexiChains._make_posterior_chain(
@@ -745,7 +826,7 @@ function FlexiChains._make_posterior_chain(
     weights ./= sum(weights)
     dist = Distributions.Categorical(weights)
     idxs = rand(rng, dist, n_iters, n_chains)
-    return AbstractMCMC.from_samples(VNChain, prior_samples[idxs])
+    return AbstractMCMC.from_samples(OldVNChain, prior_samples[idxs])
 end
 function FlexiChains._make_posterior_chain(
     model::DynamicPPL.Model,
@@ -761,8 +842,8 @@ end
 
 using AbstractMCMC: AbstractMCMC
 using Distributions: Distributions
-using DynamicPPL: DynamicPPL, @model, ParamsWithStats, InitFromPrior
-using FlexiChains: VNChain, summarystats
+using DynamicPPL: DynamicPPL, @model, ParamsWithStats, InitFromPrior, VarName
+using FlexiChains: summarystats
 using PrecompileTools: @setup_workload, @compile_workload
 
 # dummy, needed to satisfy interface of bundle_samples
@@ -775,8 +856,13 @@ struct NotASampler <: AbstractMCMC.AbstractSampler end
     model = f()
     transitions = [ParamsWithStats(InitFromPrior(), model) for _ in 1:10]
     @compile_workload begin
-        chn =
-            AbstractMCMC.bundle_samples(transitions, model, NotASampler(), nothing, VNChain)
+        chn = AbstractMCMC.bundle_samples(
+            transitions,
+            model,
+            NotASampler(),
+            nothing,
+            FlexiChains.FlexiChain{VarName},
+        )
         summarystats(chn)
     end
 end

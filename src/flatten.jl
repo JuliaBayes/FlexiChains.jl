@@ -39,7 +39,7 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
             dim = DD.dims(d1, 1)
             label_type = eltype(dim)
             if (label_type === Symbol || label_type <: AbstractString)
-                vn_leaves = AbstractPPL.varname_leaves(vn, d1)
+                vn_leaves = VarNames.varname_leaves(vn, d1)
                 for (vn_leaf, label) in zip(vn_leaves, dim)
                     prettylabel = label isa Symbol ? repr(label) : label
                     plot_names[vn_leaf] = string(vn, "[", prettylabel, "]")
@@ -90,9 +90,9 @@ _varname_as(::Type{<:AbstractString}, vn::VarName) = String(Symbol(vn))
 
 # Get leaf data by applying the optic - slower fallback that always works
 function _get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
-    # TODO(penelopeysm): the following line is `AbstractPPL._unprefix_optic`. Change this
+    # TODO(penelopeysm): the following line is `VarNames._unprefix_optic`. Change this
     # once we can.
-    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, AbstractPPL.Iden(), vn_leaf)
+    optic, _ = _getindex_optic_and_vn([vn], vn_leaf, VarNames.Iden(), vn_leaf)
     return _map_optic(optic, d, vn_leaf)
 end
 
@@ -101,7 +101,7 @@ function _split_parameter_leaves(vn::VarName, d::AbstractArray)
     if _elems_have_fixed_vn_leaves(d)
         # Don't need to iterate over all array elements - just check the first one.
         d1 = first(d)
-        vn_leaves = collect(AbstractPPL.varname_leaves(vn, d1))
+        vn_leaves = collect(VarNames.varname_leaves(vn, d1))
         if length(vn_leaves) == 1 && only(vn_leaves) == vn
             # Scalar-valued parameter: nothing to split.
             return [vn => d]
@@ -117,7 +117,7 @@ function _split_parameter_leaves(vn::VarName, d::AbstractArray)
     else # leaves may have different sizes
         vns = OrderedSet{VarName}()
         for i in eachindex(d)
-            for vn_leaf in AbstractPPL.varname_leaves(vn, d[i])
+            for vn_leaf in VarNames.varname_leaves(vn, d[i])
                 push!(vns, vn_leaf)
             end
         end
@@ -194,7 +194,7 @@ function _parameter_array_components(
             d1 = first(v)
             if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
                 # No need to look more at data if all have fixed leaves
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
+                for vn_leaf in VarNames.varname_leaves(vn, d1)
                     leaf_name = _varname_as(TKey, vn_leaf)
                     push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
                     push!(kept_eltypes, eltype(d1))
@@ -356,13 +356,13 @@ end
 Convert a `FlexiSummary` into a `DimArray` with a `:param` dimension appended after the
 non-collapsed dimensions of the summary. For example:
 
-| Summary produced via                     | Dimensions of resulting `DimArray` |
-| :--------------------------------------- | :--------------------------------- |
-| `mean(chn)`                              | `(:param)`                         |
-| `mean(chn; dims=:iter)`                  | `(:chain, :param)`                 |
-| `mean(chn; dims=:chain)`                 | `(:iter, :param)`                  |
-| `summarystats(chn)`                      | `(:stat, :param)`                  |
-| `collapse(chn, [mean, std]; dims=:iter)` | `(:chain, :stat, :param)`          |
+| Summary produced via                          | Dimensions of resulting `DimArray` |
+| :-------------------------------------------- | :--------------------------------- |
+| `mean(chn)`                                   | `(:param)`                         |
+| `mean(chn; dims=:iter)`                       | `(:chain, :param)`                 |
+| `mean(chn; dims=:chain)`                      | `(:iter, :param)`                  |
+| `summarystats(chn)`                           | `(:stat, :param)`                  |
+| `collapse(chn, [cfunc1, cfunc2]; dims=:iter)` | `(:chain, :stat, :param)`          |
 
 ## Keyword arguments
 
@@ -429,7 +429,9 @@ function _check_duplicate_keys(ks)
     return if !isempty(duplicates)
         throw(
             ArgumentError(
-                "duplicate column names after converting keys to Symbols: " *
+                "duplicate column names (note that keys are converted to Symbols, and " *
+                "`$(ITER_DIM_NAME)`, `$(CHAIN_DIM_NAME)`, and `$(PARAM_DIM_NAME)` are " *
+                "reserved column names): " *
                 join(unique(duplicates), ", "),
             ),
         )
@@ -461,21 +463,10 @@ column.
 
 ## Example (`FlexiChain`)
 
-```julia
-using Turing, FlexiChains, DataFrames
-
-@model function f()
-    x ~ Normal()
-    b ~ Bernoulli()
-end
-chn = sample(f(), Prior(), MCMCThreads(), 10, 2; chain_type=VNChain)
-
-df = DataFrame(Wide(chn))
-```
-
-returns a DataFrame that looks like the following. Each parameter is a different column, and
-the `iter` and `chain` dimensions are represented as separate columns as well; `iter` varies
-faster than `chain`.
+Suppose we have a `chn::FlexiChain` with 2 parameters, `x::Float64` and `b::Bool`, 10
+iterations and 2 chains. Then `DataFrame(Wide(chn))` will return a DataFrame that looks like
+the following. Each parameter is a different column, and the `iter` and `chain` dimensions
+are represented as separate columns as well; `iter` varies faster than `chain`.
 
 !!! note
     Because all parameter names must be converted to `Symbol` for column names, this
@@ -512,7 +503,7 @@ julia> df = DataFrame(Wide(summarystats(chn)))
 
 julia> df = DataFrame(Wide(mean(chn)))
 2×2 DataFrame
- Row │ param     stat
+ Row │ param     mean
      │ VarName…  Float64
 ─────┼─────────────────────
    1 │ x         -0.253812
@@ -535,7 +526,10 @@ struct Wide{F<:ChainOrSummary,N<:NamedTuple}
         sym_ks = Symbol.(get_name.(ks))
         _check_duplicate_keys(sym_ks)
         symbol_to_keys = NamedTuple{sym_ks}(ks)
-        return new{typeof(cs),typeof(symbol_to_keys)}(cs, symbol_to_keys, parameters_only)
+        w = new{typeof(cs),typeof(symbol_to_keys)}(cs, symbol_to_keys, parameters_only)
+        # Parameter or stat names can still clash with the `iter`/`chain`/`param` columns.
+        _check_duplicate_keys(Tables.columnnames(w))
+        return w
     end
 end
 
@@ -558,21 +552,11 @@ indicating the parameter name.
 
 ## Example
 
-```julia
-using Turing, FlexiChains, DataFrames
-
-@model function f()
-    x ~ Normal()
-    b ~ Bernoulli()
-end
-chn = sample(f(), Prior(), MCMCThreads(), 10, 2; chain_type=VNChain)
-
-df = DataFrame(Long(chn))
-```
-
-returns a DataFrame that looks like the following. The `iter` and `chain` dimensions are
-represented as separate columns as before, but now the parameter names are stacked into a
-single `param` column, and the values are stacked into a single `value` column.
+Suppose we have a `chn::FlexiChain` with 2 parameters, `x::Float64` and `b::Bool`, 10
+iterations and 2 chains. Then `DataFrame(Long(chn))` will return a DataFrame that looks like
+the following. The `iter` and `chain` dimensions are represented as separate columns as
+before, but now the parameter names are stacked into a single `param` column, and the values
+are stacked into a single `value` column.
 
 The `iter` column varies faster than the `chain` column, which in turn varies faster than
 the `param` column.
@@ -651,18 +635,15 @@ function Tables.columnnames(w::Wide{<:FlexiSummary})
     if chain_indices(w.cs) !== nothing
         push!(cols, FlexiChains.CHAIN_DIM_NAME)
     end
-    si = stat_indices(w.cs)
-    if si !== nothing
-        append!(cols, parent(si))
-    else
-        push!(cols, FlexiChains.STAT_DIM_NAME)
-    end
+    # Use the stored stat indices even if the stat dimension was dropped, so that e.g.
+    # `DataFrame(mean(chn))` has a `mean` column rather than a generic `stat` column.
+    append!(cols, parent(w.cs._stat_indices))
     return cols
 end
 function Tables.getcolumn(w::Wide{<:FlexiSummary}, col::Symbol)
     ii = iter_indices(w.cs)
     ci = chain_indices(w.cs)
-    si = stat_indices(w.cs)
+    si = w.cs._stat_indices
     nic = if ii === nothing && ci === nothing
         1
     elseif ii === nothing
@@ -689,50 +670,23 @@ function Tables.getcolumn(w::Wide{<:FlexiSummary}, col::Symbol)
             ArgumentError("summary does not have a chain dimension; should not happen"),
         )
         repeat(ci; outer=nparams)
-    elseif col === FlexiChains.STAT_DIM_NAME
-        if si === nothing
-            if ii === nothing && ci === nothing
-                [w.cs._data[k][] for k in values(w.symbol_to_keys)]
-            else
-                vcat([vec(w.cs._data[k]) for k in values(w.symbol_to_keys)]...)
-            end
+    elseif col in parent(si)
+        # Named stat column. Perf optimisation: this is equivalent to
+        #     get_stat_val(k) = w.cs[k, stat=At(col)]
+        # but avoids the overhead of the getindex call when we know for certain that `k`
+        # is already a valid key in `w.cs._data`.
+        idx = findfirst(==(col), parent(si))
+        get_stat_val(k) = w.cs._data[k][:, :, idx]
+        if ii === nothing && ci === nothing
+            # get_stat_val returns 1x1x1 array
+            [get_stat_val(k)[] for k in values(w.symbol_to_keys)]
         else
-            throw(
-                ArgumentError(
-                    "summary has a non-collapse stat dimension but :stat column was requested; should not happen",
-                ),
-            )
+            # get_stat_val returns iters x 1 x 1 array or 1 x nchains x 1 array
+            stat_vals = [vec(get_stat_val(k)) for k in values(w.symbol_to_keys)]
+            vcat(stat_vals...)
         end
     else
-        # named stat dimension.
-        if si === nothing
-            throw(
-                ArgumentError("summary does not have a stat dimension; should not happen"),
-            )
-        else
-            if col in parent(si)
-                # Perf optimisation. This is equivalent to
-                #     get_stat_val(k) = w.cs[k, stat=At(col)]
-                # but avoids the overhead of the getindex call when we know for certain
-                # that `k` is already a valid key in `w.cs._data`.
-                idx = findfirst(==(col), parent(si))
-                get_stat_val(k) = w.cs._data[k][:, :, idx]
-                if ii === nothing && ci === nothing
-                    # get_stat_val returns 1x1x1 array
-                    [get_stat_val(k)[] for k in values(w.symbol_to_keys)]
-                else
-                    # get_stat_val returns iters x 1 x 1 array or 1 x nchains x 1 array
-                    stat_vals = [vec(get_stat_val(k)) for k in values(w.symbol_to_keys)]
-                    vcat(stat_vals...)
-                end
-            else
-                throw(
-                    ArgumentError(
-                        "summary does not have a stat named $col; should not happen",
-                    ),
-                )
-            end
-        end
+        throw(ArgumentError("summary does not have a stat named $col; should not happen"))
     end
 end
 

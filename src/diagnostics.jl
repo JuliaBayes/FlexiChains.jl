@@ -1,21 +1,44 @@
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
 """
-    changerate(chain::FlexiChain; warn=true, split_varnames=true)
+    changerate(
+        chain::FlexiChain;
+        dims::Symbol=:both,
+        warn::Bool=true,
+        split_varnames::Bool=true,
+    )
 
-Return a `FlexiSummary` with the fraction of adjacent values that differ (`!=`) for
-each parameter in each chain. The denominator is the number of transitions, `niters - 1`.
-A single value gives `NaN`.
+Calculate the number of adjacent values that differ for each key in the `chain`, divided by
+the number of transitions, i.e., `niters - 1`.
 
-Array-valued parameters are split into scalar components by default. Set
-`split_varnames=false` to compare whole parameter values instead. The `warn` keyword
-controls warnings for keys that cannot be summarised, as in [`FlexiChains.collapse`](@ref).
+Change rates are always computed within each chain separately, since consecutive samples
+from different chains are unrelated.
+
+The `dims` keyword argument controls how the per-chain results are combined:
+
+- `:both` (the default): the per-chain change rates are averaged, giving a single value
+  per key.
+- `:iter`: the change rate is reported separately for each chain.
+- `:chain` is not supported, since a change rate across chains at a single iteration is
+  not meaningful.
 """
-function changerate(chain::FlexiChain; warn::Bool=true, split_varnames::Bool=true)
+function changerate(
+    chain::FlexiChain;
+    dims::Symbol=:both,
+    warn::Bool=true,
+    split_varnames::Bool=true,
+)
+    per_chain = m -> map(_changerate, eachcol(m))
+    cf = CollapseFunction(
+        :changerate,
+        m -> Statistics.mean(per_chain(m)),
+        nothing,
+        per_chain,
+    )
     return collapse(
         chain,
-        [(:changerate, _changerate)];
-        dims=:iter,
+        [cf];
+        dims=dims,
         warn=warn,
         split_varnames=split_varnames,
         drop_stat_dim=true,
