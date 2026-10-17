@@ -1,5 +1,32 @@
 using MCMCDiagnosticTools: MCMCDiagnosticTools
 
+"""
+    changerate(chain::FlexiChain; warn=true, split_varnames=true)
+
+Return a `FlexiSummary` with the fraction of adjacent values that differ (`!=`) for
+each parameter in each chain. The denominator is the number of transitions, `niters - 1`.
+A single value gives `NaN`.
+
+Array-valued parameters are split into scalar components by default. Set
+`split_varnames=false` to compare whole parameter values instead. The `warn` keyword
+controls warnings for keys that cannot be summarised, as in [`FlexiChains.collapse`](@ref).
+"""
+function changerate(chain::FlexiChain; warn::Bool=true, split_varnames::Bool=true)
+    return collapse(
+        chain,
+        [(:changerate, _changerate)];
+        dims=:iter,
+        warn=warn,
+        split_varnames=split_varnames,
+        drop_stat_dim=true,
+    )
+end
+
+function _changerate(x::AbstractVector)
+    length(x) < 2 && return NaN
+    return count(i -> x[i] != x[i-1], (firstindex(x)+1):lastindex(x)) / (length(x) - 1)
+end
+
 # Convert the output of `MCMCDiagnosticTools.gelmandiag` into a FlexiSummary
 function _gelmandiag_summary(::Type{TKey}, kept_keys, psrf, psrfci) where {TKey}
     data = OrderedDict{ParameterOrExtra{<:TKey},Array{Float64,3}}()

@@ -120,6 +120,14 @@ StatsBase.iqr(::FlexiChains.FlexiChain; kwargs...)
 There are also similar overloads for `PosteriorStats.hdi` and `PosteriorStats.eti`, which calculate highest density intervals and equal-tailed intervals, respectively.
 Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
 
+## Change rates
+
+Change rates count transitions separately within each chain.
+
+```@docs
+changerate
+```
+
 ## Custom statistics
 
 There are two scenarios where the above are not enough:

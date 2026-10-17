@@ -77,6 +77,7 @@ export summarystats, mad
 using MCMCDiagnosticTools:
     ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
 export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
+export changerate
 
 """
     VNChain
