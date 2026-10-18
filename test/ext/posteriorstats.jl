@@ -18,7 +18,7 @@ using Test
         chain = FlexiChain{Symbol}(
             N_iters,
             N_chains,
-            OrderedDict(Parameter(:a) => as, Parameter(:b) => bs, Extra("c") => cs),
+            OrderedDict(Parameter(:a) => as, Parameter(:b) => bs, Extra(:c) => cs),
         )
 
         @testset "split_interval defaults to true" begin
