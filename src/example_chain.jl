@@ -78,5 +78,6 @@ const EXAMPLE_CHAIN = begin
         Extra(:logjoint) => logjoint,
         Extra(:is_divergent) => is_divergent,
     )
-    FlexiChain{VarName}(10, 2, data; iter_indices=101:110)
+    structures = fill(VarNamedTuple(), 10, 2)
+    FlexiChain{VarName}(10, 2, data; iter_indices=101:110, structures=structures)
 end
