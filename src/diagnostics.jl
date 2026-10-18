@@ -1,5 +1,6 @@
 using Random: Random
 using MCMCDiagnosticTools: MCMCDiagnosticTools
+using MLJModelInterface: MLJModelInterface as MMI
 
 # Convert the output of `MCMCDiagnosticTools.gelmandiag` into a FlexiSummary
 function _gelmandiag_summary(::Type{TKey}, kept_keys, psrf, psrfci) where {TKey}
@@ -166,7 +167,7 @@ end
 """
     MCMCDiagnosticTools.rstar(
         [rng::Random.AbstractRNG,]
-        classifier,
+        classifier::MLJModelInterface.Supervised,
         chain::FlexiChain;
         warn::Bool=true,
         kwargs...
@@ -189,7 +190,7 @@ rstar(DecisionTreeClassifier(), chain)
 """
 function MCMCDiagnosticTools.rstar(
     rng::Random.AbstractRNG,
-    classifier,
+    classifier::MMI.Supervised,
     chain::FlexiChain;
     warn::Bool=true,
     kwargs...,
@@ -198,6 +199,6 @@ function MCMCDiagnosticTools.rstar(
     return MCMCDiagnosticTools.rstar(rng, classifier, parent(dimarr); kwargs...)
 end
 
-function MCMCDiagnosticTools.rstar(classifier, chain::FlexiChain; kwargs...)
+function MCMCDiagnosticTools.rstar(classifier::MMI.Supervised, chain::FlexiChain; kwargs...)
     return MCMCDiagnosticTools.rstar(Random.default_rng(), classifier, chain; kwargs...)
 end
