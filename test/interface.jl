@@ -16,15 +16,25 @@ using OrderedCollections: OrderedDict
 using AbstractMCMC: AbstractMCMC
 using Test
 using Random: Xoshiro
+using StatsBase: Weights, sample
+using VarNames: VarNames
 
 @testset verbose = true "interface.jl" begin
     @info "Testing interface.jl"
 
+    @testset "Draw roundtrip" begin
+        draws = fill(VarNames.Draw(VarNames.VarNamedTuple(x=1.0), (lp=-2.0,)), 2, 1)
+        chain = AbstractMCMC.from_samples(FlexiChain{VarName}, draws)
+        restored = AbstractMCMC.to_samples(VarNames.Draw, chain)
+        @test VarNames.parameters.(restored) == VarNames.parameters.(draws)
+        @test VarNames.extras.(restored) == VarNames.extras.(draws)
+    end
+
     @testset "show doesn't error" begin
         ds = [
-            Dict(Parameter(:a) => 1, Extra("hello") => 3.0),
+            Dict(Parameter(:a) => 1, Extra(:hello) => 3.0),
             Dict(Parameter(:a) => 1),
-            Dict(Extra("hello") => 3.0),
+            Dict(Extra(:hello) => 3.0),
             Dict(),
         ]
         for d in ds
@@ -47,7 +57,7 @@ using Random: Xoshiro
     end
 
     @testset "equality" begin
-        d = Dict(Parameter(:a) => 1, Extra("hello") => 3.0)
+        d = Dict(Parameter(:a) => 1, Extra(:hello) => 3.0)
         chain1 = FlexiChain{Symbol}(
             10,
             1,
@@ -107,7 +117,7 @@ using Random: Xoshiro
 
     @testset "dictionary interface" begin
         N_iters, N_chains = 10, 2
-        d = OrderedDict(Parameter(:a) => 1, Extra("hello") => 3.0, Parameter(:b) => 2)
+        d = OrderedDict(Parameter(:a) => 1, Extra(:hello) => 3.0, Parameter(:b) => 2)
         dicts = fill(d, N_iters, N_chains)
         chain = FlexiChain{Symbol}(N_iters, N_chains, dicts)
         # size
@@ -118,19 +128,19 @@ using Random: Xoshiro
         @test FlexiChains.niters(chain) == N_iters
         @test FlexiChains.nchains(chain) == N_chains
         # keys
-        @test collect(keys(chain)) == [Parameter(:a), Extra("hello"), Parameter(:b)]
+        @test collect(keys(chain)) == [Parameter(:a), Extra(:hello), Parameter(:b)]
         for k in keys(d)
             @test haskey(chain, k)
         end
         # values
         @test collect(values(chain)) ==
-              [chain[Parameter(:a)], chain[Extra("hello")], chain[Parameter(:b)]]
+              [chain[Parameter(:a)], chain[Extra(:hello)], chain[Parameter(:b)]]
         @test collect(values(chain; parameters_only=true)) ==
               [chain[Parameter(:a)], chain[Parameter(:b)]]
         # pairs
         @test collect(pairs(chain)) == [
             Parameter(:a) => chain[Parameter(:a)],
-            Extra("hello") => chain[Extra("hello")],
+            Extra(:hello) => chain[Extra(:hello)],
             Parameter(:b) => chain[Parameter(:b)],
         ]
         @test collect(pairs(chain; parameters_only=true)) ==
@@ -143,9 +153,9 @@ using Random: Xoshiro
         d = OrderedDict(
             Parameter(:a) => 1,
             Parameter(:b) => 2,
-            Extra("hello") => 3.0,
-            Extra("world") => 4.0,
-            Extra("key") => 5.0,
+            Extra(:hello) => 3.0,
+            Extra(:world) => 4.0,
+            Extra(:key) => 5.0,
         )
         chain = FlexiChain{Symbol}(N_iters, 1, fill(d, N_iters))
 
@@ -153,8 +163,7 @@ using Random: Xoshiro
             @test FlexiChains.parameters(chain) == [:a, :b]
         end
         @testset "extras" begin
-            @test FlexiChains.extras(chain) ==
-                  [Extra("hello"), Extra("world"), Extra("key")]
+            @test FlexiChains.extras(chain) == [Extra(:hello), Extra(:world), Extra(:key)]
         end
     end
 
@@ -206,12 +215,12 @@ using Random: Xoshiro
 
         @testset "DimArray name is set to key" begin
             N_iters = 10
-            dicts = fill(Dict(Parameter(:a) => 1, Extra("hello") => 3.0), N_iters)
+            dicts = fill(Dict(Parameter(:a) => 1, Extra(:hello) => 3.0), N_iters)
             chain = FlexiChain{Symbol}(N_iters, 1, dicts)
 
             @testset "by ParameterOrExtra key" begin
                 @test DD.name(chain[Parameter(:a)]) == "Parameter(:a)"
-                @test DD.name(chain[Extra("hello")]) == "Extra(\"hello\")"
+                @test DD.name(chain[Extra(:hello)]) == "Extra(:hello)"
             end
             @testset "by parameter name" begin
                 @test DD.name(chain[:a]) == "Parameter(:a)"
@@ -224,7 +233,7 @@ using Random: Xoshiro
         end
 
         @testset "metadata is correctly constructed" begin
-            d = Dict(Parameter(:a) => 1, Extra("hello") => 3.0)
+            d = Dict(Parameter(:a) => 1, Extra(:hello) => 3.0)
             c = FlexiChain{Symbol}(
                 10,
                 3,
@@ -260,7 +269,7 @@ using Random: Xoshiro
                 Dict(
                     Parameter(Shay("a")) => 1,
                     Parameter(Shay("b")) => 2,
-                    Extra("hello") => 3.0,
+                    Extra(:hello) => 3.0,
                 ),
                 N_iters,
             )
@@ -283,9 +292,9 @@ using Random: Xoshiro
                 @test chain[Parameter(Shay("a"))] == fill(1, N_iters, 1)
                 @test chain[Parameter(Shay("a"))] == fill(1, N_iters, 1)
                 @test chain[Parameter(Shay("b"))] == fill(2, N_iters, 1)
-                @test chain[Extra("hello")] == fill(3.0, N_iters, 1)
+                @test chain[Extra(:hello)] == fill(3.0, N_iters, 1)
                 @test_throws KeyError chain[Parameter(Shay("c"))]
-                @test_throws KeyError chain[Extra("world")]
+                @test_throws KeyError chain[Extra(:world)]
                 @testset "with iter subsetting" begin
                     @test chain[Parameter(Shay("a")), iter=4:6] == fill(1, 3, 1)
                     @test chain[Parameter(Shay("a")), iter=4:6, chain=DD.At(1)] ==
@@ -316,12 +325,12 @@ using Random: Xoshiro
                 Base.Symbol(::TurnsToA) = :a
 
                 N_iters = 10
-                dicts = fill(Dict(Parameter(TurnsToA()) => 1, Extra("a") => 3.0), N_iters)
+                dicts = fill(Dict(Parameter(TurnsToA()) => 1, Extra(:a) => 3.0), N_iters)
                 chain = FlexiChain{TurnsToA}(N_iters, 1, dicts)
 
                 # getindex with the full key should be fine
                 @test chain[Parameter(TurnsToA())] == fill(1, N_iters, 1)
-                @test chain[Extra("a")] == fill(3.0, N_iters, 1)
+                @test chain[Extra(:a)] == fill(3.0, N_iters, 1)
                 # but getindex with the symbol should fail
                 @test_throws KeyError chain[:a]
                 # ... with the correct error message
@@ -353,7 +362,7 @@ using Random: Xoshiro
             dicts = Dict(
                 Parameter("a") => 1:N_iters,
                 Parameter("b") => fill(2, N_iters),
-                Extra("hello") => hellos,
+                Extra(:hello) => hellos,
             )
             chain = FlexiChain{String}(N_iters, 1, dicts; iter_indices=2:2:(N_iters*2))
 
@@ -376,12 +385,12 @@ using Random: Xoshiro
                 @test isequal(chain, chain[:])
             end
             @testset "AbstractVector{ParameterOrExtra{TKey}}" begin
-                keys = [Parameter("a"), Extra("hello")]
+                keys = [Parameter("a"), Extra(:hello)]
                 c = chain[keys]
                 @test c isa FlexiChain{String}
                 @test size(c) == (N_iters, 1)
                 @test c[Parameter("a")] == reshape(1:N_iters, N_iters, 1)
-                @test c[Extra("hello")] == reshape(hellos, N_iters, 1)
+                @test c[Extra(:hello)] == reshape(hellos, N_iters, 1)
                 @test !haskey(c, Parameter("b"))
                 @test_throws KeyError c[Parameter("b")]
             end
@@ -488,7 +497,7 @@ using Random: Xoshiro
         c = FlexiChain{Symbol}(
             Ni,
             Nc,
-            OrderedDict(Parameter(:a) => rand(Ni, Nc), Extra("c") => rand(Ni, Nc)),
+            OrderedDict(Parameter(:a) => rand(Ni, Nc), Extra(:c) => rand(Ni, Nc)),
         )
 
         @testset "values_at" begin
@@ -497,13 +506,13 @@ using Random: Xoshiro
                 @test d isa OrderedDict
                 @test length(d) == 2
                 @test d[Parameter(:a)] == c[Parameter(:a)][i]
-                @test d[Extra("c")] == c[Extra("c")][i]
+                @test d[Extra(:c)] == c[Extra(:c)][i]
                 d = FlexiChains.values_at(c, NamedTuple; iter=i, chain=1)
-                @test d == (a=c[Parameter(:a)][i], c=c[Extra("c")][i])
+                @test d == (a=c[Parameter(:a)][i], c=c[Extra(:c)][i])
                 d = FlexiChains.values_at(c, ComponentArray; iter=i, chain=1)
-                @test d == ComponentArray(; a=c[Parameter(:a)][i], c=c[Extra("c")][i])
+                @test d == ComponentArray(; a=c[Parameter(:a)][i], c=c[Extra(:c)][i])
                 d = FlexiChains.values_at(c, ComponentArray{Real}; iter=i, chain=1)
-                @test d == ComponentArray{Real}(; a=c[Parameter(:a)][i], c=c[Extra("c")][i])
+                @test d == ComponentArray{Real}(; a=c[Parameter(:a)][i], c=c[Extra(:c)][i])
             end
 
             @testset "default kwargs (all iters/chains)" begin
@@ -712,7 +721,7 @@ using Random: Xoshiro
                     Nc_s,
                     OrderedDict(
                         Parameter(:a) => rand(Ni_s, Nc_s),
-                        Extra("c") => rand(Ni_s, Nc_s),
+                        Extra(:c) => rand(Ni_s, Nc_s),
                     );
                     structures=structs,
                 )
@@ -730,13 +739,13 @@ using Random: Xoshiro
         @testset "basic merge" begin
             struct Foo end
             N_iters = 10
-            dict1 = Dict(Parameter(:a) => 1, Parameter(:b) => "no", Extra("foo") => 3.0)
+            dict1 = Dict(Parameter(:a) => 1, Parameter(:b) => "no", Extra(:foo) => 3.0)
             chain1 = FlexiChain{Symbol}(N_iters, 1, fill(dict1, N_iters))
 
             dict2 = Dict(
                 Parameter(:c) => Foo(),
                 Parameter(:b) => "yes",
-                Extra("bar") => "cheese",
+                Extra(:bar) => "cheese",
             )
             ii = 3:3:(N_iters*3)
             ci = [4]
@@ -782,8 +791,8 @@ using Random: Xoshiro
                 # Matrix{Any} which would lose type information.
                 @test eltype(chain3[Parameter(:a)]) == Int
                 @test eltype(chain3[Parameter(:b)]) == String
-                @test eltype(chain3[Extra("foo")]) == Float64
-                @test eltype(chain3[Extra("bar")]) == String
+                @test eltype(chain3[Extra(:foo)]) == Float64
+                @test eltype(chain3[Extra(:bar)]) == String
                 @test eltype(chain3[Parameter(:c)]) == Foo
             end
         end
@@ -846,26 +855,25 @@ using Random: Xoshiro
 
     @testset "subset parameters and extras" begin
         N_iters = 10
-        d = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+        d = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
         chain = FlexiChain{Symbol}(N_iters, 1, fill(d, N_iters))
         @test isequal(FlexiChains.subset_parameters(chain), chain[[Parameter(:a)]])
-        @test isequal(FlexiChains.subset_extras(chain), chain[[Extra("c")]])
+        @test isequal(FlexiChains.subset_extras(chain), chain[[Extra(:c)]])
     end
 
     @testset "vcat" begin
         @testset "basic application" begin
             niters1 = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(niters1, 1, fill(d1, niters1))
             niters2 = 20
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(niters2, 1, fill(d2, niters2))
             chain12 = vcat(chain1, chain2)
             @test chain12 isa FlexiChain{Symbol}
             @test size(chain12) == (niters1 + niters2, 1)
             @test chain12[Parameter(:a)] == vcat(fill(1, niters1, 1), fill(2, niters2, 1))
-            @test chain12[Extra("c")] ==
-                  vcat(fill(3.0, niters1, 1), fill("foo", niters2, 1))
+            @test chain12[Extra(:c)] == vcat(fill(3.0, niters1, 1), fill("foo", niters2, 1))
         end
 
         @testset "_smartcat" begin
@@ -883,7 +891,7 @@ using Random: Xoshiro
 
         @testset "handling indices" begin
             N_iters = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(
                 N_iters,
                 1,
@@ -891,7 +899,7 @@ using Random: Xoshiro
                 iter_indices=1:10,
                 chain_indices=[1],
             )
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(
                 N_iters,
                 1,
@@ -907,7 +915,7 @@ using Random: Xoshiro
 
         @testset "metadata" begin
             niters1 = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(
                 niters1,
                 1,
@@ -916,7 +924,7 @@ using Random: Xoshiro
                 last_sampler_state=["foo"],
             )
             niters2 = 20
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(
                 niters2,
                 1,
@@ -944,9 +952,9 @@ using Random: Xoshiro
         end
 
         @testset "error on different number of chains" begin
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(10, 1, fill(d1, 10, 1))
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(10, 2, fill(d2, 10, 2))
             @test_throws DimensionMismatch vcat(chain1, chain2)
         end
@@ -963,22 +971,22 @@ using Random: Xoshiro
     @testset "hcat" begin
         @testset "basic application" begin
             N_iters = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(N_iters, 1, fill(d1, N_iters))
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(N_iters, 1, fill(d2, N_iters))
             chain12 = hcat(chain1, chain2)
             @test chain12 isa FlexiChain{Symbol}
             @test size(chain12) == (N_iters, 2)
             @test chain12[Parameter(:a)] == repeat([1 2], N_iters)
-            @test chain12[Extra("c")] == repeat([3.0 "foo"], N_iters)
+            @test chain12[Extra(:c)] == repeat([3.0 "foo"], N_iters)
         end
 
         @testset "handling indices" begin
             N_iters = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(N_iters, 1, fill(d1, N_iters); iter_indices=1:10)
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(N_iters, 1, fill(d2, N_iters); iter_indices=21:30)
 
             @test_logs (:warn, r"different iteration indices") hcat(chain1, chain2)
@@ -1026,20 +1034,20 @@ using Random: Xoshiro
 
         @testset "3 or more inputs" begin
             N_iters = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(N_iters, 1, fill(d1, N_iters))
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(N_iters, 1, fill(d2, N_iters))
-            d3 = Dict(Parameter(:x) => 4, Extra("e") => :y)
+            d3 = Dict(Parameter(:x) => 4, Extra(:e) => :y)
             chain3 = FlexiChain{Symbol}(N_iters, 1, fill(d3, N_iters))
             chain123 = hcat(chain1, chain2, chain3)
             @test chain123 isa FlexiChain{Symbol}
             @test size(chain123) == (N_iters, 3)
             # need isequal() rather than `==` to handle the `missing` values
             @test isequal(chain123[Parameter(:a)], repeat([1 2 missing], N_iters))
-            @test isequal(chain123[Extra("c")], repeat([3.0 "foo" missing], N_iters))
+            @test isequal(chain123[Extra(:c)], repeat([3.0 "foo" missing], N_iters))
             @test isequal(chain123[Parameter(:x)], repeat([missing missing 4], N_iters))
-            @test isequal(chain123[Extra("e")], repeat([missing missing :y], N_iters))
+            @test isequal(chain123[Extra(:e)], repeat([missing missing :y], N_iters))
         end
 
         @testset "stacking different numbers of chains" begin
@@ -1054,9 +1062,9 @@ using Random: Xoshiro
         end
 
         @testset "error on different number of iters" begin
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(20, 1, fill(d1, 20))
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(10, 1, fill(d2, 10))
             @test_throws DimensionMismatch hcat(chain1, chain2)
         end
@@ -1083,11 +1091,11 @@ using Random: Xoshiro
         @testset "AbstractMCMC.chainscat and chainsstack" begin
             # These methods make use of hcat. We just do a basic test
             N_iters = 10
-            d1 = Dict(Parameter(:a) => 1, Extra("c") => 3.0)
+            d1 = Dict(Parameter(:a) => 1, Extra(:c) => 3.0)
             chain1 = FlexiChain{Symbol}(N_iters, 1, fill(d1, N_iters))
-            d2 = Dict(Parameter(:a) => 2, Extra("c") => "foo")
+            d2 = Dict(Parameter(:a) => 2, Extra(:c) => "foo")
             chain2 = FlexiChain{Symbol}(N_iters, 1, fill(d2, N_iters))
-            d3 = Dict(Parameter(:x) => 4, Extra("e") => :y)
+            d3 = Dict(Parameter(:x) => 4, Extra(:e) => :y)
             chain3 = FlexiChain{Symbol}(N_iters, 1, fill(d3, N_iters))
             chain12 = hcat(chain1, chain2)
             @test isequal(AbstractMCMC.chainscat(chain1, chain2), chain12)
@@ -1101,7 +1109,7 @@ using Random: Xoshiro
     @testset "map_keys" begin
         N_iters = 10
         dicts = fill(
-            OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2, Extra("hello") => 3.0),
+            OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2, Extra(:hello) => 3.0),
             N_iters,
         )
         chain = FlexiChain{Symbol}(N_iters, 1, dicts)
@@ -1115,14 +1123,15 @@ using Random: Xoshiro
 
         @testset "a working mapping" begin
             g(s::Parameter{Symbol}) = Parameter(String(s.name))
-            g(e::Extra) = Extra(Symbol(e.name))
+            g(e::Extra) = Extra(:greeting)
             gchain = FlexiChains.map_keys(g, chain)
             @test gchain isa FlexiChain{String}
             # this checks that the order of keys is preserved
-            @test collect(keys(gchain)) == [Parameter("a"), Parameter("b"), Extra(:hello)]
+            @test collect(keys(gchain)) ==
+                  [Parameter("a"), Parameter("b"), Extra(:greeting)]
             @test gchain[Parameter("a")] == chain[Parameter(:a)]
             @test gchain[Parameter("b")] == chain[Parameter(:b)]
-            @test gchain[Extra(:hello)] == chain[Extra("hello")]
+            @test gchain[Extra(:greeting)] == chain[Extra(:hello)]
         end
 
         @testset "bad function output" begin
@@ -1138,7 +1147,7 @@ using Random: Xoshiro
     @testset "map_parameters" begin
         N_iters = 10
         dicts = fill(
-            OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2, Extra("hello") => 3.0),
+            OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2, Extra(:hello) => 3.0),
             N_iters,
         )
         chain = FlexiChain{Symbol}(N_iters, 1, dicts)
@@ -1154,10 +1163,10 @@ using Random: Xoshiro
             gchain = FlexiChains.map_parameters(String, chain)
             @test gchain isa FlexiChain{String}
             # this checks that the order of keys is preserved
-            @test collect(keys(gchain)) == [Parameter("a"), Parameter("b"), Extra("hello")]
+            @test collect(keys(gchain)) == [Parameter("a"), Parameter("b"), Extra(:hello)]
             @test gchain[Parameter("a")] == chain[Parameter(:a)]
             @test gchain[Parameter("b")] == chain[Parameter(:b)]
-            @test gchain[Extra("hello")] == chain[Extra("hello")]
+            @test gchain[Extra(:hello)] == chain[Extra(:hello)]
         end
 
         @testset "bad function output" begin
@@ -1172,7 +1181,7 @@ using Random: Xoshiro
 
     @testset "rand" begin
         N_iters, N_chains = 10, 3
-        d = OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra("lp") => -3.0)
+        d = OrderedDict(Parameter(:a) => 1, Parameter(:b) => 2.0, Extra(:lp) => -3.0)
         chn = FlexiChain{Symbol}(N_iters, N_chains, fill(d, N_iters, N_chains))
         rng = Xoshiro(468)
 
@@ -1180,7 +1189,7 @@ using Random: Xoshiro
         for args in ((rng,), ())
             vals = rand(args..., chn)
             @test vals isa OrderedDict{ParameterOrExtra{<:Symbol}}
-            @test collect(keys(vals)) == [Parameter(:a), Parameter(:b), Extra("lp")]
+            @test collect(keys(vals)) == [Parameter(:a), Parameter(:b), Extra(:lp)]
             params = rand(args..., chn; parameters_only=true)
             @test params isa NamedTuple
             @test keys(params) == (:a, :b)
@@ -1195,6 +1204,26 @@ using Random: Xoshiro
         @testset "reproducibility" begin
             @test rand(Xoshiro(468), chn) == rand(Xoshiro(468), chn)
             @test rand(Xoshiro(468), chn, 2) == rand(Xoshiro(468), chn, 2)
+        end
+
+        @testset "weighted sampling" begin
+            values = reshape(1:6, 3, 2)
+            weighted = FlexiChain{Symbol}(
+                3,
+                2,
+                OrderedDict(Parameter(:a) => values, Extra(:lp) => -values),
+            )
+            w = Weights([0, 1, 3, 0, 2, 4])
+            draws = rand(Xoshiro(8675309), weighted, 2, 3; weights=w)
+            indices = sample(Xoshiro(8675309), 1:6, w, (2, 3))
+            @test getindex.(draws, Ref(Parameter(:a))) == indices
+            @test getindex.(draws, Ref(Extra(:lp))) == -indices
+            @test rand(Xoshiro(8675309), weighted, 2, 3; weights=Weights(2 .* w)) == draws
+
+            pointmass = Weights([0, 0, 0, 1, 0, 0])
+            @test rand(weighted; weights=pointmass) ==
+                  OrderedDict(Parameter(:a) => 4, Extra(:lp) => -4)
+            @test rand(weighted; weights=pointmass, parameters_only=true) == (; a=4)
         end
     end
 

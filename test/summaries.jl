@@ -40,8 +40,8 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         Dict(
             Parameter(:a) => as,
             Parameter(:b) => bs,
-            Extra("c") => cs,
-            Extra("actuallyString") => ds,
+            Extra(:c) => cs,
+            Extra(:actuallyString) => ds,
         );
         iter_indices=FlexiChains._make_lookup(4:4:(4*N_iters)),
         chain_indices=FlexiChains._make_lookup(1:N_chains),
@@ -60,10 +60,10 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 if func in WORKS_ON_STRING
                     # the 1 dim at the end is the stat dim
                     expected = reshape(func(ds; dims=1), N_chains, 1)
-                    @test fs[Extra("actuallyString")] == expected
+                    @test fs[Extra(:actuallyString)] == expected
                 else
                     # the key "actuallyString" should be skipped
-                    @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
+                    @test_logs (:warn, r"actuallyString") FlexiChains.collapse(
                         chain,
                         [CollapseFunctionVec(func)];
                         dims=:iter,
@@ -84,10 +84,10 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 if func in WORKS_ON_STRING
                     # the 1 dim at the end is the stat dim
                     expected = reshape(func(ds; dims=2), N_iters, 1)
-                    @test fs[Extra("actuallyString")] == expected
+                    @test fs[Extra(:actuallyString)] == expected
                 else
                     # the key "actuallyString" should be skipped
-                    @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
+                    @test_logs (:warn, r"actuallyString") FlexiChains.collapse(
                         chain,
                         [CollapseFunctionVec(func)];
                         dims=:chain,
@@ -105,10 +105,10 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 if func in WORKS_ON_STRING
                     # the 1 dim at the end is the stat dim
                     expected = func(ds)
-                    @test only(fs[Extra("actuallyString")]) == expected
+                    @test only(fs[Extra(:actuallyString)]) == expected
                 else
                     # the key "actuallyString" should be skipped
-                    @test_logs (:warn, r"\"actuallyString\"") FlexiChains.collapse(
+                    @test_logs (:warn, r"actuallyString") FlexiChains.collapse(
                         chain,
                         [CollapseFunctionVec(func)];
                         dims=:both,
@@ -413,9 +413,9 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
 
     @testset "show doesn't error" begin
         ds = [
-            Dict(Parameter(:a) => 1, Extra("hello") => 3.0),
+            Dict(Parameter(:a) => 1, Extra(:hello) => 3.0),
             Dict(Parameter(:a) => 1),
-            Dict(Extra("hello") => 3.0),
+            Dict(Extra(:hello) => 3.0),
             Dict(),
         ]
         for d in ds
@@ -815,7 +815,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             OrderedDict(
                 Parameter(:a) => randn(10, 3),
                 Parameter(:b) => randn(10, 3),
-                Extra("hello") => randn(10, 3),
+                Extra(:hello) => randn(10, 3),
             ),
             10,
             3,
@@ -832,14 +832,14 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
 
         @testset "a working mapping" begin
             g(s::Parameter{Symbol}) = Parameter(String(s.name))
-            g(e::Extra) = Extra(Symbol(e.name))
+            g(e::Extra) = Extra(:greeting)
             gsmy = FlexiChains.map_keys(g, smy)
             @test gsmy isa FlexiSummary{String}
             # this checks that the order of keys is preserved
-            @test collect(keys(gsmy)) == [Parameter("a"), Parameter("b"), Extra(:hello)]
+            @test collect(keys(gsmy)) == [Parameter("a"), Parameter("b"), Extra(:greeting)]
             @test isequal(gsmy[Parameter("a")], smy[Parameter(:a)])
             @test isequal(gsmy[Parameter("b")], smy[Parameter(:b)])
-            @test isequal(gsmy[Extra(:hello)], smy[Extra("hello")])
+            @test isequal(gsmy[Extra(:greeting)], smy[Extra(:hello)])
         end
 
         @testset "bad function output" begin
@@ -857,7 +857,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             OrderedDict(
                 Parameter(:a) => randn(10, 3),
                 Parameter(:b) => randn(10, 3),
-                Extra("hello") => randn(10, 3),
+                Extra(:hello) => randn(10, 3),
             ),
             10,
             3,
@@ -876,10 +876,10 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             gsmy = FlexiChains.map_parameters(String, smy)
             @test gsmy isa FlexiSummary{String}
             # this checks that the order of keys is preserved
-            @test collect(keys(gsmy)) == [Parameter("a"), Parameter("b"), Extra("hello")]
+            @test collect(keys(gsmy)) == [Parameter("a"), Parameter("b"), Extra(:hello)]
             @test isequal(gsmy[Parameter("a")], smy[Parameter(:a)])
             @test isequal(gsmy[Parameter("b")], smy[Parameter(:b)])
-            @test isequal(gsmy[Extra("hello")], smy[Extra("hello")])
+            @test isequal(gsmy[Extra(:hello)], smy[Extra(:hello)])
         end
 
         @testset "bad function output" begin
@@ -904,7 +904,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         chain_bc = FlexiChain{Symbol}(
             N_iters,
             N_chains,
-            Dict(Parameter(:b) => bs, Extra("c") => cs);
+            Dict(Parameter(:b) => bs, Extra(:c) => cs);
             iter_indices=2:2:(2*N_iters),
             chain_indices=[1, 2, 3],
         )
@@ -926,8 +926,8 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             @test merged isa FlexiSummary{Symbol}
             # :a only in s1
             @test isapprox(merged[:a], s1[:a])
-            # Extra("c") only in s2
-            @test isapprox(merged[Extra("c")], s2[Extra("c")])
+            # Extra(:c) only in s2
+            @test isapprox(merged[Extra(:c)], s2[Extra(:c)])
             # :b in both — s2 wins
             @test isapprox(merged[:b], s2[:b])
         end
@@ -953,9 +953,9 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             # :a only has mean (from s1), std should be missing
             @test isapprox(merged[:a, stat=DD.At(:mean)], s1[:a])
             @test ismissing(merged[:a, stat=DD.At(:std)])
-            # Extra("c") only has std (from s2), mean should be missing
-            @test isapprox(merged[Extra("c"), stat=DD.At(:std)], s2[Extra("c")])
-            @test ismissing(merged[Extra("c"), stat=DD.At(:mean)])
+            # Extra(:c) only has std (from s2), mean should be missing
+            @test isapprox(merged[Extra(:c), stat=DD.At(:std)], s2[Extra(:c)])
+            @test ismissing(merged[Extra(:c), stat=DD.At(:mean)])
             # :b has mean from s1 and std from s2
             @test isapprox(merged[:b, stat=DD.At(:mean)], s1[:b])
             @test isapprox(merged[:b, stat=DD.At(:std)], s2[:b])
@@ -1071,7 +1071,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             @test merged isa FlexiSummary{Symbol}
             @test haskey(merged, Parameter(:a))
             @test haskey(merged, Parameter(:b))
-            @test haskey(merged, Extra("c"))
+            @test haskey(merged, Extra(:c))
             @test haskey(merged, Parameter(:d))
         end
     end
@@ -1080,7 +1080,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         chain_mixed = FlexiChain{Symbol}(
             N_iters,
             N_chains,
-            Dict(Parameter(:a) => as, Extra("c") => cs);
+            Dict(Parameter(:a) => as, Extra(:c) => cs);
             iter_indices=2:2:(2*N_iters),
             chain_indices=[1, 2, 3],
         )
@@ -1088,14 +1088,14 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         sp = FlexiChains.subset_parameters(s)
         @test sp isa FlexiSummary{Symbol}
         @test haskey(sp, Parameter(:a))
-        @test !haskey(sp, Extra("c"))
+        @test !haskey(sp, Extra(:c))
     end
 
     @testset "subset_extras on summary" begin
         chain_mixed = FlexiChain{Symbol}(
             N_iters,
             N_chains,
-            Dict(Parameter(:a) => as, Extra("c") => cs);
+            Dict(Parameter(:a) => as, Extra(:c) => cs);
             iter_indices=2:2:(2*N_iters),
             chain_indices=[1, 2, 3],
         )
@@ -1103,7 +1103,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         se = FlexiChains.subset_extras(s)
         @test se isa FlexiSummary{Symbol}
         @test !haskey(se, Parameter(:a))
-        @test haskey(se, Extra("c"))
+        @test haskey(se, Extra(:c))
     end
     @testset "autocor" begin
         rng = Random.MersenneTwister(12)
@@ -1121,7 +1121,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
         chn = FlexiChain{Symbol}(
             niter,
             nchain,
-            OrderedDict(Parameter(:x) => xs, Parameter(:y) => ys, Extra("s") => strs),
+            OrderedDict(Parameter(:x) => xs, Parameter(:y) => ys, Extra(:s) => strs),
         )
         lags = [1, 5, 10]
         # StatsBase.autocor on a matrix returns an (nlags, nchains) matrix
@@ -1134,7 +1134,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             @test ac[:x] ≈ vec(mean(expected_per_chain; dims=2))
             @test ac[:x, stat=:lag5] ≈ mean(expected_per_chain[2, :])
             @test ac[:y] ≈ vec(mean(autocor(ys, lags); dims=2))
-            @test !haskey(ac, Extra("s"))
+            @test !haskey(ac, Extra(:s))
         end
 
         @testset "dims=:iter is per chain" begin
@@ -1197,7 +1197,7 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
                 Parameter(:b) => bs,
                 Parameter(:c) => cs,
                 Parameter(:str) => strs,
-                Extra("e") => as,
+                Extra(:e) => as,
             ),
         )
 

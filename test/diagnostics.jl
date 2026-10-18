@@ -1,7 +1,7 @@
 module FCDiagnosticsTests
 
 using FlexiChains:
-    FlexiChains, FlexiChain, FlexiSummary, Parameter, Extra, VarName, @varname
+    FlexiChains, FlexiChain, FlexiSummary, Parameter, Extra, VarName, @varname, changerate
 import DimensionalData as DD
 using MCMCDiagnosticTools:
     MCMCDiagnosticTools, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
@@ -13,6 +13,50 @@ using Test
 
 @testset verbose = true "diagnostics.jl" begin
     @info "Testing diagnostics.jl"
+
+    @testset "changerate" begin
+        chain = FlexiChain{Symbol}(
+            4,
+            3,
+            Dict(
+                Parameter(:x) => [0 1 0; 0 2 0; 0 1 1; 0 2 1],
+                Parameter(:label) =>
+                    ["a" "b" "c"; "a" "c" "c"; "a" "b" "d"; "a" "c" "d"],
+            );
+            chain_indices=[2, 4, 6],
+        )
+        @testset "dims=:iter is per chain" begin
+            rates = changerate(chain; dims=:iter)
+            @test rates[:x] == [0, 1, 1 / 3]
+            @test rates[:label] == [0, 1, 1 / 3]
+            @test DD.lookup(rates[:x], :chain) == [2, 4, 6]
+        end
+
+        @testset "dims=:both averages over chains" begin
+            rates = changerate(chain)
+            @test rates[:x] ≈ (0 + 1 + 1 / 3) / 3
+            @test rates[:label] ≈ (0 + 1 + 1 / 3) / 3
+        end
+
+        @testset "dims=:chain unsupported" begin
+            @test_throws ArgumentError changerate(chain; dims=:chain)
+        end
+
+        for n in 0:1
+            short = FlexiChain{Symbol}(n, 1, Dict(Parameter(:x) => zeros(Int, n, 1)))
+            @test isnan(changerate(short; split_varnames=(n > 0))[:x])
+            @test isnan(only(changerate(short; dims=:iter, split_varnames=(n > 0))[:x]))
+        end
+
+        arrays = FlexiChain{VarName}(
+            3,
+            1,
+            Dict(Parameter(@varname(x)) => reshape([[0, 0], [0, 1], [0, 0]], 3, 1)),
+        )
+        @test changerate(arrays)[@varname(x[1])] == 0
+        @test changerate(arrays)[@varname(x[2])] == 1
+        @test changerate(arrays; split_varnames=false)[@varname(x)] == 1
+    end
 
     @testset "gelmandiag" begin
         N_iters, N_chains = 100, 3
@@ -186,13 +230,13 @@ using Test
                 Dict(
                     Parameter(:a) => as,
                     Parameter(:f) => randn(N_iters, N_chains),
-                    Extra("str") => fill("hello", N_iters, N_chains),
+                    Extra(:str) => fill("hello", N_iters, N_chains),
                 ),
             )
             result = @test_logs (:warn, r"not subtype Integer") discretediag(chain)
             @test haskey(result.between, Parameter(:a))
             @test !haskey(result.between, Parameter(:f))
-            @test !haskey(result.between, Extra("str"))
+            @test !haskey(result.between, Extra(:str))
             @test_logs discretediag(chain; warn=false)
         end
 

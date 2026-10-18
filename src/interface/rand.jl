@@ -1,9 +1,14 @@
 import Random: Random
+import StatsBase: StatsBase
 
 """
-    Base.rand(rng::Random.AbstractRNG, chn::FlexiChain, dims::Int...; parameters_only=false)
+    Base.rand(rng::Random.AbstractRNG, chn::FlexiChain, dims::Int...; parameters_only=false, weights=nothing)
 
 Sample uniformly from a FlexiChain with replacement.
+
+Pass `weights::StatsBase.AbstractWeights` to sample with probabilities proportional to
+the weights instead. Supply one weight per sample, with all iterations of the first
+chain followed by all iterations of the second chain, and so on.
 
 `rand([rng,] chn)` returns a single sample, whereas `rand([rng,] chn, dims...)` returns an
 `Array` of samples with dimensions `dims...`. The `parameters_only` keyword specifies
@@ -23,10 +28,17 @@ function Base.rand(
     chn::FlexiChain,
     dims::Int...;
     parameters_only=false,
+    weights::Union{Nothing,StatsBase.AbstractWeights}=nothing,
 )
     func = parameters_only ? FlexiChains.parameters_at : FlexiChains.values_at
     ci = CartesianIndices(size(chn))
-    idxs = rand(rng, ci, dims...)
+    idxs = if weights === nothing
+        rand(rng, ci, dims...)
+    else
+        # Array sampling checks weight lengths even for scalar requests.
+        selected = StatsBase.sample(rng, ci, weights, dims)
+        isempty(dims) ? selected[] : selected
+    end
     return if isempty(dims)
         i, c = idxs.I
         func(chn; iter=i, chain=c)
@@ -37,6 +49,12 @@ function Base.rand(
         end
     end
 end
-function Base.rand(chn::FlexiChain, dims::Int...; parameters_only=false)
-    return rand(Random.default_rng(), chn, dims...; parameters_only=parameters_only)
+function Base.rand(chn::FlexiChain, dims::Int...; parameters_only=false, weights=nothing)
+    return rand(
+        Random.default_rng(),
+        chn,
+        dims...;
+        parameters_only=parameters_only,
+        weights=weights,
+    )
 end

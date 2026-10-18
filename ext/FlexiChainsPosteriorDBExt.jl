@@ -5,19 +5,15 @@ using OrderedCollections: OrderedDict
 using FlexiChains: FlexiChains, FlexiChain, Parameter, VarName
 
 """
-    FlexiChains.from_posteriordb(
-        ref::PosteriorDB.ReferencePosterior
-    )::FlexiChain{VarName}
+    FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
+    FlexiChains.from_posteriordb(db::PosteriorDB.PosteriorDatabase, model_name::String)
 
-Load a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
+Load a reference posterior from PosteriorDB.jl into a `FlexiChain{VarName}`.
 
 PosteriorDB stores vector-valued parameters as separate scalar entries, using Stan's naming
-convention (e.g. `theta[1]`, ..., `theta[8]`). These are recombined into a single
-vector-valued parameter (e.g. `@vn(theta)`, where each draw is a `Vector{Float64}`). An
-error is thrown if the entries for a given parameter do not form a complete, 1-based vector.
-
-No reference posterior in PosteriorDB currently contains matrix-valued parameters (e.g.
-`Sigma[1,2]`), so these are not supported: an error is thrown if one is encountered.
+convention (e.g. `theta[1]`, ..., `theta[8]`). When loaded into FlexiChains, these are
+recombined into a single vector-valued parameter (e.g. `@vn(theta)`, where each draw is a
+`Vector{Float64}`).
 """
 function FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
     raw, niters, nchains, iter_indices = _load_posteriordb_ref(ref)
@@ -44,6 +40,13 @@ function FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
         end
     end
     return FlexiChain{VarName}(niters, nchains, d; iter_indices=iter_indices)
+end
+function FlexiChains.from_posteriordb(db::PosteriorDB.PosteriorDatabase, model_name::String)
+    post = PosteriorDB.posterior(db, model_name)
+    ref = PosteriorDB.reference_posterior(post)
+    ref === nothing &&
+        throw(ArgumentError("Posterior `$model_name` has no reference posterior."))
+    return FlexiChains.from_posteriordb(ref)
 end
 
 """
