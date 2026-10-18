@@ -82,8 +82,8 @@ export mean, median, std, var, quantile, cor
 using StatsBase: summarystats, mad, autocor
 export summarystats, mad, autocor
 using MCMCDiagnosticTools:
-    ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
-export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
+    ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
+export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
 export changerate
 
 """

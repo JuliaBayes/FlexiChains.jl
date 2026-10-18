@@ -111,6 +111,11 @@ Since the result is a matrix over pairs of parameters, it is returned as a `DimA
 Its default behaviour, `dims=:both`, is to now compute per-chain changerates and average them across chains, like `autocor` above.
 To restore the old behaviour, specify `dims=:iter`.
 
+## New diagnostic: `rstar`
+
+`rstar([rng,] classifier, chain)` computes the R* convergence diagnostic of Lambert & Vehtari (2022), by forwarding the chain's `Real`-valued parameters to `MCMCDiagnosticTools.rstar`.
+The `classifier` must be an MLJ model; depending on whether it is probabilistic or deterministic, either a distribution of R* or a single R* value is returned.
+
 ## PosteriorDB.jl integration
 
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.

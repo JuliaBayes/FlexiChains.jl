@@ -267,6 +267,7 @@ MCMCDiagnosticTools.gelmandiag
 MCMCDiagnosticTools.gelmandiag_multivariate
 MCMCDiagnosticTools.discretediag
 MCMCDiagnosticTools.bfmi
+MCMCDiagnosticTools.rstar
 ```
 
 ## Flattening summaries
