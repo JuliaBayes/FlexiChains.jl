@@ -103,10 +103,17 @@ makedocs(;
     plugins=[CodeBlocks(), links],
 )
 
+# For PR previews, pass `versions=nothing` so that Documenter only writes to
+# previews/PR###/ and doesn't regenerate versions.js, index.html, or the version
+# symlinks at the root of gh-pages. Otherwise a preview deploy replaces the
+# VitePress-built `stable/` folder (v0.6 and earlier) with a symlink to `v0.6`,
+# which VitePress can't serve because its base path is baked into the build.
+is_preview = get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
 Documenter.deploydocs(;
     repo="github.com/JuliaBayes/FlexiChains.jl",
     target="build",
     push_preview=true,
+    (is_preview ? (; versions=nothing) : (;))...,
 )
 
 # Restore original environment variable
