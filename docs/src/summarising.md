@@ -16,84 +16,88 @@ Thus, when calculating `mean(chain)`, any `String`-valued parameters will be dro
 If multiple summary statistics are requested (e.g. with [`summarystats`](@ref StatsBase.summarystats)), the key is only dropped if _all_ of them fail.
 If at least one statistic is successfully computed for a key, that key will be included in the result, with `missing` values for the statistics that failed.
 
-To give a flavour of how this works, here is an example of a model that generates parameters of different types:
-
-```@example stats
-using FlexiChains, Distributions, LinearAlgebra
-using DynamicPPL: @model, @varname
-
-@model function f()
-    f ~ Normal()               # float
-    v ~ MvNormal(zeros(2), I)  # vector
-    s := "a string"            # string
-end
-
-chain = FlexiChains._make_prior_chain(f(), 20, 3)
-```
-
-Over the course of this page we will see what happens to each of these parameters when we try to compute summary statistics.
+This behaviour should be more or less intuitive, so we will not delve into it further here, except to note that FlexiChains will warn you when a key is dropped, so that you are aware of it.
 
 ## Overall summary statistics
 
-If you want a quick overview of what's in your chain, [`summarystats`](@ref StatsBase.summarystats) provides a handy selection of commonly used statistics:
+If you want a quick overview of what your chain contains, [`summarystats`](@ref StatsBase.summarystats) provides a handy selection of commonly used statistics:
 
 ```@docs
 StatsBase.summarystats(::FlexiChains.FlexiChain)
 ```
 
 ```@example stats
-st = summarystats(chain)
+using FlexiChains
+
+chain = FlexiChains.EXAMPLE_CHAIN
+summary = summarystats(chain)
 ```
 
-Notice that the string-valued parameter `s` has been dropped from the result, since no statistics could be computed for it.
-(If you run this in the terminal, you will see a warning about this, so it is not completely silent; it's just not shown in the docs.)
+Recall that you can index into a chain using a parameter name, e.g. `chain[@vn(mu)]` to get a matrix of values for the first element of `theta`.
 
-You can index with a variable name (or names!) and the `stat` dimension:
+With a `FlexiSummary`, you can use parameter names in the same way:
 
 ```@example stats
-st[@varname(v[1]), stat=:mean]  # Mean of first element of vector v
+summary[@vn(mu)]  # All of mu's stats.
+```
+
+You can add the `stat` dimension to extract a specific statistic:
+
+```@example stats
+summary[@vn(mu), stat=:mean]  # Mean of mu.
 ```
 
 !!! note "Named statistic shorthand"
 
-    Passing a `Symbol` to `stat` is shorthand for a named lookup: `stat=:mean` is
-    equivalent to `stat=At(:mean)`. Other selectors follow DimensionalData.jl's usual
-    behaviour; for example, `stat=1` selects the first statistic by position.
+    Passing a `Symbol` to `stat` is shorthand for a named lookup: `stat=:mean` is equivalent to `stat=At(:mean)`.
+    Other selectors follow DimensionalData.jl's usual behaviour; for example, `stat=1` selects the first statistic by position.
 
 For more details on indexing, please see the [Indexing page](@ref indexing).
 
-In the result above, the vector-valued `v` has been broken up into its individual elements `v[1]` and `v[2]`.
-This happens automatically for chains with `VarName` keys; you can disable this behaviour by passing `split_varnames=false`:
+### Splitting of variables
+
+Notice that in the `FlexiSummary`, the vector-valued parameter `theta` has been broken up into its individual elements `theta[1]` through `theta[8]`.
+We can also see this by looking at the keys of the summary:
 
 ```@example stats
-st2 = summarystats(chain; split_varnames=false)
+keys(summary)
+```
+
+This is done mainly for convenience.
+Many statistic functions are not well-defined for array-valued parameters, or other more complicated structures.
+You can disable this behaviour by passing `split_varnames=false`:
+
+```@example stats
+summarystats(chain; split_varnames=false)
 ```
 
 Now, the summary statistics are calculated with each vector `v` being a single entity.
 The key `v` is still present in the result (since `mean` and `std` could be computed for it).
 However, notice that other statistics such as `ess` are no longer defined, and so return `missing` values.
-Just like before, the string `s` is dropped since no statistics could be computed for it.
+
+Don't forget that if you want to do a more involved analysis, e.g. calculating correlations between different elements of a vector-valued parameter, you can always index into the original `FlexiChain`.
 
 ## Individual statistics
 
 Sometimes you may only want to calculate a single statistic.
 
 The following functions are all overloaded to accept `FlexiChain` objects.
-In all cases, they can be called with `dims=:both`, `dims=:iter`, or `dims=:chain` to specify the dimension over which to compute the statistic; the default is `dims=:both`.
-The only exceptions are the MCMC diagnostics `ess`, `rhat`, and `mcse`, which do not support `dims=:chain` (since computing them across chains at a single iteration is not meaningful).
+In most cases, they can be called with `dims=:both`, `dims=:iter`, or `dims=:chain` to specify the dimension over which to compute the statistic; the default is `dims=:both`.
+There are some exceptions to this, such as the MCMC diagnostics `ess`, `rhat`, and `mcse`, which do not support `dims=:chain` (since computing them across chains at a single iteration is not meaningful).
 
 All of these functions return a `FlexiSummary` where the `:stat` dimension has already been collapsed.
-That means that if you want to access the mean of a variable `@varname(a)` you don't need to further use the `stat` dimension:
+That means that if you want to access the mean of a variable `@vn(a)` you don't need to further use the `stat` dimension:
 
 ```@example stats
 mn = mean(chain)
-# Not needed: mean_f = m[@varname(f), stat=:mean]
+
+# Not needed: mean_mu = m[@vn(mu), stat=:mean]
 # Just do:
-mean_f = mn[@varname(f)]
+mean_mu = mn[@vn(mu)]
 ```
 
 In fact, behind the scenes, the actual name of the statistic is retained.
-This means that, for example, if you convert the result to a `DataFrame`, the column will be named `mean` rather than `stat`:
+This means that, for example, if you convert the result to a `DataFrame`, the column will still be named `mean`:
 
 ```@example stats
 using DataFrames;
@@ -117,59 +121,15 @@ StatsBase.mad(::FlexiChains.FlexiChain; kwargs...)
 StatsBase.geomean(::FlexiChains.FlexiChain; kwargs...)
 StatsBase.harmmean(::FlexiChains.FlexiChain; kwargs...)
 StatsBase.iqr(::FlexiChains.FlexiChain; kwargs...)
-```
-
-There are also similar overloads for `PosteriorStats.hdi` and `PosteriorStats.eti`, which calculate highest density intervals and equal-tailed intervals, respectively.
-Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
-
-## Autocorrelation
-
-[`autocor`](@ref StatsBase.autocor) calculates the autocorrelation of each parameter at one or more lags.
-Since there is one value per lag, the result is a `FlexiSummary` with one statistic per lag, named `lag1`, `lag5`, and so on:
-
-```@example stats
-ac = autocor(chain; lags=[1, 2, 5])
-```
-
-Autocorrelation is always calculated within each chain, since consecutive samples from different chains are unrelated.
-By default (`dims=:both`) the per-chain results are averaged; with `dims=:iter` they are reported separately for each chain:
-
-```@example stats
-autocor(chain; lags=[1, 2, 5], dims=:iter)[@varname(f)]
-```
-
-```@docs
 StatsBase.autocor(::FlexiChains.FlexiChain; kwargs...)
-```
-
-## Correlations between parameters
-
-[`cor`](@ref Statistics.cor) calculates the Pearson correlation matrix between all parameters in the chain.
-Because the result is a matrix over _pairs_ of parameters, rather than one value per parameter, it is returned as a `DimArray` with two `param` dimensions instead of a `FlexiSummary`:
-
-```@example stats
-c = cor(chain)
-```
-
-Both dimensions are indexed by the parameter names, so the correlation between two parameters can be looked up with `At`:
-
-```@example stats
-c[At(@varname(f)), At(@varname(v[1]))]
-```
-
-Passing `dims=:iter` computes a separate correlation matrix for each chain, adding a leading `chain` dimension to the result.
-
-```@docs
 Statistics.cor(::FlexiChains.FlexiChain; kwargs...)
+FlexiChains.changerate(::FlexiChains.FlexiChain; kwargs...)
 ```
 
-## Change rates
+### Density intervals
 
-Change rates count transitions separately within each chain.
-
-```@docs
-changerate
-```
+It is worth just noting briefly here that FlexiChains has a PosteriorStats extension which allows you to calculate highest density intervals and equal-tailed intervals.
+Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
 
 ## Custom statistics
 
@@ -185,13 +145,14 @@ In both cases, you can directly use [`FlexiChains.collapse`] to achieve this.
 FlexiChains.collapse
 ```
 
-The statistics passed to `collapse` must be wrapped in a `FlexiChains.CollapseFunction`, which specifies how to compute the statistic for each choice of `dims`.
+Instead of just passing the functions you want to use, such as `mean`, `std`, and so on, `FlexiChains.collapse` must be passed a series of `FlexiChains.CollapseFunction`s.
+This is a wrapper type which allows you to precisely specify how the values should be collapsed over iterations, chains, or both.
 
 ```@docs
 FlexiChains.CollapseFunction
 ```
 
-In most cases, you can construct one using the following shortcuts:
+For many cases, you can construct a `CollapseFunction` using the following shortcuts:
 
 ```@docs
 FlexiChains.CollapseFunctionVec
@@ -224,9 +185,11 @@ custom_stat =
 
 There are two things worth mentioning, which we will note in passing here without demonstrating (since they are also covered in the docstring):
 
- 1. If there is only one function provided, you can additionally pass `drop_stat_dim=true` to remove the `:stat` dimension from the result, much like what `mean(chain)` et al. do.
+ 1. If there is only one function provided, you can additionally pass `drop_stat_dim=true` to remove the `:stat` dimension from the result, much like what `mean(chain)` does for you.
 
- 2. The name of the statistic is inferred from the underlying function. Sometimes this doesn't work out nicely, for example if you pass an anonymous function. In this case you can pass the name as the first argument, e.g. `FlexiChains.CollapseFunctionVec(:name, f)`.
+ 2. The name of the statistic is inferred from the underlying function.
+    Sometimes this doesn't work out nicely, for example if you pass an anonymous function.
+    In this case you can pass the name as the first argument, e.g. `FlexiChains.CollapseFunctionVec(:name, f)`.
 
 ## Merging summaries
 
@@ -242,11 +205,6 @@ merge(mn, sd)
 ```@docs
 Base.merge(::FlexiChains.FlexiSummary, ::FlexiChains.FlexiSummary)
 ```
-
-## Density intervals
-
-It is worth just noting briefly here that FlexiChains has a PosteriorStats extension which allows you to calculate highest density intervals and equal-tailed intervals.
-Please see the [PosteriorStats integration section](@ref integrations-posteriorstats) for details.
 
 ## [MCMC diagnostics](@id mcmc-diagnostics)
 
@@ -267,6 +225,7 @@ MCMCDiagnosticTools.gelmandiag
 MCMCDiagnosticTools.gelmandiag_multivariate
 MCMCDiagnosticTools.discretediag
 MCMCDiagnosticTools.bfmi
+MCMCDiagnosticTools.rstar
 ```
 
 ## Flattening summaries

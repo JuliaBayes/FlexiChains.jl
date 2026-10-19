@@ -80,9 +80,9 @@ makedocs(;
         "Usage" => [
             "datastructure.md",
             "indexing.md",
-            "samples.md",
             "summarising.md",
             "arrays.md",
+            "samples.md",
             "modifying.md",
             "serialising.md",
             "Plotting" => ["plotting.md", "makie.md", "plots.md", "aog.md"],
