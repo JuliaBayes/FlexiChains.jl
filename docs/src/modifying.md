@@ -198,7 +198,7 @@ fake_chain =
     transform_values(fake_chain, @vn(m_scaled) => (i -> reconstruct(zs, i)) => @vn(m))
 ```
 
-The mean of the reconstructed `m` should be approximately 2:
+The mean of the reconstructed `m` should be approximately `(4 * 1) + 2 = 6`:
 
 ```@example modifications
 mean(fake_chain[@vn(m), stack=true])
