@@ -94,7 +94,7 @@ makedocs(;
             "tables.md",
             "turing.md",
         ],
-        "About" => ["contributing.md"],
+        "About" => ["contributing.md", "library_authors.md"],
         "api.md",
     ],
     checkdocs=:exports,
