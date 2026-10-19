@@ -5,8 +5,8 @@ using Pkg: Pkg
 Pkg.develop(Pkg.PackageSpec(; path=dirname(@__DIR__)))
 
 using Documenter
+using DocumenterCodeBlocks
 using DocumenterInterLinks
-using DocumenterVitepress
 
 using FlexiChains
 
@@ -63,26 +63,18 @@ modules = [
 old_GKSwstype = get(ENV, "GKSwstype", nothing)
 ENV["GKSwstype"] = "100"
 
-GITHUB_REPO = "github.com/JuliaBayes/FlexiChains.jl"
-PAGES_BRANCH = "gh-pages"
-DEV_BRANCH = "main"
-
 makedocs(;
     sitename="FlexiChains.jl",
-    format=DocumenterVitepress.MarkdownVitepress(
-        repo=GITHUB_REPO,
-        devbranch=DEV_BRANCH,
-        devurl="dev",
-    ),
+    format=Documenter.HTML(; assets=["assets/custom.css"]),
     modules=modules,
     pages=[
         "index.md",
         "Usage" => [
             "datastructure.md",
             "indexing.md",
-            "samples.md",
             "summarising.md",
             "arrays.md",
+            "samples.md",
             "modifying.md",
             "serialising.md",
             "Plotting" => ["plotting.md", "makie.md", "plots.md", "aog.md"],
@@ -102,20 +94,18 @@ makedocs(;
             "tables.md",
             "turing.md",
         ],
-        "About" => ["contributing.md", "why.md", "whynot.md"],
+        "About" => ["contributing.md", "library_authors.md"],
         "api.md",
     ],
     checkdocs=:exports,
     warnonly=false,
     doctest=false,
-    plugins=[links],
+    plugins=[CodeBlocks(), links],
 )
 
-DocumenterVitepress.deploydocs(;
-    repo=GITHUB_REPO,
-    target=joinpath(@__DIR__, "build"),
-    branch=PAGES_BRANCH,
-    devbranch=DEV_BRANCH,
+Documenter.deploydocs(;
+    repo="github.com/JuliaBayes/FlexiChains.jl",
+    target="build",
     push_preview=true,
 )
 

@@ -4,7 +4,7 @@
 
 ## For users
 
-**Turing is currently only compatible with FlexiChains v0.6.
+**Turing is currently compatible with FlexiChains v0.6.
 Please see [the documentation for that version](https://juliabayes.org/FlexiChains.jl/v0.6/).**
 
 Up until version 0.6, FlexiChains has used the `VarName` and `VarNamedTuple` types defined in AbstractPPL.jl and DynamicPPL.jl respectively.

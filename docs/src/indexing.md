@@ -10,34 +10,33 @@ But, on top of this, it also allows you to more surgically index into these obje
 This page first begins with some illustrative examples, which might be the clearest way to demonstrate the indexing behaviour.
 If you prefer reading a fuller specification, the sections below that describe the exact behaviour in more detail.
 
-## Examples: chains
+## Examples
 
-Let's first set up a chain.
-We'll use a chain sampled from the prior, but to make it look more interesting we'll drop the first 100 iterations (mimicking MCMC warmup).
+### Chains
+
+Let's first load our example chain.
+As a reminder, this was sampled from the classic eight-schools model using NUTS.
 
 ```@example 1
-using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains
 
-@model function f()
-    x ~ MvNormal(zeros(2), I)
-end
-
-chn = FlexiChains._make_prior_chain(f(), 105, 2)
-chn = chn[iter=101:End]  # drop the first 100 iterations
+chn = FlexiChains.EXAMPLE_CHAIN
 ```
 
-Notice how the iteration numbers in the resulting chain start from 101, not 1.
+Notice how the iteration numbers in the example chain start from 101, not 1.
+This mimics how one might typically discard burn-in samples.
 
 ```@example 1
 # Picking out a single parameter; this returns a `DimMatrix`.
-chn[@varname(x)]
+chn[@vn(mu)]
 ```
 
-When indexing with plain integer indices, these refer to the _entries_ in the chain, not the iteration numbers.
+When indexing with plain integer indices, these refer to the indices of the actual matrix stored in the chain (i.e., they are 1-indexed), not the iteration numbers.
 
 ```@example 1
-# This picks out the first of the iterations (note: this has iteration number 101)
-chn[@varname(x), iter=1]
+# This picks out the first of the iterations.
+# (Note: this has iteration number 101)
+chn[@vn(mu), iter=1]
 ```
 
 !!! warning "Keyword arguments to `getindex`"
@@ -45,42 +44,40 @@ chn[@varname(x), iter=1]
     Note that keyword arguments when indexing with square brackets must be separated from positional arguments by a comma. Using a semicolon will lead to an error.
 
 ```@example 1
-# You can also select a specific chain
-chn[@varname(x), iter=1, chain=2]
+# You can also select a specific chain.
+chn[@vn(mu), iter=1, chain=2]
 ```
 
+FlexiChains re-exports a number of selectors from DimensionalData.jl, which you can use to make more powerful and precise selections.
+For example:
+
 ```@example 1
-# This picks out iteration number 101
-chn[@varname(x), iter=At(101)]
+# Use `At` to pick out the actual iteration number.
+chn[@vn(mu), iter=At(101)]
 ```
 
 ```@example 1
 # This picks out iteration numbers 101 through 103
-chn[@varname(x), iter=101..103]
+chn[@vn(mu), iter=101..103]
 ```
+
+If we have a vector-valued parameter, like `theta`, we can use a `VarName` to pick out a specific element of that vector.
+This works in general for any parameter that is an aggregate type, such as an array, tuple, struct, or NamedTuple.
 
 ```@example 1
-# If you only want the first element of `x`:
-chn[@varname(x[1])]
+# If you only want the first element of `theta`:
+chn[@vn(theta[1])]
 ```
+
+You can also specify multiple keys at once, in which case a subsetted `FlexiChain` object is returned.
+The data that we didn't care for, such as `@vn(x[2])`, are simply dropped.
 
 ```@example 1
-# You can specify a vector of parameters
-chn[[@varname(x[1]), :logjoint]]
+# You can specify a vector of parameters.
+chn[[@vn(theta[1]), :logjoint]]
 ```
 
-This last one returns a `FlexiChain` object, because multiple keys were specified.
-The data that we didn't care for, such as `@varname(x[2])`, are simply dropped.
-
-Notice that this also gives us a way to 'flatten' a `FlexiChain` object such that all of its keys point to scalar values.
-We just need to find a full set of sub-`VarName`s, like the following.
-In practice you don't need to construct this set yourself: FlexiChains has an internal function, called `_split_varnames`, that will do this for you.
-
-```@example 1
-chn[[@varname(x[1]), @varname(x[2])]]
-```
-
-## Examples: summaries
+### Summaries
 
 Calling any summary function such as `mean`, `std`, or `summarystats` on a `FlexiChain` object will return a `FlexiSummary` object.
 
@@ -91,12 +88,12 @@ sm = summarystats(chn)
 Notice two things:
 
  1. This summary no longer has `iter` or `chain` dimensions, because the summary statistics have been calculated over all iterations and chains. However, it has a `stat` dimension, which we will need to use when accessing the data.
- 2. The variable `x` has been broken up for you into its components `x[1]` and `x[2]`.
+ 2. The variable `theta` has been broken up into its components `theta[1]` through `theta[8]`.
 
 Indexing is very similar as for chains, but there is an additional `stat` dimension which lets you specify which summary statistic you want to access.
 
 ```@example 1
-sm[@varname(x[1]), stat=:mean]
+sm[@vn(theta[1]), stat=:mean]
 ```
 
 !!! note "Named statistic shorthand"
@@ -109,35 +106,39 @@ If only a single summary function was applied, e.g. via `mean(chn)`, then the `s
 
 ```@example 1
 sm_mean = mean(chn)
-sm_mean[@varname(x[1])]
+sm_mean[@vn(theta[1])]
 ```
 
-If you don't want to split the VarNames up, you can specify this as a keyword argument.
+If you don't want to split the variables up, you can specify this as a keyword argument.
 
 ```@example 1
 sm_mean_nosplit = mean(chn; split_varnames=false)
-sm_mean_nosplit[@varname(x)]
+sm_mean_nosplit[@vn(theta)]
 ```
 
 If you collapse only over iterations (for example), then you can specify the `chain` keyword argument (and likewise for `iter` if you collapse over chains).
 
 ```@example 1
 sm_iter = mean(chn; dims=:iter)
-sm_iter[@varname(x[1]), chain=2]
+sm_iter[@vn(theta[1]), chain=2]
 ```
 
-## Positional arguments
+## Formal specification
+
+### Positional arguments
 
 When indexing into a `FlexiChain` (or `FlexiSummary`) object, you can use one optional positional argument.
 This positional argument can either be an object pointing to a single key, in which case a `DimMatrix` is returned; or it can be an object pointing to multiple keys, in which case a `FlexiChain` (or `FlexiSummary`) is returned.
 
-To specify a single key, you can use:
+Consider a `FlexiChain{T}` object.
+The allowed types for the positional argument are:
 
-  - a parameter name (e.g. for a `FlexiChain{T}`, an object of type `T`);
-  - a `VarName` or sub-`VarName`, for a `FlexiChain{VarName}` (i.e. `VNChain`);
-  - a `FlexiChains.Extra` for non-parameter keys;
-  - a `Symbol`, as long as it refers to an unambiguous key;
-  - a `FlexiChains.Parameter` (this is mentioned for completeness; as a user you probably don't need to do this)
+  - an object of type `T` (i.e. a parameter);
+  - a `FlexiChains.Parameter{T}` for a parameter;
+  - a `FlexiChains.Extra` for a non-parameter key; or
+  - a `Symbol`, as long as it refers to an unambiguous key. Specifically, there must be only one key in the chain (between both parameters and extras) for which `Symbol(get_name(key))` matches the `Symbol` you provided.
+
+For `T = VarName`, there is additionally the option of providing a sub-`VarName` to access a component of a parameter, such as `@vn(theta[1])` to access the first element of the vector-valued parameter `theta`.
 
 On the other hand, you could specify multiple keys via:
 
@@ -146,9 +147,9 @@ On the other hand, you could specify multiple keys via:
 
 If a positional argument is not specified, it defaults to `:`.
 
-## Keyword arguments: chains
+### Keyword arguments: chains
 
-### `iter` and `chain`
+#### `iter` and `chain`
 
 In addition to the positional argument, you can also specify the `iter` and `chain` keyword arguments when indexing into the `FlexiChain` object.
 (`FlexiSummary` objects are covered right below this.)
@@ -202,12 +203,12 @@ Finally, note that regular `begin` and `end` cannot be used with the `iter` and 
 In place of this you can use `Begin` and `End`, which are [semantically equivalent and re-exported from DimensionalData](@extref DimensionalData Begin-End-indexing).
 
 ```@example 1
-chn[@varname(x), iter=(Begin+1):End]
+chn[@vn(mu), iter=(Begin+1):End]
 ```
 
 For more information about DimensionalData's selectors, please see [their docs](@extref DimensionalData Selectors).
 
-### `stack`
+#### `stack`
 
 The `stack` keyword argument only affects parameters which are arrays; other parameters ignore it.
 
@@ -220,7 +221,7 @@ Thus, for example if the parameter `:x` is a `Vector{T}`, then `chn[:x]` will re
 
     In the current version of FlexiChains, for DimArray-valued parameters the stacking happens by default. This will be removed in a future version: you will have to explicitly specify `stack=true` to get this behaviour.
 
-## Keyword arguments: summaries
+### Keyword arguments: summaries
 
 !!! note "Positional arguments"
 
@@ -233,13 +234,13 @@ There are two differences between a `FlexiChain` and a `FlexiSummary` in terms o
 
 Consequently, there are three possible keyword arguments: `iter`, `chain`, and `stat`; but depending on which dimensions have been collapsed, you may not be able to use them.
 
-### `iter` and `chain`
+#### `iter` and `chain`
 
 In general, if you apply a summary function like `mean` without specifying dimensions, then both `iter` and `chain` dimensions will be collapsed.
 
 If you have performed the mean over a single dimension only, such as via `summary = mean(chn; dims=:iter)`, then the `iter` dimension will be collapsed, but you can still index into the `chain` dimension using `summary[key, chain=...]`.
 
-### `stat`
+#### `stat`
 
 In general, the `stat` dimension is generally:
 
@@ -256,6 +257,6 @@ Thus, for example, if you have a summary that contains the `mean` and `std` of t
 | `:mean`          | shorthand for `At(:mean)`            |
 | `Not(At(:mean))` | everything but the `:mean` statistic |
 
-### `stack`
+#### `stack`
 
 The `stack` keyword argument behaves the same as for `FlexiChain` objects.

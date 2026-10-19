@@ -14,40 +14,50 @@ All of these functions return a new chain (or summary) and avoid mutating the or
 
 ## Modifying keys
 
-Let's set up a chain first:
+Let's load our example chain first:
 
 ```@example modifications
-using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
+using FlexiChains
 
-data = Dict(
-    Parameter(:x) => randn(10, 3),
-    Parameter(:y) => randn(10, 3),
-    Extra(:a) => randn(10, 3),
-)
-chain = FlexiChain{Symbol}(10, 3, data)
+chain = FlexiChains.EXAMPLE_CHAIN
 ```
 
-If you want to change the keys stored inside a `FlexiChain` or `FlexiSummary`, you can use the `map_keys` function:
+If you want to change the keys stored inside a `FlexiChain` or `FlexiSummary`, you can use the [`FlexiChains.map_keys`](@ref) function.
 
 ```@example modifications
-using FlexiChains: get_name, map_keys
+using FlexiChains: get_name, map_keys, Parameter, Extra, VarName
+using VarNames: getsym, getoptic
 
 # Define a function that takes the old key and returns a new key.
-f(p::Parameter) = Parameter(Symbol("new_", get_name(p)))
+function f(p::Parameter{<:VarName})
+    # Get the name of the parameter (e.g. @vn(x))
+    name = get_name(p)
+    # Get the components of that VarName.
+    sym, optic = getsym(name), getoptic(name)
+    # Add a prefix to the symbol.
+    new_sym = Symbol("new_", sym)
+    # Return a new Parameter with the new name
+    return Parameter{VarName}(VarName{new_sym}(optic))
+end
+
+# Don't change extras!
 f(p::Extra) = p
 
 map_keys(f, chain)
 ```
 
-Often for the most part you will only want to modify `Parameter`s, in which case you can use `map_parameters`, and can skip the wrapping/unwrapping in `Parameter`:
+This example is admittedly quite contrived.
+However, it is intended to be general enough to cover any use case you might have.
+For example, if you want to rename a single key, `f` can simply be a function that looks it up in a dictionary:
 
-```@example modifications
-using FlexiChains: map_parameters
+```julia
+mapping = Dict(old_key => new_key)
 
-g(s::Symbol) = Symbol("new_", s)
-
-map_parameters(g, chain)
+f(p) = get(mapping, p, p)  # Return the new key if it exists, otherwise return the old key.
 ```
+
+Often for the most part you will only want to modify `Parameter`s, in which case you can use [`FlexiChains.map_parameters`](@ref).
+This has the same behaviour as `map_keys`, except that you can skip the wrapping/unwrapping in `Parameter`.
 
 Note that both `map_keys` and `map_parameters` work with `FlexiSummary` as well.
 
@@ -57,66 +67,44 @@ It is also possible to modify the *values* stored inside a `FlexiChain` (but not
 This is done with the `transform_values` function:
 
 ```@example modifications
-using FlexiChains: FlexiChain, VarName, Parameter, Extra, transform_values, @vn
-data = Dict(
-    Parameter(@vn(x)) => randn(10, 3),
-    Parameter(@vn(y)) => randn(10, 3),
-    Extra(:a) => randn(10, 3),
-)
-chain = FlexiChain{VarName}(10, 3, data)
+using FlexiChains: transform_values
 
-chain2 =
-    transform_values(chain, @vn(x) => (i -> i + 1), @vn(y) => (i -> i * 2) => @vn(new_y))
+chain2 = transform_values(
+    chain,
+    @vn(mu) => (i -> i + 1),
+    @vn(tau) => (i -> i * 2) => @vn(new_tau)
+)
 ```
 
 The above example:
 
-  - adds 1 to each element of `chain[@vn(x)]`; and
-  - multiplies each element of `chain[@vn(y)]` by 2, and stores the result in a new key `@vn(new_y)`.
+  - adds 1 to each element of `chain[@vn(mu)]`; and
+  - multiplies each element of `chain[@vn(tau)]` by 2, and stores the result in a new key `@vn(new_tau)`.
 
 ```@example modifications
-chain2[@vn(x)] .- chain[@vn(x)]   # Should be all 1.
+chain2[@vn(mu)] .- chain[@vn(mu)]   # Should be all 1.
 ```
 
 You can pass as many transformations as you like.
-The syntax is designed to be similar to that of `DataFrames.transform`, but has some slight differences: notably, the function being applied acts on *individual draws* from `chain[@vn(x)]` rather than the matrix as a whole.
+The syntax is designed to be similar to that of `DataFrames.transform`, but has some slight differences: notably, the function being applied acts on *individual draws* from `chain[@vn(x)]` rather than the matrix of all draws.
+(In DataFrames, the functions act on entire columns of data.)
 
 You can also pass binary (or *n*-ary) functions to `transform_values` to combine multiple keys.
-Again, this is similar to `DataFrames.transform`, but the function combines individual draws from `chain[@vn(x)]` and `chain[@vn(y)]` rather than the matrices themselves.
+Again, this is similar to `DataFrames.transform`, but the function combines individual draws from `chain[@vn(mu)]` and `chain[@vn(tau)]` rather than the matrices themselves.
 
 ```@example modifications
-chain3 = transform_values(chain, [@vn(x), @vn(y)] => (+) => @vn(sum_xy))
+chain3 = transform_values(chain, [@vn(mu), @vn(tau)] => (+) => @vn(mu_plus_tau))
 ```
 
 ```@example modifications
-chain3[@vn(sum_xy)] == chain[@vn(x)] .+ chain[@vn(y)]
+chain3[@vn(mu_plus_tau)] == chain[@vn(mu)] .+ chain[@vn(tau)]
 ```
 
 ### Attaching labels to data
 
 A common use case for `transform_values` is to attach labels to data, for example, converting a `Vector` of parameters into a `DimVector`.
-For example, consider our (now familiar) eight-schools model.
 
-```@example modifications
-using DynamicPPL: @model, filldist
-using Distributions, LinearAlgebra
-
-y = [28, 8, -3, 7, -1, 1, 18, 12]
-sigma = [15, 10, 16, 11, 9, 11, 10, 18]
-@model function eight_schools(y, sigma)
-    mu ~ Normal(0, 5)
-    tau ~ truncated(Cauchy(0, 5); lower=0)
-    theta ~ MvNormal(fill(mu, length(y)), tau^2 * I)
-    for i in eachindex(y)
-        y[i] ~ Normal(theta[i], sigma[i])
-    end
-    return (mu=mu, tau=tau)
-end
-model = eight_schools(y, sigma)
-chain = FlexiChains._make_prior_chain(model, 3, 1)
-```
-
-In this chain, `theta` has one entry per school, but is stored as a plain `Vector`.
+In our example chain above, `theta` has one entry per school, but is stored as a plain `Vector`.
 While this is fine for many applications, attaching labels can help make it easier to analyse the data.
 
 ```@example modifications
@@ -134,7 +122,7 @@ school_names = [
 ]
 add_labels(v::Vector{<:Real}) = DimArray(v, Dim{:school}(school_names))
 
-chain = transform_values(chain, :theta => add_labels)
+labelled_chain = transform_values(chain, @vn(theta) => add_labels)
 ```
 
 For example, `DimVector` parameters get special labels when plotting:
@@ -142,7 +130,7 @@ For example, `DimVector` parameters get special labels when plotting:
 ```@example modifications
 using CairoMakie
 
-FlexiChains.Makie.traceplot(chain, :theta; layout=(4, 2))
+FlexiChains.Makie.traceplot(labelled_chain, @vn(theta); layout=(4, 2))
 ```
 
 Having the labels also benefits downstream analysis of any data extracted from the chain.
@@ -151,8 +139,11 @@ For example, you can obtain the same functionality as [tidybayes' `spread_draws`
 ```@example modifications
 using DataFrames
 
+# Subset to the first three iterations, or else the output will be very long!
+labelled_chain = labelled_chain[iter=1:3]
+
 # Create a 3D DimArray (iter x chain x school)
-dimarr = chain[:theta, stack=true]
+dimarr = labelled_chain[@vn(theta), stack=true]
 
 # Convert it to a DataFrame (long-format by default)
 df = DataFrame(dimarr)
@@ -170,10 +161,9 @@ df = DataFrame(DimTable(dimarr; layersfrom=:school))
 
 Another use case for transforming values is to (un)standardise parameter values.
 
-For example, consider this simple linear regression (in principle `X` should also be standardised, but we'll skip it here).
+For example, consider a case where we have some model data `y` which is standardised before being passed to a model:
 
 ```@example modifications
-X = randn(100, 3)
 y = randn(100) .* 4.0 .+ 2.0
 
 using StatsBase: fit, ZScoreTransform, transform
@@ -183,31 +173,38 @@ y_scaled = transform(zs, y)
 mean(y_scaled), std(y_scaled)  # ≈ 0 and 1
 ```
 
-```@example modifications
-@model function linear_regression(X)
-    beta ~ filldist(Normal(), size(X, 2))
-    mu := X * beta
-    y ~ MvNormal(mu, I)
-end
-model = linear_regression(X) | (; y=y_scaled)
-
-chain = FlexiChains._make_prior_chain(model, 1000, 1)
-```
-
-In the resulting chain, we have values of `mu` but these are standardised according to the same ZScoreTransform we fitted to `y`.
+Then, suppose that we pass `y_scaled` to a model and sample a parameter `m_scaled` which is the mean of the standardised `y`.
+We'll construct one such chain for demonstration purposes:
 
 ```@example modifications
-mean(chain[:mu, stack=true])  # (probably) close to 0.
+using FlexiChains: FlexiChain, VarName, Parameter
+
+niters, nchains = 1000, 2
+fake_m_data = [randn(100) .+ 1 for _ in 1:niters, _ in 1:nchains]
+
+fake_chain =
+    FlexiChain{VarName}(niters, nchains, Dict(Parameter(@vn(m_scaled)) => fake_m_data))
 ```
 
-We can unstandardise them by applying the inverse transformation.
+The mean of this `m_scaled` should be approximately 1:
+
+```@example modifications
+mean(fake_chain[@vn(m_scaled), stack=true])
+```
+
+We can unstandardise the `m_scaled` values by applying the inverse transformation:
 
 ```@example modifications
 using StatsBase: reconstruct
 
-chain = transform_values(chain, :mu => (i -> reconstruct(zs, i)))
+fake_chain =
+    transform_values(fake_chain, @vn(m_scaled) => (i -> reconstruct(zs, i)) => @vn(m))
+```
 
-mean(chain[:mu, stack=true])
+The mean of the reconstructed `m` should be approximately `(4 * 1) + 2 = 6`:
+
+```@example modifications
+mean(fake_chain[@vn(m), stack=true])
 ```
 
 ## Docstrings
