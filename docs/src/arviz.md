@@ -11,24 +11,22 @@ InferenceObjects.convert_to_inference_data
 For example:
 
 ```@example arviz
-using InferenceObjects, FlexiChains, DynamicPPL, Distributions
+using InferenceObjects, FlexiChains
 
-@model function f(y)
-    x ~ Normal()
-    y ~ Normal(x)
-end
-model = f(1.0)
+chn = FlexiChains.EXAMPLE_CHAIN
+```
 
-chn = FlexiChains._make_prior_chain(model, 100, 2)
+```@example arviz
 idata = InferenceObjects.convert_to_inference_data(chn)
 ```
 
-You can combine multiple `InferenceData` objects with `merge`:
+You can combine multiple `InferenceData` objects with `merge`.
+For example, if you have a chain containing parameters and a chain containing pointwise log-likelihoods, you can merge them into a single `InferenceData` object:
 
-```@example arviz
-llike_chn = DynamicPPL.pointwise_loglikelihoods(model, chn)
-idata2 = InferenceObjects.convert_to_inference_data(llike_chn; group=:log_likelihood)
-idata_merged = merge(idata, idata2)
+```julia
+llike_idata = InferenceObjects.convert_to_inference_data(llike_chn; group=:log_likelihood)
+
+idata_merged = merge(idata, llike_idata)
 ```
 
 From here you can use the full functionality of ArviZ.jl, which includes various plotting and analysis tools: please see [the ArviZ.jl documentation](https://julia.arviz.org/ArviZ/stable/) for more info.
