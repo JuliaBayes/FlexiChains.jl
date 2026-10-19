@@ -21,7 +21,7 @@ There are aliases for common `FlexiChain` key types:
 
 ```@docs
 VNChain
-
+SymChain
 ```
 
 You can also use `Base.keytype`:
