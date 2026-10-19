@@ -10,6 +10,7 @@ FlexiChains also guarantees that any changes to these APIs will be reflected wit
 
 The `FlexiChain` and `FlexiSummary` types are technically marked as public, but you should not handle them or their fields directly.
 For dispatch purposes, it is guaranteed that the first type parameter is always the key type; this should typically be all you need.
+Both types have extra type parameters, but they are considered internal and may change at any time.
 
 ```@docs
 FlexiChains.FlexiChain
@@ -20,10 +21,8 @@ There are aliases for common `FlexiChain` key types:
 
 ```@docs
 VNChain
-SymChain
-```
 
-Both types have extra type parameters, but they are considered internal and may change at any time.
+```
 
 You can also use `Base.keytype`:
 
@@ -147,6 +146,10 @@ Please see the [converting to/from arrays page](@ref arrays).
 Please see the [samples page](./samples.md).
 
 ## Integration with Turing.jl
+
+!!! warning
+
+    Note that if you are using Turing.jl with FlexiChains you almost certainly want to read [the docs for v0.6](https://juliabayes.org/FlexiChains.jl/v0.6).
 
 ```@docs
 DynamicPPL.logprior
