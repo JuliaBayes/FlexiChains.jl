@@ -29,12 +29,12 @@ Generally the means that things that involve flat representations of data (a sim
 With FlexiChains, you have to pay this cost every time you want to do something that requires a flat representation.
 
 ```@example flat
-using FlexiChains: FlexiChain, Parameter
+using FlexiChains: FlexiChain, Parameter, @vn, VarName
 using Chairmarks, DataFrames
 
 niter, nchain, nparam = 1000, 4, 100
-d = [Dict(Parameter(:x) => randn(nparam)) for _ in 1:niter, _ in 1:nchain]
-c = FlexiChain{Symbol}(niter, nchain, d)
+d = [Dict(Parameter(@vn(x)) => randn(nparam)) for _ in 1:niter, _ in 1:nchain]
+c = FlexiChain{VarName}(niter, nchain, d)
 nothing # hide
 ```
 
