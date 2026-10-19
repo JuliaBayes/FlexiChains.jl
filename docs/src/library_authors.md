@@ -1,6 +1,7 @@
 # For library authors
 
 If you are the author of a Julia library and want to integrate FlexiChains with your package: first of all, thank you for your interest!
+If you need any kind of help, please don't hesitate to open an issue or reach out.
 
 This page contains a single tip for integrating FlexiChains, namely...
 
