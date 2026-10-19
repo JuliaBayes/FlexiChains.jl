@@ -6,27 +6,12 @@ AlgebraOfGraphics.jl (AoG) is a plotting package built on top of Makie, which pr
 
 FlexiChains does not provide any direct functionality to work with AoG.
 However, since FlexiChains [provides a Tables.jl interface](@ref integrations-tables), it can be fed into AoG for plotting.
-This page provides a handful of examples.
-
-We begin by sampling our familiar eight-schools model.
+This page provides a handful of examples, using our now familiar demonstration chain:
 
 ```@example aog
-using FlexiChains, Distributions, LinearAlgebra
-using DynamicPPL: @model, @varname
+using FlexiChains
 
-y = [28, 8, -3, 7, -1, 1, 18, 12]
-sigma = [15, 10, 16, 11, 9, 11, 10, 18]
-@model function eight_schools(y, sigma)
-    mu ~ Normal(0, 5)
-    tau ~ truncated(Cauchy(0, 5); lower=0)
-    theta ~ MvNormal(fill(mu, length(y)), tau^2 * I)
-    for i in eachindex(y)
-        y[i] ~ Normal(theta[i], sigma[i])
-    end
-    return (mu=mu, tau=tau)
-end
-model = eight_schools(y, sigma)
-chain = FlexiChains._make_prior_chain(model, 100, 3)
+chain = FlexiChains.EXAMPLE_CHAIN
 ```
 
 Because AoG mainly works with long-form data, we need to specify this when creating a Tables.jl-compatible object, as the default for FlexiChains is a wide-form table.
@@ -35,12 +20,12 @@ We also subset the chain to only include the `theta` parameters.
 ```@example aog
 using FlexiChains: Long
 
-lng = Long(chain[[@varname(theta)]])
+lng = Long(chain[[@vn(theta)]])
 nothing # hide
 ```
 
 We can directly feed `lng` into AoG, without having to materialise it as a DataFrame.
-For the purposes of these docs we will take a look at (ten random rows of) the data:
+For the purposes of these docs we will take a look at (ten random rows of) the data, so that you can see what AoG expects to be passed:
 
 ```@example aog
 using DataFrames, Random
