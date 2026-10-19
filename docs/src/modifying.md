@@ -139,6 +139,9 @@ For example, you can obtain the same functionality as [tidybayes' `spread_draws`
 ```@example modifications
 using DataFrames
 
+# Subset to the first three iterations, or else the output will be very long!
+labelled_chain = labelled_chain[iter=1:3]
+
 # Create a 3D DimArray (iter x chain x school)
 dimarr = labelled_chain[@vn(theta), stack=true]
 
