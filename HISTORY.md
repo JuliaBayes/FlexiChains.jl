@@ -144,6 +144,10 @@ A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforw
 
 The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
 
+# 0.6.44
+
+Documentation updates only.
+
 # 0.6.43
 
 Added `changerate` to compute per-chain parameter change rates.
