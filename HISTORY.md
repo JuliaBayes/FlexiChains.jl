@@ -11,15 +11,15 @@ This allows for a good amount of code simplification as previously any VarNamedT
 
 In order to not completely break users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
 **However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.
-Until & unless Turing itself updates its codebase (please see [this issue](https://github.com/TuringLang/Turing.jl/issues/2856)), Turing users should stick to FlexiChains 0.6 where possible (this will be enforced by compatibility bounds).**
+Until and unless Turing itself updates its codebase (please see [this issue](https://github.com/TuringLang/Turing.jl/issues/2856)), Turing users should stick to FlexiChains 0.6 where possible (this will be enforced by compatibility bounds).**
 
 If you are only using Turing, it is unlikely that you will have FlexiChains v0.7 in your environment.
 However, if for some reason you *need* to use FlexiChains 0.7, please:
 
   - update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`
-  - if you need to convert to/from the new VNChain, you can use the `to_new_vnchain` and `to_old_vnchain` conversion functions
+  - if you need to convert to/from the new VNChain, you can use the `FlexiChains.upgrade` and `FlexiChains.downgrade` conversion functions
 
-apart from this one change, everything else should still work seamlessly.
+Apart from this one change, everything else should still work seamlessly.
 If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
 
 ## Pushforward plot functions
