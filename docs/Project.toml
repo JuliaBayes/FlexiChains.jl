@@ -36,7 +36,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 VarNames = "09a315b2-63fc-4165-8d7f-d59368e770cc"
 
 [sources]
-FlexiChains = {path = "/Users/pysm/jl/fc"}
+FlexiChains = {path = "../"}
 Pigeons = {rev = "main", url = "https://github.com/Julia-Tempering/Pigeons.jl"}
 
 [compat]
