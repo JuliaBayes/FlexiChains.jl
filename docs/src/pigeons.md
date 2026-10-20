@@ -59,7 +59,7 @@ chn = FlexiChains.from_pigeons(pt)
 
 ## Other models
 
-Sampling with other models also works, but will return a `SymChain` (i.e., `FlexiChain{Symbol}`) instead of `VNChain`.
+Sampling with other models also works, and will return a `VNChain` (i.e., `FlexiChain{VarNames.VarName}`).
 Here is another example lifted from the [Pigeons docs](https://pigeons.run/stable/input-julia), where a custom log-density function is used.
 
 ```@example pigeons
@@ -82,7 +82,7 @@ pt = pigeons(;
 )
 ```
 
-By default, `from_pigeons` will return a `SymChain` with a single vector-valued parameter:
+By default, `from_pigeons` will return a `VNChain` with a single vector-valued parameter, `@vn(param)`:
 
 ```@example pigeons
 chn = FlexiChains.from_pigeons(pt)
