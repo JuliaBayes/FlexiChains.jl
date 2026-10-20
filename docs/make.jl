@@ -25,6 +25,7 @@ using Pigeons: Pigeons
 using Plots: Plots
 using PosteriorDB: PosteriorDB
 using PosteriorStats: PosteriorStats
+using StanSample: StanSample
 using Statistics: Statistics
 using StatsBase: StatsBase
 using StatsPlots: StatsPlots
@@ -56,6 +57,7 @@ modules = [
     Base.get_extension(FlexiChains, :FlexiChainsPosteriorStatsDynamicPPLExt),
     Base.get_extension(FlexiChains, :FlexiChainsPosteriorStatsExt),
     Base.get_extension(FlexiChains, :FlexiChainsRecipesBaseExt),
+    Base.get_extension(FlexiChains, :FlexiChainsStanSampleExt),
     Base.get_extension(FlexiChains, :FlexiChainsStatsPlotsExt),
 ]
 
