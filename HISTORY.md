@@ -128,7 +128,8 @@ There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, mo
 
 The `FlexiChain{Symbol}(::StanSample.SampleModel)` constructor has been replaced by `FlexiChains.from_stansample(::StanSample.SampleModel)`, to match the other `from_*` conversion functions.
 
-`FlexiChains.from_stan_csv` and `FlexiChains.from_stansample` now accept an optional `key_spec` argument, in the same way as `FlexiChains.from_mcmcchains`. This lets you construct a chain with `VarName` keys, or with array-valued parameters grouped together.
+`FlexiChains.from_stan_csv` and `FlexiChains.from_stansample` now accept an optional `key_spec` argument, in the same way as `FlexiChains.from_mcmcchains`.
+This lets you construct a chain with `VarName` keys, or with array-valued parameters grouped together.
 
 ## Other non-breaking changes
 
