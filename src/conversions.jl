@@ -247,3 +247,27 @@ function AbstractMCMC.to_samples(
     pwss = AbstractMCMC.to_samples(VarNames.Draw, chain)
     return map(parameters, pwss)
 end
+
+_maybe_promote_key(::Type{Tnew}) where {Tnew} = Tnew
+_maybe_promote_key(::Type{<:VarName}) = VarName
+
+"""
+Infer the key type of a `FlexiChain` from a `key_spec` tuple, as accepted by the `FlexiChain`
+from-array constructor.
+"""
+function _infer_key_type(key_spec::Tuple)
+    T = Union{}
+    for k in key_spec
+        key = k isa Pair ? first(k) : k
+        if key isa Parameter
+            Tnew = typeof(key).parameters[1]
+            # Special-case promote VarName parameters to avoid overly narrow key types like
+            # `VarName{sym,Iden} where {sym}`, which can happen if you have [@varname(x),
+            # @varname(y)]. This causes issues when parameters like e.g. @varname(x[1]) are
+            # used later on, e.g. in _split_varnames.
+            Tnew = _maybe_promote_key(Tnew)
+            T = typejoin(T, Tnew)
+        end
+    end
+    return T
+end

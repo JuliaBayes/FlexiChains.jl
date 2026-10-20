@@ -56,9 +56,6 @@ include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
 
-_maybe_promote_key(::Type{Tnew}) where {Tnew} = Tnew
-_maybe_promote_key(::Type{<:VarName}) = VarName
-
 # Extended in MCMCChains extension
 function from_mcmcchains end
 @public from_mcmcchains
@@ -73,6 +70,10 @@ function from_pigeons end
 @public from_pigeons
 function _internal_from_pigeons end
 function _faithful_sample_array end
+
+# Extended in StanSample extension
+function from_stansample end
+@public from_stansample
 
 # Convenience re-exports.
 export Wide, Long
