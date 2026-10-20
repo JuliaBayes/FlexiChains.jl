@@ -21,8 +21,36 @@ sm = SampleModel(args...)
 # Note: this mutates `sm` -- StanSample has a rather unconventional interface
 stan_sample(sm; data)
 
-# The key type has to be `Symbol`.
-chn = FlexiChain{Symbol}(sm)
+chn = FlexiChains.from_stansample(sm)
+```
+
+```@docs
+FlexiChains.from_stansample
+```
+
+By default, both of these functions return a `FlexiChain{Symbol}`, where each column of the CSV is a separate key (e.g. `Symbol("theta.1")`).
+If you want `VarName` keys, or want to group array-valued parameters back together, you can pass a `key_spec` tuple as the last argument.
+This works in exactly the same way as for the [`FlexiChain` from-array constructor](@ref FlexiChains.FlexiChain(::AbstractArray{T,3}, key_spec) where {T}).
+Note that `key_spec` must cover every column, including the sampler columns that Stan writes first:
+
+```julia
+using FlexiChains: Parameter, Extra, @vn
+
+key_spec = (
+    Extra(:lp),
+    Extra(:accept_stat),
+    Extra(:stepsize),
+    Extra(:treedepth),
+    Extra(:n_leapfrog),
+    Extra(:divergent),
+    Extra(:energy),
+    Parameter(@vn(theta)) => (8,),
+    Parameter(@vn(mu)),
+    Parameter(@vn(tau)),
+)
+chn = FlexiChains.from_stan_csv("eight_schools", 4, key_spec)
+# or
+chn = FlexiChains.from_stansample(sm, key_spec)
 ```
 
 If you are using [BridgeStan.jl](https://roualdes.us/bridgestan/latest/languages/julia.html) and/or [StanLogDensityProblems.jl](https://sethaxen.github.io/StanLogDensityProblems.jl/stable/) plus a native Julia sampler, you should check whether there is an integration for the sampler in question.
