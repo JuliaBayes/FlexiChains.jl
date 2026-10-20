@@ -124,6 +124,13 @@ There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, mo
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
+## Stan conversions
+
+The `FlexiChain{Symbol}(::StanSample.SampleModel)` constructor has been replaced by `FlexiChains.from_stansample(::StanSample.SampleModel)`, to match the other `from_*` conversion functions.
+
+`FlexiChains.from_stan_csv` and `FlexiChains.from_stansample` now accept an optional `key_spec` argument, in the same way as `FlexiChains.from_mcmcchains`.
+This lets you construct a chain with `VarName` keys, or with array-valued parameters grouped together.
+
 ## Other non-breaking changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).

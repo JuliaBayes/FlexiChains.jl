@@ -2,8 +2,8 @@ using DelimitedFiles: readdlm
 
 """
     FlexiChains.from_stan_csv(
-        base_path::AbstractString, num_chains::Integer
-    )::FlexiChain{Symbol}
+        base_path::AbstractString, num_chains::Integer, key_spec=nothing
+    )::FlexiChain
 
 Reads the Stan CSV files from `{base_path}_1.csv` through to `{base_path}_{num_chains}.csv`.
 This is a convenience method that recognises the fact that CmdStan saves its outputs in this
@@ -12,19 +12,25 @@ format.
 !!! note
     You do not need to provide the underscore before the chain number in the filename! That
     is, if your files are `example_1.csv` etc., then `base_path` should just be `"example"`.
+
+See the other method of `from_stan_csv` for details of the `key_spec` argument.
 """
-function from_stan_csv(base_path::AbstractString, num_chains::Integer)
+function from_stan_csv(
+    base_path::AbstractString,
+    num_chains::Integer,
+    key_spec::Union{Nothing,Tuple}=nothing,
+)
     if num_chains <= 0
         throw(ArgumentError("num_chains must be at least 1"))
     end
     csv_paths = ["$(base_path)_$(i).csv" for i in 1:num_chains]
-    return from_stan_csv(csv_paths)
+    return from_stan_csv(csv_paths, key_spec)
 end
 
 """
     FlexiChains.from_stan_csv(
-        csv_paths::AbstractVector{<:AbstractString}
-    )::FlexiChain{Symbol}
+        csv_paths::AbstractVector{<:AbstractString}, key_spec=nothing
+    )::FlexiChain
 
 Parse a set of Stan CSV files at the given paths.
 
@@ -34,10 +40,26 @@ case if they were all drawn from the same call to Stan's sampling. However, note
 FlexiChains does only a rudimentary set of checks to ensure consistency: the user should be
 responsible for ensuring that the CSVs read in are valid.
 
-Columns that end in double-underscores (`__`) are treated as `Extra`s (the underscores will
-be stripped), and all other columns as `Parameter`s.
+If `key_spec` is not provided, columns that end in double-underscores (`__`) are treated as
+`Extra`s (the underscores will be stripped), and all other columns as `Parameter{Symbol}`s,
+giving a `FlexiChain{Symbol}`.
+
+If `key_spec` is provided, it is passed directly to the `FlexiChain` from-array constructor,
+and the key type of the resulting `FlexiChain` is inferred from it. `key_spec` must cover
+every column of the CSV files, in order, including the sampler columns (e.g. `lp__`) that
+CmdStan writes before the model's own parameters. This lets you, for example, use `VarName`
+keys, or group array-valued parameters together: since CmdStan writes arrays in
+column-major order, `Parameter(@vn(Sigma)) => (2, 2)` will correctly reconstruct a 2x2
+matrix `Sigma` from the columns `Sigma.1.1`, `Sigma.2.1`, `Sigma.1.2`, `Sigma.2.2`.
+
+Please see [the `FlexiChain` constructor documentation](@ref
+FlexiChains.FlexiChain(::AbstractArray{T,3}, key_spec) where {T}) for details on what
+`key_spec` is allowed.
 """
-function from_stan_csv(csv_paths::AbstractVector{<:AbstractString})
+function from_stan_csv(
+    csv_paths::AbstractVector{<:AbstractString},
+    key_spec::Union{Nothing,Tuple}=nothing,
+)
     isempty(csv_paths) && throw(ArgumentError("no CSV paths provided"))
 
     # Parse sampling settings from the first CSV. This is pretty ugly, but well, it doesn't
@@ -122,6 +144,16 @@ function from_stan_csv(csv_paths::AbstractVector{<:AbstractString})
         push!(sampling_times, _parse_stan_sampling_time(csv_path))
     end
     data = stack(data) # niters x nparams x nchains
+
+    if key_spec !== nothing
+        # The FlexiChain from-array constructor expects (niters, nchains, nparams).
+        return FlexiChain{_infer_key_type(key_spec)}(
+            permutedims(data, (1, 3, 2)),
+            key_spec;
+            iter_indices=iter_indices,
+            sampling_time=sampling_times,
+        )
+    end
 
     data_dict = OrderedDict{ParameterOrExtra{<:Symbol},Matrix{Float64}}()
     # Sort out parameters vs extras based on header names
