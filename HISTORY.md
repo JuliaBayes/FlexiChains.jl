@@ -1,3 +1,149 @@
+# 0.7
+
+v0.7 is a fairly large release of FlexiChains containing breaking changes.
+
+## Changes to core types
+
+`Extra` is no longer parametric. Its name must be a `Symbol`, regardless of the chain's parameter key type.
+
+FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
+This allows for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
+
+In order to not completely break users, the old code based on AbstractPPL and DynamicPPL types has been retained for compatibility.
+**However, please note that `VNChain` is now aliased to the new type, i.e., `FlexiChain{VarNames.VarName}`.
+Until & unless Turing itself updates its codebase (please see [this issue](https://github.com/TuringLang/Turing.jl/issues/2856)), Turing users should stick to FlexiChains 0.6 where possible (this will be enforced by compatibility bounds).**
+
+If you are only using Turing, it is unlikely that you will have FlexiChains v0.7 in your environment.
+However, if for some reason you *need* to use FlexiChains 0.7, please:
+
+  - update your code to use `FlexiChain{AbstractPPL.VarName}` instead of `VNChain`
+  - if you need to convert to/from the new VNChain, you can use the `to_new_vnchain` and `to_old_vnchain` conversion functions
+
+apart from this one change, everything else should still work seamlessly.
+If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
+
+## Pushforward plot functions
+
+The keyword arguments of the plotting functions to create pushforward visualisations (`pushforward_hist`, `pushforward_continuous`, `pushforward_discrete`) have been changed:
+
+  - the `baseline` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `lines!` or `scatter!` to overlay baseline values on the pushforward plot.
+  - the `residual` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `transform_values` to calculate residuals inside the `FlexiChain` and to then plot this new parameter using the respective `pushforward_` function.
+  - `quantiles` keyword argument has been renamed to `levels` across all pushforward functions and matches how `forestplot`'s `levels` keyword argument works.
+
+## Stacking of array-valued parameters
+
+Previously, if you had a parameter whose value was a `DimArray`, accessing its data (i.e., `chain[key]`) would automatically stack the parameter's dimensions with the iteration and chain dimensions.
+This behaviour has been removed now; you must explicitly request stacking by passing `stack=true` to `getindex`, i.e., `chain[key, stack=true]`.
+
+## Removal of deprecated functions
+
+The deprecated top-level plotting functions have been removed.
+Please use the versions in the `FlexiChains.Plots` and `FlexiChains.Makie` submodules instead:
+
+  - `FlexiChains.traceplot`, `FlexiChains.mixeddensity`, `FlexiChains.meanplot`, `FlexiChains.rankplot`, and `FlexiChains.autocorplot` (and their mutating versions) are now `FlexiChains.Plots.traceplot` etc.
+  - `FlexiChains.mtraceplot`, `FlexiChains.mmixeddensity`, `FlexiChains.mmeanplot`, `FlexiChains.mrankplot`, and `FlexiChains.mautocorplot` (and their mutating versions) are now `FlexiChains.Makie.traceplot` etc.
+
+The deprecated positional signatures `values_at(chn, iter, chain[, Tout])` and `parameters_at(chn, iter, chain[, Tout])` have been removed.
+Please use the keyword-argument forms `values_at(chn[, Tout]; iter=..., chain=...)` and `parameters_at(chn[, Tout]; iter=..., chain=...)` instead.
+
+For `FlexiChain{Symbol}`s without a stored `structure`, `parameters_at` (and therefore `rand(chn; parameters_only=true)`) now returns a `NamedTuple` by default instead of an `OrderedDict{Symbol}`.
+The two are isomorphic, but `NamedTuple`s are more ergonomic to work with.
+To restore the old behaviour, pass `OrderedDict` as the output type, i.e. `parameters_at(chn, OrderedDict; iter=..., chain=...)`.
+
+`FlexiChains.FlexiChain(::MCMCChains.Chains)` has been removed; please use
+`FlexiChains.from_mcmcchains` instead.
+
+## Tables.jl output for single-statistic summaries
+
+When converting a `FlexiSummary` with a dropped stat dimension (e.g. the output of `mean(chn)`) to a table, the statistic column is now named after the statistic (e.g. `mean`), rather than the generic `stat`.
+For example, `DataFrame(mean(chn))` now has columns `param` and `mean`.
+
+## `split_interval` is now the default for `hdi` and `eti`
+
+`PosteriorStats.hdi(::FlexiChain)` and `PosteriorStats.eti(::FlexiChain)` now default to `split_interval=true`, i.e., the returned `FlexiSummary` has separate `hdi_lower` / `hdi_upper` (or `eti_lower` / `eti_upper`) statistics instead of a single `hdi` (or `eti`) statistic containing `ClosedInterval`s.
+To restore the old behaviour, pass `split_interval=false`.
+
+When using a multimodal HDI method (e.g. `method=:multimodal`), intervals cannot be split, so the unsplit `FlexiSummary` is returned along with a warning. Pass `split_interval=false` to silence the warning.
+
+## `FlexiChains.collapse` now requires `CollapseFunction`s
+
+`collapse` now accepts a vector of `CollapseFunction`s instead of plain functions or `(name::Symbol, f)` tuples. Previously, collapsing over both dimensions flattened samples into a vector, discarding chain identity and requiring special handling for MCMC diagnostics (see the v0.6.40 bug fix).
+
+A `CollapseFunction` holds a statistic name and three functions for `dims=:both`, `:chain`, and `:iter`. Each receives the full `(iter, chain)` sample matrix for a key. Setting a function to `nothing` disables that dimension; requesting it throws an `ArgumentError`. Returning an output of the wrong size throws a `DimensionMismatch`.
+
+Two shortcut constructors cover common uses, each accepting `([name::Symbol,] f, args...; kwargs...)` (the name defaults to `Symbol(f)`):
+
+  - `FlexiChains.CollapseFunctionVec`: for vector-to-scalar functions, such as `mean` or `quantile`. Preserves the previous behavior.
+  - `FlexiChains.CollapseFunctionDiagnostic`: applies diagnostics to the full matrix for `:both` or separately to each chain for `:iter`. Does not support `:chain`.
+
+To migrate, replace:
+
+```julia
+collapse(chn, [f, (:name, g)])
+```
+
+with:
+
+```julia
+collapse(
+    chn,
+    [FlexiChains.CollapseFunctionVec(f), FlexiChains.CollapseFunctionVec(:name, g)],
+)
+```
+
+`FlexiChains.ChainDimAware` has been removed; use `FlexiChains.CollapseFunctionDiagnostic` instead.
+
+`ess`, `rhat`, and `mcse` now throw an `ArgumentError` for `FlexiChain`s with `dims=:chain`: computing these diagnostics across chains at each iteration is not meaningful. All other summary functions (`mean`, `summarystats`, `PosteriorStats.hdi`, etc.) are unchanged.
+
+`quantile(chn, ps::AbstractVector; dims=:iter)` (or `dims=:chain`) previously returned only `missing` values; it now returns a vector of quantiles for each chain (or iteration).
+
+## New summary functions: `autocor` and `cor`
+
+`autocor(chain; lags=[1, 5, 10, 50])` calculates the autocorrelation of each parameter at the given lags.
+It returns a `FlexiSummary` with one statistic per lag, named `lag1`, `lag5`, and so on.
+Autocorrelation is always computed within each chain; by default the per-chain values are averaged, and `dims=:iter` reports them separately for each chain.
+
+`cor(chain)` calculates the Pearson correlation matrix between all parameters.
+Since the result is a matrix over pairs of parameters, it is returned as a `DimArray` with two `param` dimensions rather than a `FlexiSummary`.
+`dims=:iter` computes a separate correlation matrix for each chain.
+
+`changerate` now accepts a `dims` keyword.
+Its default behaviour, `dims=:both`, is to now compute per-chain changerates and average them across chains, like `autocor` above.
+To restore the old behaviour, specify `dims=:iter`.
+
+## New diagnostic: `rstar`
+
+`rstar([rng,] classifier, chain)` computes the R* convergence diagnostic of Lambert & Vehtari (2022), by forwarding the chain's `Real`-valued parameters to `MCMCDiagnosticTools.rstar`.
+The `classifier` must be an MLJ model; depending on whether it is probabilistic or deterministic, either a distribution of R* or a single R* value is returned.
+
+## PosteriorDB.jl integration
+
+A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
+Vector-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single vector-valued parameter (e.g. `@vn(theta)`).
+There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, model::String)`, which directly loads the reference posterior for the given model (or throws if it does not have a reference posterior).
+
+`FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
+
+## Pigeons.jl conversions
+
+`FlexiChains.from_pigeons` now returns a `VNChain` rather than a `SymChain`.
+
+## Stan conversions
+
+The `FlexiChain{Symbol}(::StanSample.SampleModel)` constructor has been replaced by `FlexiChains.from_stansample(::StanSample.SampleModel)`, to match the other `from_*` conversion functions.
+
+`FlexiChains.from_stan_csv` and `FlexiChains.from_stansample` now accept an optional `key_spec` argument, in the same way as `FlexiChains.from_mcmcchains`.
+This lets you construct a chain with `VarName` keys, or with array-valued parameters grouped together.
+
+## Other miscellaneous changes
+
+The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
+There is no difference in their behaviour.
+
+A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforward_continuous`, and `pushforward_discrete`. It sets the alpha values of the outer- and innermost quantile bands drawn by these functions.
+
+The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
+
 # 0.6.44
 
 Documentation updates only.

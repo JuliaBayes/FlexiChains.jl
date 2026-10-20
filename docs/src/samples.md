@@ -3,27 +3,22 @@
 FlexiChains stores data in a dict-of-array format (a column-oriented form, similar to dataframes).
 This means that it is very easy to access all the data for a given variable, but accessing all the data for a given sample (i.e., iteration / chain number) is a bit more involved.
 
-Consider the following example:
+Consider our now-familiar example chain:
 
 ```@example samples
-using FlexiChains, Turing
+using FlexiChains
 
-@model function f()
-    x ~ Normal()
-    y ~ Uniform(1, 2)
-end
-
-chn = sample(f(), Prior(), 10; chain_type=VNChain, progress=false)
+chn = FlexiChains.EXAMPLE_CHAIN
 ```
 
-Here, we have two variables `x` and `y`.
-FlexiChains makes it very easy to access _all_ the samples for `x`, or _all_ the samples for `y`, and so on:
+Here, we have three parameters `mu`, `tau`, and `theta`.
+FlexiChains makes it very easy to access the value of _a single parameter_ across all iterations and chains:
 
 ```@example samples
-chn[@varname(x)]
+chn[@vn(mu)]
 ```
 
-However, suppose you want to access the samples for a given iteration and chain number.
+However, suppose you want to obtain the values of _all parameters_ at a given iteration and chain number.
 For example, you might want to know what happened at the fifth iteration.
 
 One way is to subset a chain.
@@ -36,40 +31,62 @@ subsetted = chn[iter=5, chain=1]
 and to access the data you will still need to index into it, which is rather awkward:
 
 ```@example samples
-(x=only(subsetted[@varname(x)]), y=only(subsetted[@varname(y)]))
+(mu=only(subsetted[@vn(mu)]), tau=only(subsetted[@vn(tau)]))
 ```
 
-More generally speaking, the operation above can be viewed as a transformation from column-oriented data to row-oriented data, or from a dict-of-arrays to an array-of-dicts.
+We should definitely like to have a better way of accessing this collection of values at a given iteration/chain.
+
+Generally speaking, the operation above can be viewed as a transformation from column-oriented data to row-oriented data, or from a dict-of-arrays to an array-of-dicts.
 FlexiChains provides a few convenient ways for you to do this transformation.
 
 # `values_at`
 
-The function `values_at` is at the core of this transformation.
+The function [`FlexiChains.values_at`](@ref) is at the core of this transformation.
 Given iteration and chain indices (as keyword arguments), it returns some container that holds all the values for a given iteration.
 
 ```@example samples
-vs = FlexiChains.values_at(chn; iter=5, chain=1)
+draw = FlexiChains.values_at(chn; iter=5, chain=1)
 ```
 
-In the case of a chain sampled from Turing, the returned container is `DynamicPPL.ParamsWithStats`, which separately stores the parameters and the stats as a `VarNamedTuple` and `NamedTuple` respectively.
-This is a high-fidelity representation of the data, and is exactly what you get when sampling with Turing.jl (for example, if you call `sample(...; chain_type=Any)`, you will get an array of `ParamsWithStats` objects).
+There is a subtlety here in that the exact type of the container returned depends on what is stored in the chain.
 
-!!! info
+!!! note "Structures"
 
-    This is accomplished by storing a skeletal `VarNamedTuple` for each sample in the chain; if you are interested, see [the DynamicPPL docs](https://turinglang.org/DynamicPPL.jl/stable/vnt/manipulation/#Skeleton-VNTs) for more info.
+    For the interested reader, or if you are developing FlexiChains, this is determined by the _structures_ stored in the chain, which are meant to be a 'template' for the container.
+    If you are just a user who has obtained a `FlexiChain` from some library, should not need to worry about this, as the structures should be set up correctly for you by that library.
 
-The main benefit of this is that you can feed this right back into Turing's API.
-For example, to initialise MCMC sampling from the fifth sample, you can write:
+For chains that have parameter type `VarName`, i.e. a `VNChain`, the returned container should usually be a [`VarNames.Draw`](@extref).
+This is a struct that separately stores the parameters and the stats as a [`VarNames.VarNamedTuple`](@extref) and a `NamedTuple` respectively.
+
+!!! note "Not getting a `Draw`?"
+
+    If you instead get an `OrderedDict`, you _should_ probably report this as a bug to the library that produced the chain.
+
+For more information about these types, the reader is referred to the [VarNames.jl docs](https://juliabayes.org/VarNames.jl/stable/).
+The key point here is that this is a high-fidelity representation of the data.
+You can access the parameters and extras separately:
 
 ```@example samples
-pws = FlexiChains.values_at(chn; iter=5, chain=1)
-sample(f(), NUTS(), 10; initial_params=InitFromParams(pws), progress=false);
+ps = FlexiChains.parameters(draw)
 ```
+
+```@example samples
+FlexiChains.extras(draw)
+```
+
+The parameter `VarNamedTuple` can be further indexed into with `VarName`s to obtain the values of individual parameters.
+Much like a `FlexiChain` itself, you have the ability to index into a `VarNamedTuple` with sub-variables, such as `theta[1:3]`:
+
+```@example samples
+ps[@vn(mu)], ps[@vn(theta[1:3])]
+```
+
+## Choosing a different container type
 
 Sometimes, though, one might want different output formats.
 There is some support for converting to `NamedTuple` or `AbstractDict`, by passing an optional type argument.
 
-!!! warning
+!!! warning "Conversion to NamedTuple is not faithful"
 
     Note that conversion to `NamedTuple` is lossy if you have `VarName`s that contain indexing or field access syntax (e.g., `x[1]` or `x.a`).
 
@@ -81,20 +98,24 @@ FlexiChains.values_at(chn, NamedTuple; iter=5, chain=1)
 FlexiChains.values_at(chn, Dict; iter=5, chain=1)
 ```
 
-# Parameters only
+# Obtaining only parameters
 
 Often the stats are not of very much interest, and you just want the parameters.
 In that case, you can use `parameters_at`:
-
-For Turing-sampled chains, this returns a `VarNamedTuple`, which is just the same as the `params` field of the `ParamsWithStats` object.
 
 ```@example samples
 FlexiChains.parameters_at(chn; iter=5, chain=1)
 ```
 
+This is exactly the same as `values_at`, except that it only returns the parameters.
+
+!!! note "Not getting a VarNamedTuple"
+
+    Just as above, if you instead get an `OrderedDict`, you should *probably* report this as a bug to the library that produced the chain.
+
 # Arrays of samples
 
-To get more than one sample, you can pass arrays of indices.
+The functions above also accept multiple iteration or chain indices, and will return the corresponding array of containers.
 
 ```@example samples
 FlexiChains.parameters_at(chn; iter=[5, 6], chain=1)
@@ -106,16 +127,16 @@ All of DimensionalData's selectors also work:
 FlexiChains.parameters_at(chn; iter=Not(1..8), chain=1)
 ```
 
-This also means that you can convert a FlexiChain back into an `Array` of `ParamsWithStats` objects by passing `:` for both the iteration and chain indices, which is essentially the inverse of what `sample` does (it bundles the array into a FlexiChain).
-In fact, `:` is the default for both of these keyword arguments, so you can just write:
+This also means that you can convert a `VNChain` back into an `Array` of `Draw` objects by passing `:` for both the iteration and chain indices.
 
 ```@example samples
-FlexiChains.values_at(chn)
+FlexiChains.values_at(chn; iter=:, chain=:)
 ```
 
 # Drawing random samples
 
-To get a random sample from the chain, you can use `rand`:
+To get a random sample from the chain, you can use [`Base.rand`](@ref).
+The container type returned is the same as for `values_at`:
 
 ```@example samples
 rand(chn)
@@ -128,27 +149,13 @@ using Random: Xoshiro
 rand(Xoshiro(468), chn, 2, 2)
 ```
 
+Weighted sampling is also supported (see the docstring below for more info).
+
 If you only want parameters, pass the `parameters_only=true` keyword argument:
 
 ```@example samples
 rand(chn, parameters_only=true)
 ```
-
-For weighted sampling with replacement, pass `weights=StatsBase.Weights(w)`.
-The vector `w` supplies one weight per sample, in iteration order within each chain,
-with the chains concatenated in their stored order.
-
-# Using `VarNamedTuple`s
-
-All of the above functions, when run with Turing-sampled chains, return `VarNamedTuple`s or containers thereof.
-To access the values, you need to index with a `VarName`:
-
-```@example samples
-vnt = rand(chn, parameters_only=true)
-vnt[@varname(x)]
-```
-
-Please see [the Turing docs](https://turinglang.org/docs/usage/varnamedtuple/) for more details on working with `VarNamedTuple`s.
 
 # Docstrings
 

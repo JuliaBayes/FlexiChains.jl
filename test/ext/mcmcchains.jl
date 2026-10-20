@@ -3,13 +3,15 @@ module FlexiChainsMCMCChainsExtTests
 using AbstractMCMC: AbstractMCMC
 using DimensionalData: DimArray, Dim
 using Distributions
-using DynamicPPL
+using DynamicPPL: DynamicPPL, @model, @varname
 using FlexiChains:
-    FlexiChains, FlexiChain, VNChain, Parameter, Extra, ParameterOrExtra, _make_prior_chain
+    FlexiChains, FlexiChain, Parameter, Extra, ParameterOrExtra, _make_prior_chain
 using LinearAlgebra: I
 using MCMCChains: MCMCChains
 using Random: Xoshiro
 using Test
+
+const OldVNChain = FlexiChains.FlexiChain{DynamicPPL.VarName}
 
 """
 Build an `MCMCChains.Chains` from a DynamicPPL model, mimicking what Turing's
@@ -57,7 +59,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
         end
 
         @testset "sampling time is preserved" begin
-            flexic_with_time = VNChain(20, 1, flexic._data; sampling_time=[3.14])
+            flexic_with_time = OldVNChain(20, 1, flexic._data; sampling_time=[3.14])
             mc = MCMCChains.Chains(flexic_with_time)
             @test hasproperty(mc.info, :start_time)
             @test hasproperty(mc.info, :stop_time)
@@ -67,7 +69,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
 
         @testset "sampler state is preserved" begin
             flexic_with_state =
-                VNChain(20, 1, flexic._data; last_sampler_state=["some_state"])
+                OldVNChain(20, 1, flexic._data; last_sampler_state=["some_state"])
             mc = MCMCChains.Chains(flexic_with_state)
             @test hasproperty(mc.info, :samplerstate)
             @test mc.info.samplerstate == FlexiChains.last_sampler_state(flexic_with_state)
@@ -78,13 +80,13 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
         # Mostly to test that it works; the VarName test above is responsible for checking
         # all the other fields.
         niters, nchains, nparams = 10, 3, 5
-        rand_da() = DimArray(rand(nparams), Dim{:param}(1:nparams))
+        rand_array() = rand(nparams)
         dict_of_arrays = Dict{ParameterOrExtra{Symbol},Matrix}(
-            Parameter(:params) => [rand_da() for _ in 1:niters, _ in 1:nchains],
+            Parameter(:params) => [rand_array() for _ in 1:niters, _ in 1:nchains],
             Extra(:lp) => rand(niters, nchains),
         )
         chn = FlexiChain{Symbol}(niters, nchains, dict_of_arrays)
-        @test size(chn[:params]) == (niters, nchains, nparams)
+        @test size(chn[:params, stack=true]) == (niters, nchains, nparams)
 
         mc = MCMCChains.Chains(chn)
         mc_params = MCMCChains.get_sections(mc, :parameters)
@@ -93,7 +95,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             @test Symbol("params[$i]") in keys(mc_params)
         end
         # MCMCChains is niters x nparams x nchains
-        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params]
+        @test permutedims(mc_params.value.data, (1, 3, 2)) == chn[:params, stack=true]
         @test mc[:lp] == chn[:lp]
     end
 
@@ -170,7 +172,7 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
                 Parameter(@varname(z)),
             )
             fc = FlexiChains.from_mcmcchains(chn, ks)
-            @test fc isa FlexiChain{VarName}
+            @test fc isa OldVNChain
             @test size(fc) == (size(chn, 1), size(chn, 3))
             @test collect(FlexiChains.parameters(fc)) ==
                   [@varname(x), @varname(y), @varname(z)]
@@ -180,13 +182,6 @@ _make_sampler_state(n_chains) = [(; x="state_$i") for i in 1:n_chains]
             # This used to error prior to v0.6.31 because `fc` would be a
             # `FlexiChain{VarName{sym,Iden} where sym}`.
             @test FlexiChains._split_varnames(fc) isa Any
-        end
-
-        @testset "deprecated constructor still works" begin
-            chn = _make_mcmcchains(Xoshiro(654), g(), 50, 1)
-            fc = @test_deprecated FlexiChain{Symbol}(chn)
-            @test fc isa FlexiChain{Symbol}
-            @test size(fc) == (size(chn, 1), size(chn, 3))
         end
     end
 end

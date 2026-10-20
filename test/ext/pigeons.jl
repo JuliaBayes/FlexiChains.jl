@@ -4,7 +4,7 @@ module FlexiChainsPigeonsExtTests
 using Pkg
 Pkg.add(url="https://github.com/Julia-Tempering/Pigeons.jl", rev="main")
 
-using FlexiChains: FlexiChains, SymChain, VNChain, @varname, Extra
+using FlexiChains: FlexiChains, VNChain, @vn, Extra
 using BridgeStan
 using Pigeons
 using DynamicPPL
@@ -39,10 +39,10 @@ using Test
         )
 
         chn = FlexiChains.from_pigeons(pt)
-        @test chn isa SymChain
+        @test chn isa VNChain
         # Should be a single parameter which is a length-2 vector
-        @test only(FlexiChains.parameters(chn)) == :param
-        @test size(first(chn[:param])) == (2,)
+        @test only(FlexiChains.parameters(chn)) == @vn(param)
+        @test size(first(chn[@vn(param)])) == (2,)
         # log density should be recorded as an extra
         @test only(FlexiChains.extras(chn)) == Extra(:log_density)
         @test eltype(chn[:log_density]) == Float64
@@ -80,7 +80,7 @@ using Test
         # `_faithful_sample_array` function). If we used `Pigeons.sample_array` then `y`
         # would be converted to `Float64`.
         chn = FlexiChains.from_pigeons(pt)
-        @test chn isa VNChain
+        @test chn isa FlexiChains.FlexiChain{DynamicPPL.VarName}
         @test eltype(chn[@varname(x)]) == Float64
         @test eltype(chn[@varname(y)]) == Int
         for lp in (:logprior, :loglikelihood, :logjoint)
@@ -101,10 +101,10 @@ using Test
         pt = pigeons(target=stan_unid(100, 50), reference=stan_unid(0, 0), record=[traces])
         chn = FlexiChains.from_pigeons(pt)
 
-        @test chn isa SymChain
-        @test FlexiChains.parameters(chn) == [:p1, :p2]
-        @test eltype(chn[:p1]) == Float64
-        @test eltype(chn[:p2]) == Float64
+        @test chn isa VNChain
+        @test FlexiChains.parameters(chn) == [@vn(p1), @vn(p2)]
+        @test eltype(chn[@vn(p1)]) == Float64
+        @test eltype(chn[@vn(p2)]) == Float64
         @test only(FlexiChains.extras(chn)) == Extra(:log_density)
         @test eltype(chn[:log_density]) == Float64
     end

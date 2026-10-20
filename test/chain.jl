@@ -1,8 +1,9 @@
 module FCChainTests
 
 using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
-using AbstractPPL: @varname, VarName
-using DimensionalData: DimensionalData as DD, val, At
+using VarNames: @varname, VarName
+import DimensionalData as DD
+using DimensionalData: val, At
 using OffsetArrays: OffsetArray
 using OrderedCollections: OrderedDict
 using Test
@@ -15,7 +16,7 @@ using Test
             @testset "vector of dict" begin
                 N_iters = 10
                 dicts = fill(
-                    Dict(Parameter(:a) => 1, Parameter(:b) => 2, Extra("hello") => 3.0),
+                    Dict(Parameter(:a) => 1, Parameter(:b) => 2, Extra(:hello) => 3.0),
                     N_iters,
                 )
                 chain = FlexiChain{Symbol}(N_iters, 1, dicts)
@@ -42,7 +43,7 @@ using Test
             @testset "matrix of dict" begin
                 N_iters, N_chains = 10, 2
                 dicts = fill(
-                    Dict(Parameter(:a) => 1, Parameter(:b) => 2, Extra("hello") => 3.0),
+                    Dict(Parameter(:a) => 1, Parameter(:b) => 2, Extra(:hello) => 3.0),
                     N_iters,
                     N_chains,
                 )
@@ -126,7 +127,7 @@ using Test
                 arrays = Dict(
                     Parameter(:a) => rand(N_iters),
                     Parameter(:b) => rand(N_iters),
-                    Extra("hello") => rand(N_iters),
+                    Extra(:hello) => rand(N_iters),
                 )
                 chain = FlexiChain{Symbol}(N_iters, 1, arrays)
                 @test size(chain) == (N_iters, 1)
@@ -154,7 +155,7 @@ using Test
                 arrays = Dict(
                     Parameter(:a) => rand(N_iters, N_chains),
                     Parameter(:b) => rand(N_iters, N_chains),
-                    Extra("hello") => rand(N_iters, N_chains),
+                    Extra(:hello) => rand(N_iters, N_chains),
                 )
                 chain = FlexiChain{Symbol}(N_iters, N_chains, arrays)
                 @test size(chain) == (N_iters, N_chains)
@@ -378,24 +379,24 @@ using Test
         @testset "array-of-dict" begin
             N_iters, N_chains = 10, 2
             dicts = fill(
-                OrderedDict(Parameter(:b) => 1, Extra("hello") => 3, Parameter(:a) => 2),
+                OrderedDict(Parameter(:b) => 1, Extra(:hello) => 3, Parameter(:a) => 2),
                 N_iters,
                 N_chains,
             )
             chain = FlexiChain{Symbol}(N_iters, N_chains, dicts)
             @test collect(keys(chain._data)) ==
-                  [Parameter(:b), Extra("hello"), Parameter(:a)]
+                  [Parameter(:b), Extra(:hello), Parameter(:a)]
         end
         @testset "dict-of-array" begin
             N_iters, N_chains = 10, 2
             dicts = OrderedDict(
                 Parameter(:b) => fill(1, N_iters, N_chains),
-                Extra("hello") => fill(3, N_iters, N_chains),
+                Extra(:hello) => fill(3, N_iters, N_chains),
                 Parameter(:a) => fill(2, N_iters, N_chains),
             )
             chain = FlexiChain{Symbol}(N_iters, N_chains, dicts)
             @test collect(keys(chain._data)) ==
-                  [Parameter(:b), Extra("hello"), Parameter(:a)]
+                  [Parameter(:b), Extra(:hello), Parameter(:a)]
         end
     end
 

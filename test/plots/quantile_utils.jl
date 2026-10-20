@@ -44,6 +44,15 @@ const PU = FC.PlotUtils
     end
 end
 
+@testset "level_to_quantile_bounds" begin
+    @test all(PU.level_to_quantile_bounds(0.95) .≈ (0.025, 0.975))
+    @test PU.level_to_quantile_bounds(0.5) == (0.25, 0.75)
+
+    for bad in (0.0, 1.0, -0.1, 1.1)
+        @test_throws "level must be in (0, 1), got $bad" PU.level_to_quantile_bounds(bad)
+    end
+end
+
 @testset "binning utilities" begin
     @testset "get_bin_edges spans the range" begin
         edges = PU.get_bin_edges([0.0, 10.0, 5.0], 5)

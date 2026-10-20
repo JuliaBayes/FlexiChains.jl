@@ -6,15 +6,9 @@ MonteCarloMeasurements.jl is a package that lets you treat probability distribut
 FlexiChains contains an extension which allows you to directly convert a `FlexiChain` into a collection of `MonteCarloMeasurements.Particles` objects, in essence creating `Particles` from the distribution which the chain represents.
 
 ```@example montecarlomeasurements
-using FlexiChains, DynamicPPL, Distributions, LinearAlgebra
+using FlexiChains
 
-@model function f()
-    x ~ Normal()
-    y ~ Poisson(3.0)
-    v ~ MvNormal(zeros(2), I)
-    nt ~ product_distribution((a=Normal(), b=Normal()))
-end
-chn = FlexiChains._make_prior_chain(f(), 1000, 3)
+chn = FlexiChains.EXAMPLE_CHAIN
 ```
 
 ```@example montecarlomeasurements
@@ -24,17 +18,21 @@ pdict = Particles(chn)
 ```
 
 ```@example montecarlomeasurements
-# Calculates the distribution of `x + y` (for example).
-pdict[@varname(x)] + pdict[@varname(y)]
+# Calculates the distribution of `mu + tau` (for example).
+pdict[@vn(mu)] + pdict[@vn(tau)]
 ```
 
-Notice that `pdict[@varname(x)]` can be constructed quite trivially without an extension via
+Notice that `pdict[@vn(mu)]` can be constructed quite trivially without an extension via
 
 ```@example montecarlomeasurements
-Particles(vec(chn[@varname(x)]))
+Particles(vec(chn[@vn(mu)]))
 ```
 
-However, FlexiChains' extension additionally handles array- and NamedTuple-valued variables for you, such as `v` and `nt` above.
+However, FlexiChains' extension additionally handles array- and NamedTuple-valued variables for you, such as `theta` above.
+
+```@example montecarlomeasurements
+pdict[@vn(theta)]
+```
 
 The default output is an `OrderedDict`, which is not always the most convenient type to work with.
 If you prefer a `NamedTuple`, you can pass this as an argument to the constructor:

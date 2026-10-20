@@ -1,21 +1,46 @@
+using Random: Random
 using MCMCDiagnosticTools: MCMCDiagnosticTools
+using MLJModelInterface: MLJModelInterface as MMI
 
 """
-    changerate(chain::FlexiChain; warn=true, split_varnames=true)
+    changerate(
+        chain::FlexiChain;
+        dims::Symbol=:both,
+        warn::Bool=true,
+        split_varnames::Bool=true,
+    )
 
-Return a `FlexiSummary` with the fraction of adjacent values that differ (`!=`) for
-each parameter in each chain. The denominator is the number of transitions, `niters - 1`.
-A single value gives `NaN`.
+Calculate the number of adjacent values that differ for each key in the `chain`, divided by
+the number of transitions, i.e., `niters - 1`.
 
-Array-valued parameters are split into scalar components by default. Set
-`split_varnames=false` to compare whole parameter values instead. The `warn` keyword
-controls warnings for keys that cannot be summarised, as in [`FlexiChains.collapse`](@ref).
+Change rates are always computed within each chain separately, since consecutive samples
+from different chains are unrelated.
+
+The `dims` keyword argument controls how the per-chain results are combined:
+
+- `:both` (the default): the per-chain change rates are averaged, giving a single value
+  per key.
+- `:iter`: the change rate is reported separately for each chain.
+- `:chain` is not supported, since a change rate across chains at a single iteration is
+  not meaningful.
 """
-function changerate(chain::FlexiChain; warn::Bool=true, split_varnames::Bool=true)
+function changerate(
+    chain::FlexiChain;
+    dims::Symbol=:both,
+    warn::Bool=true,
+    split_varnames::Bool=true,
+)
+    per_chain = m -> map(_changerate, eachcol(m))
+    cf = CollapseFunction(
+        :changerate,
+        m -> Statistics.mean(per_chain(m)),
+        nothing,
+        per_chain,
+    )
     return collapse(
         chain,
-        [(:changerate, _changerate)];
-        dims=:iter,
+        [cf];
+        dims=dims,
         warn=warn,
         split_varnames=split_varnames,
         drop_stat_dim=true,
@@ -187,4 +212,43 @@ For chains sampled with Turing.jl's HMC/NUTS, the energy key is `:hamiltonian_en
 """
 function MCMCDiagnosticTools.bfmi(chain::FlexiChain, energy_key)
     return MCMCDiagnosticTools.bfmi(chain[energy_key])
+end
+
+"""
+    MCMCDiagnosticTools.rstar(
+        [rng::Random.AbstractRNG,]
+        classifier::MLJModelInterface.Supervised,
+        chain::FlexiChain;
+        warn::Bool=true,
+        kwargs...
+    )
+
+Compute the ``R^*`` convergence diagnostic of the chain using the given MLJ `classifier`.
+Returns a distribution of ``R^*`` values for probabilistic classifiers, or a single value
+for deterministic ones; values close to 1 indicate convergence.
+
+All `Real`-valued parameters are used; array-valued parameters are automatically split into
+their constituent scalars. Non-`Real`-valued keys are skipped with a warning (which can be
+suppressed via `warn=false`).
+
+Other keyword arguments are forwarded to [`MCMCDiagnosticTools.rstar`](@extref).
+
+```julia
+using MLJDecisionTreeInterface
+rstar(DecisionTreeClassifier(), chain)
+```
+"""
+function MCMCDiagnosticTools.rstar(
+    rng::Random.AbstractRNG,
+    classifier::MMI.Supervised,
+    chain::FlexiChain;
+    warn::Bool=true,
+    kwargs...,
+)
+    dimarr = DD.DimArray(chain; warn=warn, eltype_filter=Real, parameters_only=true)
+    return MCMCDiagnosticTools.rstar(rng, classifier, parent(dimarr); kwargs...)
+end
+
+function MCMCDiagnosticTools.rstar(classifier::MMI.Supervised, chain::FlexiChain; kwargs...)
+    return MCMCDiagnosticTools.rstar(Random.default_rng(), classifier, chain; kwargs...)
 end

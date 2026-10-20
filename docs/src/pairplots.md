@@ -8,48 +8,38 @@ FlexiChains provides two ways to interact with PairPlots.jl.
 
 Firstly, you can directly call `pairplot(chn[, param_or_params])` on a `FlexiChain`.
 This is a convenience method which includes extra functionality for e.g. highlighting divergent transitions.
+To demonstrate this we'll create a fake `FlexiChain` with some random data.
+(Our usual `EXAMPLE_CHAIN` only contains 10 iterations, so leads to some very poor plots.)
 
 ```@example pairplots
-using DynamicPPL, Distributions, LinearAlgebra, FlexiChains
+using FlexiChains
+using FlexiChains: FlexiChain, Parameter, Extra, OrderedDict
 
-J = 8
-y = [28, 8, -3, 7, -1, 1, 18, 12]
-sigma = [15, 10, 16, 11, 9, 11, 10, 18]
-@model function eightsch(J, y, sigma)
-    mu ~ Normal(0, 5)
-    tau ~ truncated(Cauchy(0, 5); lower=0)
-    theta ~ MvNormal(fill(mu, J), tau^2 * I)
-    for i in 1:J
-        y[i] ~ Normal(theta[i], sigma[i])
-    end
-end
-model = eightsch(J, y, sigma)
-
-chn = FlexiChains._make_posterior_chain(model, 1000, 4)
-```
-
-When sampling with Turing's HMC or NUTS, the resulting chain will contain an `Extra(:numerical_error)` key, which is a Boolean indicating whether or not the transition was divergent.
-Because in this docs page we aren't actually sampling with Turing.jl, the chain above doesn't have this, so we'll add it in ourselves.
-
-The following says: 'transform each sample of `mu` into a random Boolean, and store it in the `Extra(:numerical_error)` key'.
-(See the [Modifying data section](@ref modifying-values) for more details on `transform_values`.)
-
-```@example pairplots
-# Make approximately 5% of the samples 'divergent'.
-chn = FlexiChains.transform_values(
-    chn,
-    @varname(mu) => (_ -> rand() < 0.05) => FlexiChains.Extra(:numerical_error),
+chn = FlexiChain{VarName}(
+    500,
+    2,
+    OrderedDict(
+        Parameter(@vn(mu)) => randn(500, 2),
+        Parameter(@vn(tau)) => randn(500, 2) .* 3 .+ 2,
+        Parameter(@vn(theta)) => [[randn(), randn() - 1.0] for _ in 1:500, _ in 1:2],
+        Extra(:is_divergent) => rand(500, 2) .< 0.1,
+    ),
 )
 ```
+
+When sampling with NUTS, the resulting chain will (hopefully!) contain an `Extra` Boolean indicating whether or not the transition was divergent.
+In the example chain above, this has been stored in the `Extra(:is_divergent)` key.
+If you are sampling with e.g. Turing.jl, this key should be named `Extra(:numerical_error)`.
+Either way, this can be passed to `pairplot()` to highlight the divergent transitions in the plot.
 
 Carrying on with our plotting:
 
 ```@example pairplots
 # Limit the parameters being plotted for readability
-vns = [@varname(tau), @varname(theta[1]), @varname(theta[2])]
+vns = [@vn(tau), @vn(theta[1]), @vn(theta[2])]
 
 using PairPlots, CairoMakie
-pairplot(chn, vns; divergences=:numerical_error)
+pairplot(chn, vns; divergences=:is_divergent)
 Makie.save("pairplot.png", ans); # hide
 ```
 
@@ -61,12 +51,12 @@ For more low-level control, you can also convert a `FlexiChain` into a `PairPlot
 
 ```@example pairplots
 # Just some random values.
-expected_means = (tau=0.0, var"theta[1]"=2.5, var"theta[2]"=5.0)
+expected_means = (tau=2.0, var"theta[1]"=0.0, var"theta[2]"=-1.0)
 
 pairplot(PairPlots.Series(chn[vns]), PairPlots.Truth(expected_means, label="True"))
 ```
 
-Notice that `Series(chn)` will pool the samples in all four chains together.
+Notice that `Series(chn)` will pool the samples in all chains together.
 If you want to plot each chain separately, split them up into separate `Series` objects:
 
 ```@example pairplots
