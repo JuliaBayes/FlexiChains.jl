@@ -1,10 +1,10 @@
 # 0.7
 
-v0.7 is a fairly large breaking change in FlexiChains.
+v0.7 is a fairly large release of FlexiChains containing breaking changes.
+
+## Changes to core types
 
 `Extra` is no longer parametric. Its name must be a `Symbol`, regardless of the chain's parameter key type.
-
-## New types
 
 FlexiChains now uses the `VarName`, `VarNamedTuple`, and `Draw` types defined in [VarNames.jl](https://github.com/JuliaBayes/VarNames.jl), instead of the versions previously defined in AbstractPPL and DynamicPPL.
 This allows for a good amount of code simplification as previously any VarNamedTuple-specific functionality had to rely on DynamicPPL, which was an unnecessarily large dependency.
@@ -135,7 +135,7 @@ The `FlexiChain{Symbol}(::StanSample.SampleModel)` constructor has been replaced
 `FlexiChains.from_stan_csv` and `FlexiChains.from_stansample` now accept an optional `key_spec` argument, in the same way as `FlexiChains.from_mcmcchains`.
 This lets you construct a chain with `VarName` keys, or with array-valued parameters grouped together.
 
-## Other non-breaking changes
+## Other miscellaneous changes
 
 The `parameters` and `extras` functions are now exported (in fact they are now defined in VarNames.jl, but FlexiChains re-exports them).
 There is no difference in their behaviour.
