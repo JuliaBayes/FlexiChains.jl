@@ -10,22 +10,13 @@ This works with any model that Pigeons supports, including DynamicPPL models and
 
 !!! warning "Versions and compatibility"
 
-
-<<<<<<< HEAD
-There are a few tricky things to be aware of here.
-
+    There are a few tricky things to be aware of here.
     **Firstly, if you are using Turing with FlexiChains, it's very likely that you are using FlexiChains v0.6.**
     You should check this by inspecting your Project.toml or Manifest.toml: if this is indeed the case, please refer to [the v0.6 documentation](https://juliabayes.org/FlexiChains.jl/v0.6/pigeons).
 
     Secondly, although Pigeons has had a compatibility patch for DynamicPPL 0.41/0.42 merged, this has not yet been released.
-
-# ||||||| 53a6ba6 The current version of FlexiChains only works with DynamicPPL 0.41, whereas the current release of Pigeons only works with DynamicPPL 0.40. To work around this, you can check out the code from [this PR](https://github.com/Julia-Tempering/Pigeons.jl/pull/442), which allows you to use DynamicPPL 0.41 (but **not** 0.42 yet).
-
     The current release of Pigeons.jl is not compatible with DynamicPPL v0.41 or v0.42, which are the versions currently used by Turing.jl.
     Although Pigeons has had a compatibility patch for DynamicPPL 0.41/0.42 merged, this has not yet been released.
-
-> > > > > > > origin/main
-> > > > > > > To work around this, you can use the main branch of Pigeons.jl directly.
 
 !!! note "Must load DifferentiationInterface"
 
