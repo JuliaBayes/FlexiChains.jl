@@ -1,3 +1,7 @@
+# 0.6.44
+
+Documentation updates only.
+
 # 0.6.43
 
 Added `changerate` to compute per-chain parameter change rates.
