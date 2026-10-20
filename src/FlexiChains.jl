@@ -77,6 +77,8 @@ function from_stansample end
 
 # Convenience re-exports.
 export Wide, Long
+using VarNames: parameters, extras
+export parameters, extras
 using DimensionalData: At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
 export At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
 using Statistics: mean, median, std, var, quantile, cor
