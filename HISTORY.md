@@ -124,6 +124,10 @@ There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, mo
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
+## Pigeons.jl conversions
+
+`FlexiChains.from_pigeons` now returns a `VNChain` rather than a `SymChain`.
+
 ## Stan conversions
 
 The `FlexiChain{Symbol}(::StanSample.SampleModel)` constructor has been replaced by `FlexiChains.from_stansample(::StanSample.SampleModel)`, to match the other `from_*` conversion functions.
