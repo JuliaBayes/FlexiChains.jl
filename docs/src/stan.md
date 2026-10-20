@@ -28,11 +28,7 @@ stan_sample(sm; data)
 chn = FlexiChains.from_stansample(sm)
 ```
 
-```@docs
-FlexiChains.from_stansample
-```
-
-By default, both of these functions return a `FlexiChain{Symbol}`, where each column of the CSV is a separate key (e.g. `Symbol("theta.1")`).
+By default, both `from_stansample` and `from_stan_csv` return a `FlexiChain{Symbol}`, where each column of the CSV is a separate key (e.g. `Symbol("theta.1")`).
 If you want `VarName` keys, or want to group array-valued parameters back together, you can pass a `key_spec` tuple as the last argument.
 This works in exactly the same way as for [the `FlexiChain` from-array constructor](@ref arrays) and [the MCMCChains converter](@ref integrations-mcmcchains).
 Note that `key_spec` must also cover the sampler columns that Stan writes first:
