@@ -40,7 +40,7 @@ are:
   `VarNamedTuple`, and the stats/extras as a `NamedTuple`).
 
   For chains that do not have a stored `structure`, the default output will be an
-  `OrderedDict`.
+  `OrderedDict`, or `NamedTuple` for `TKey = Symbol`.
 
 - `Tout <: AbstractDict`: returns a dictionary mapping `ParameterOrExtra{TKey}` to their
   values. This is the most faithful representation of the data in the chain.

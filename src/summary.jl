@@ -655,32 +655,6 @@ macro _forward_stat(make_collapse_func, func)
 end
 
 """
-    @_forward_diagnostic(func)
-
-As [`@_forward_stat`](@ref), but for MCMC diagnostics.
-"""
-macro _forward_diagnostic(func)
-    return quote
-        function $(esc(func))(
-            chn::FlexiChain{TKey};
-            dims::Symbol=:both,
-            warn::Bool=true,
-            split_varnames::Bool=true,
-            kwargs...,
-        ) where {TKey}
-            return collapse(
-                chn,
-                [(Symbol($(esc(func))), ChainDimAware(x -> $(esc(func))(x; kwargs...)))];
-                dims=dims,
-                split_varnames=split_varnames,
-                warn=warn,
-                drop_stat_dim=true,
-            )
-        end
-    end
-end
-
-"""
 $(_stat_docstring("Statistics.mean", "mean"))
 """
 @_forward_stat CollapseFunctionVec Statistics.mean

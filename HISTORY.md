@@ -120,13 +120,13 @@ The `classifier` must be an MLJ model; depending on whether it is probabilistic 
 
 A new function, `FlexiChains.from_posteriordb(ref)`, loads a `PosteriorDB.ReferencePosterior` into a `FlexiChain{VarName}`.
 Vector-valued parameters, which PosteriorDB stores as separate scalar entries using Stan's naming convention (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single vector-valued parameter (e.g. `@vn(theta)`).
-There is also a convenience method, `from_posteriordb(::PosteriorDB.Database, model::String)`, which directly loads the reference posterior for the given model (or throws if it does not have a reference posterior).
+There is also a convenience method, `from_posteriordb(::PosteriorDB.PosteriorDatabase, model::String)`, which directly loads the reference posterior for the given model (or throws if it does not have a reference posterior).
 
 `FlexiChains.from_posteriordb_ref`, which returned a `FlexiChain{String}` with one key per scalar entry, has been removed in favour of `from_posteriordb`.
 
 ## Pigeons.jl conversions
 
-`FlexiChains.from_pigeons` now returns a `VNChain` rather than a `SymChain`.
+`FlexiChains.from_pigeons` now returns a `VNChain` rather than a `SymChain` for non-DynamicPPL models.
 
 ## Stan conversions
 
@@ -142,7 +142,7 @@ There is no difference in their behaviour.
 
 A new keyword argument `alpha_limits` was added to `pushforward_hist`, `pushforward_continuous`, and `pushforward_discrete`. It sets the alpha values of the outer- and innermost quantile bands drawn by these functions.
 
-The pushforward functions now start by using the lowest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
+The pushforward functions now start by using the highest alpha to draw the innermost band. When there is only a single level specified (`levels=[0.95]`) the lowest alpha is used.
 
 # 0.6.44
 
