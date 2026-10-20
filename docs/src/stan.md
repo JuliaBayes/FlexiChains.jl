@@ -1,5 +1,7 @@
 # [Stan](@id integrations-stan)
 
+## From CSV files
+
 FlexiChains has a function to read in chains stored in Stan CSV format:
 
 ```@docs
@@ -7,6 +9,8 @@ FlexiChains.from_stan_csv
 ```
 
 This of course assumes that you already have the CSV files on disk somewhere, e.g. if you have run Stan externally.
+
+## StanSample.jl
 
 If you are using [StanSample.jl](https://github.com/StanJulia/StanSample.jl) you can also read data directly from a `SampleModel` once you have sampled with it.
 
@@ -30,8 +34,8 @@ FlexiChains.from_stansample
 
 By default, both of these functions return a `FlexiChain{Symbol}`, where each column of the CSV is a separate key (e.g. `Symbol("theta.1")`).
 If you want `VarName` keys, or want to group array-valued parameters back together, you can pass a `key_spec` tuple as the last argument.
-This works in exactly the same way as for the [`FlexiChain` from-array constructor](@ref FlexiChains.FlexiChain(::AbstractArray{T,3}, key_spec) where {T}).
-Note that `key_spec` must cover every column, including the sampler columns that Stan writes first:
+This works in exactly the same way as for [the `FlexiChain` from-array constructor](@ref arrays) and [the MCMCChains converter](@ref integrations-mcmcchains).
+Note that `key_spec` must also cover the sampler columns that Stan writes first:
 
 ```julia
 using FlexiChains: Parameter, Extra, @vn
@@ -48,9 +52,12 @@ key_spec = (
     Parameter(@vn(mu)),
     Parameter(@vn(tau)),
 )
-chn = FlexiChains.from_stan_csv("eight_schools", 4, key_spec)
-# or
+
 chn = FlexiChains.from_stansample(sm, key_spec)
+```
+
+```@docs
+FlexiChains.from_stansample
 ```
 
 If you are using [BridgeStan.jl](https://roualdes.us/bridgestan/latest/languages/julia.html) and/or [StanLogDensityProblems.jl](https://sethaxen.github.io/StanLogDensityProblems.jl/stable/) plus a native Julia sampler, you should check whether there is an integration for the sampler in question.
