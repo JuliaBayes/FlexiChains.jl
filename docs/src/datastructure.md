@@ -2,28 +2,33 @@
 
 A `FlexiChain{T}`, at its core, is a wrapper around a dictionary which maps *keys* to *matrices* of size (`niters x nchains`).
 
-Let's start by setting up an example `FlexiChain`.
-Don't worry too much about the code to generate it; the important part is the object that is created.
+Let's start by loading an example `FlexiChain`.
 
 ```@example datastructure
-using FlexiChains: FlexiChains, FlexiChain, VarName, @varname, Parameter, Extra
+using FlexiChains
 
-N_iters, N_chains = 100, 3
-values = Dict(
-    Parameter(@varname(x)) => rand(N_iters, N_chains),
-    Parameter(@varname(y)) => rand(1:5, N_iters, N_chains),
-    Parameter(@varname(z)) => [randn(2) for _ in 1:N_iters, _ in 1:N_chains],
-    Extra(:something) => rand(N_iters, N_chains),
-)
-chain = FlexiChain{VarName}(N_iters, N_chains, values)
+chain = FlexiChains.EXAMPLE_CHAIN
 ```
 
 ## Keys: parameters and extras
 
-Each key in a chain can be either a [`Parameter{<:T}`](@ref FlexiChains.Parameter) or an [`Extra`](@ref FlexiChains.Extra).
+Each key in a `FlexiChain{T}` can be either:
+
+  - a [`Parameter{<:T}`](@ref FlexiChains.Parameter), or
+  - an [`Extra`](@ref FlexiChains.Extra).
+
 Each `Parameter` or `Extra` itself carries a *name*, which can be retrieved with [`FlexiChains.get_name`](@ref).
+
+```@example datastructure
+using FlexiChains: get_name, Parameter
+
+name = FlexiChains.get_name(FlexiChains.Parameter(@vn(mu)))
+
+name, typeof(name)
+```
+
 For a `Parameter{T}`, the name must be a `T`.
-For an `Extra`, the name can in theory be anything, but in practice is most commonly `Symbol`.
+For an `Extra`, the name must always be a `Symbol`, regardless of the parameter key type.
 
 You can list all keys, all parameters, or all extras:
 
@@ -43,16 +48,18 @@ FlexiChains.extras(chain)
 
 Because each key maps to a different matrix, FlexiChains can store values of different types and sizes.
 
-For example, `x` is stored as `Float64`, and `z` as a `Vector{Float64}`.
+For example, `mu` is stored as `Float64`, and `theta` as a `Vector{Float64}`.
 Indexing into a chain returns an `niters x nchains` matrix of these samples:
 
 ```@example datastructure
-chain[@varname(x)]
+chain[@vn(mu)]
 ```
 
 ```@example datastructure
-chain[@varname(z)]
+chain[:is_divergent]
 ```
+
+In this introductory page we don't go into the details of indexing; there's [one full page on that](@ref indexing).
 
 To obtain the number of iterations or chains, you can use [`FlexiChains.niters`](@ref) and [`FlexiChains.nchains`](@ref):
 

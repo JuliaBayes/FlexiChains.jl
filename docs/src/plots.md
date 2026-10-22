@@ -59,31 +59,23 @@ plotfunc(chn, param_or_params; pool_chains::Bool=false, kwargs...)
 
 ## Setup
 
-Here, we demonstrate the plotting features with a typical chain sampled from a Turing model.
-However, the general principles are applicable to any `FlexiChain` object.
-
-We'll make a model with different types of parameters (continuous, discrete, and vector-valued).
+We'll begin by making a model with different types of parameters (continuous, discrete, and vector-valued) to demonstrate the plotting functions.
+We could use the familiar example chain from the other docs pages, but that one is too small to demonstrate some of these plots well.
 
 ```@example plotsjl
-using FlexiChains, StatsPlots, Turing
-
+using FlexiChains, StatsPlots
 import FlexiChains.Plots as FP # For the plotting functions.
 
-@model function f()
-    x ~ Normal()
-    y ~ Poisson(3)
-    z ~ MvNormal(zeros(2), I)
-end
-
-chn = sample(
-    f(),
-    MH(),
-    MCMCThreads(),
-    1000,
-    3;
-    discard_initial=100,
-    chain_type=VNChain,
-    progress=false,
+using FlexiChains: FlexiChain, Parameter, Extra, OrderedDict
+chn = FlexiChain{VarName}(
+    500,
+    2,
+    OrderedDict(
+        Parameter(@vn(float)) => randn(500, 2),
+        Parameter(@vn(int)) => rand(1:5, 500, 2) .* 3 .+ 2,
+        Parameter(@vn(vect)) => [[randn(), randn() - 1.0] for _ in 1:500, _ in 1:2],
+        Extra(:an_extra) => randn(500, 2),
+    ),
 )
 ```
 
@@ -112,7 +104,7 @@ In general, the second argument can be _anything_ that you can index into a chai
 This means a symbol, a parameter, a `FlexiChains.Extra`, a sub-VarName, or a vector thereof:
 
 ```@example plotsjl
-plot(chn, [@varname(x), :logjoint])
+plot(chn, [@vn(float), :an_extra])
 savefig("plot2.svg");
 nothing # hide
 ```

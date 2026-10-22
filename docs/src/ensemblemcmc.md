@@ -31,7 +31,7 @@ Pass one name per coordinate to get separate walker-valued parameters:
 ```@example ensemble
 named = FlexiChains.from_ensemblemcmc(draws; param_names=[:alpha, :beta])
 named[:alpha, stack=true][walker=At(23)]
-named[@varname(alpha[2])] # second walker (ID 23)
+named[@vn(alpha[2])] # second walker (ID 23)
 ```
 
 The extras `:log_density` and `:accepted` retain a value per walker per sweep.

@@ -4,7 +4,7 @@
 
 FlexiChains provides a number of functions to visualise chains using the Makie plotting library.
 
-Parts of the Makie integration in FlexiChains are heavily lifted from [the (unreleased) ChainsMakie.jl package](https://simonsteiger.github.io/ChainsMakie.jl/dev/), although there have also been further modifications made since then.
+Parts of the Makie integration in FlexiChains are heavily lifted from [the (unreleased) ChainsMakie.jl package](https://simonsteiger.github.io/ChainsMakie.jl/dev/) (there have also been many further additions since then!).
 This includes some custom code to generate (e.g.) shared legends, which leads to slightly nicer plots than for Plots.jl (on top of Makie generally yielding nicer plots out of the box).
 
 !!! note
@@ -58,29 +58,23 @@ The intention is to allow you to build more complex figures using these as build
 
 ## Setup
 
-Here, we create a model with different types of parameters (continuous, discrete, and vector-valued).
-This is the same model as used on the Plots.jl documentation page.
+Here, we set up a chain with different types of parameters (continuous, discrete, and vector-valued).
+We could use the familiar example chain from the other docs pages, but that one is too small to demonstrate some of these plots well.
 
 ```@example 1
-using FlexiChains, CairoMakie, Turing
+using FlexiChains, CairoMakie
+import FlexiChains.Makie as FM  # For the plotting functions.
 
-import FlexiChains.Makie as FM # For the plotting functions.
-
-@model function f()
-    x ~ Normal()
-    y ~ Poisson(3)
-    z ~ MvNormal(zeros(2), I)
-end
-
-chn = sample(
-    f(),
-    MH(),
-    MCMCThreads(),
-    1000,
-    3;
-    discard_initial=100,
-    chain_type=VNChain,
-    progress=false,
+using FlexiChains: FlexiChain, Parameter, Extra, OrderedDict
+chn = FlexiChain{VarName}(
+    500,
+    2,
+    OrderedDict(
+        Parameter(@vn(float)) => randn(500, 2),
+        Parameter(@vn(int)) => rand(1:5, 500, 2) .* 3 .+ 2,
+        Parameter(@vn(vect)) => [[randn(), randn() - 1.0] for _ in 1:500, _ in 1:2],
+        Extra(:an_extra) => randn(500, 2),
+    ),
 )
 ```
 
@@ -262,126 +256,6 @@ For example, `f` may be the function which generates posterior predictive draws,
 Each parameter draw `θ` yields a different draw of `f`, so the spread of `f` inherits posterior uncertainty.
 The pushforward plots in this section visualise that uncertainty as nested quantile bands, displayed as either a fitted curve (`pushforward_continuous`), per-group summaries (`pushforward_discrete`), or predictive histograms (`pushforward_hist`).
 
-We'll concoct an example with the [Palmer penguins dataset](https://github.com/devmotion/PalmerPenguins.jl) to show how these plots can be used.
-
-```@example pushforward
-using Turing, DataFrames, PalmerPenguins, CairoMakie
-import FlexiChains.Makie as FM
-using StatsBase: denserank, fit, ZScoreTransform, reconstruct
-
-# Load data
-penguins = DataFrame(PalmerPenguins.load())
-
-# Drop missing values first (this ensures that standardisation doesn't trip over)
-dropmissing!(penguins)
-
-# Fit standardisation transforms so we can unstandardise predictions later
-bill_zs = fit(ZScoreTransform, Float64.(penguins.bill_length_mm))
-mass_zs = fit(ZScoreTransform, Float64.(penguins.body_mass_g))
-
-# Tidy up the data
-standardize(x) = (x .- mean(x)) ./ std(x)
-transform!(penguins, names(penguins, Real) .=> standardize => identity)
-transform!(penguins, :species => denserank => :species_idx)
-
-# Save the mapping from species index (integer) to species name (string)
-species_names = sort(unique(penguins[!, [:species, :species_idx]]), :species_idx).species
-
-# Define a model for penguin bill length as a function of species and body mass
-@model function bill_model(species, body_mass)
-    n_species = length(unique(species))
-    beta1 ~ filldist(Normal(0, 1), n_species)
-    beta2 ~ Normal(0, 1)
-    beta3 ~ filldist(Normal(0, 1), n_species)
-    sigma ~ Exponential(1)
-    mu = @. beta1[species] + beta2 * body_mass + beta3[species] * body_mass
-    bill_length_mm ~ MvNormal(mu, sigma)
-end
-nothing # hide
-```
-
-We model a penguin's bill length as a function of its species (`beta1`), its body mass (`beta2`), and the interaction between them (`beta3`), i.e., we ask "does the effect of body mass vary by species?".
-
-Next, we condition the model on the observed data and run MCMC.
-
-```@example pushforward
-prior_model = bill_model(penguins.species_idx, penguins.body_mass_g)
-cond_model = prior_model | (; bill_length_mm=penguins.bill_length_mm)
-chain = sample(cond_model, NUTS(0.8), MCMCThreads(), 1000, 4; progress=false)
-nothing # hide
-```
-
-A common starting point is to plot the posterior predictive distribution (see also [the Turing.jl docs](https://turinglang.org/docs/usage/predictive-distributions/) on this); it can help us (at least superficially) test if the model captured basic patterns in the input data.
-We can plot a summary histogram with uncertainty bands using [`pushforward_hist`](@ref FlexiChains.Makie.pushforward_hist).
-By specifying the `observed` keyword argument we can also overlay the observed data so that we can visually compare the two distributions.
-
-Before plotting, we can use [`transform_values`](@ref FlexiChains.transform_values) to unstandardise the predictions back to physical units (see [Modifying data](@ref modifying) for more details).
-
-```@example pushforward
-# Note that we pass the `prior_model` here, not the conditioned model, so that
-# we can sample new draws for the conditioned variables (i.e., bill length).
-# This is explained in the Turing docs linked above.
-ppd = predict(prior_model, chain)
-
-# Unstandardise the predicted and observed bill lengths
-using FlexiChains: transform_values
-ppd = transform_values(ppd, :bill_length_mm => (v -> reconstruct(bill_zs, v)))
-observed = reconstruct(bill_zs, penguins.bill_length_mm)
-
-FM.pushforward_hist(
-    ppd,
-    @varname(bill_length_mm);
-    observed=observed,
-    axis=(; xlabel="bill length (mm)"),
-)
-```
-
-We may also be interested in how predicted bill length changes with increasing body mass, and how this varies by species.
-For this, we can make use of [`pushforward_continuous`](@ref FlexiChains.Makie.pushforward_continuous) by feeding it a grid of body mass values.
-
-In the example below, we have set `sigma = 0` to drop the predictive uncertainty; we're interested only in the uncertainty of the means here.
-
-```@example pushforward
-# Set up the grid of body mass values and species indices
-pred_body_mass = repeat(range(-3, 3, length=50), outer=3)
-pred_species = repeat(1:3, inner=50)
-
-# For each draw of the parameters in the chain, compute the predicted
-# bill length for each combination of species and body mass.
-pred_model = fix(bill_model(pred_species, pred_body_mass), (; sigma=0))
-pred = predict(pred_model, chain)
-
-# Unstandardise the predicted means
-using FlexiChains: transform_values
-pred = transform_values(pred, :bill_length_mm => (v -> reconstruct(bill_zs, v)))
-
-# Plot the predicted means with uncertainty bands, coloured by species.
-fig = Figure()
-ax = Axis(fig[1, 1]; xlabel="body mass (g)", ylabel="bill length (mm)")
-colors = Makie.wong_colors()[1:3]
-for (s, color) in enumerate(colors)
-    ix = findall(==(s), pred_species)
-    x_grid = reconstruct(mass_zs, pred_body_mass[ix])
-    FM.pushforward_continuous!(
-        ax,
-        pred,
-        @varname(bill_length_mm[ix]);
-        x_grid=x_grid,
-        color=color,
-    )
-end
-axislegend(ax, [PolyElement(; color=c) for c in colors], species_names; position=:lt)
-
-fig
-```
-
-Finally, if we want to examine the distributions of discrete parameters, such as the main or interaction effect of species, we can use [`pushforward_discrete`](@ref FlexiChains.Makie.pushforward_discrete).
-Here, we'll look at the interaction effect to see if there's any evidence for the effect of body mass varying by species.
-
-```@example pushforward
-FM.pushforward_discrete(chain, @varname(beta3))
-```
-
 ```@docs
 FlexiChains.Makie.pushforward_continuous
 FlexiChains.Makie.pushforward_continuous!
@@ -420,8 +294,8 @@ Pass a vector of colours (one per chain) via the `color` keyword, or a categoric
 ```@example 1
 FM.traceplot(
     chn,
-    [@varname(x), @varname(y)];
-    color=[(:red, 0.6), (:blue, 0.6), (:green, 0.6)],
+    [@vn(float), @vn(int)];
+    color=[(:red, 0.6), (:blue, 0.6)],
     # or e.g. colormap=:tab10
 )
 Makie.save("custom_colors_makie.png", ans.figure); # hide

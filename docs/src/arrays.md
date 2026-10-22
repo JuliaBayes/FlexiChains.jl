@@ -17,12 +17,12 @@ It is easiest to explain by example (the docstring, which has all the necessary 
 Here is a simple example where each column in the array corresponds to a scalar parameter:
 
 ```@example fromarray
-using FlexiChains: FlexiChain, Parameter, Extra
+using FlexiChains: FlexiChain, Parameter, Extra, @vn, VarName
 
 arr = rand(10, 4, 3)   # 10 iterations, 4 chains, 3 parameters
-names = (Parameter(:x), Parameter(:y), Extra(:lp))  # note: must be tuple
+names = (Parameter(@vn(x)), Parameter(@vn(y)), Extra(:lp))  # note: must be tuple
 
-FlexiChain{Symbol}(arr, names)
+FlexiChain{VarName}(arr, names)
 ```
 
 For convenience, this constructor also allows you to specify parameters that are array-valued, by specifying their sizes.
@@ -32,18 +32,18 @@ In this example, the last four columns of `arr` will be interpreted as a single 
 arr = rand(10, 4, 6)   # 10 iterations, 4 chains, 6 (scalar) parameters
 
 names = (
-    Parameter(:x),            # Scalar
-    Parameter(:y),            # Scalar
-    Parameter(:z) => (2, 2),   # Matrix
+    Parameter(@vn(x)),            # Scalar
+    Parameter(@vn(y)),            # Scalar
+    Parameter(@vn(z)) => (2, 2),  # Matrix
 )
 
-chn = FlexiChain{Symbol}(arr, names)
+chn = FlexiChain{VarName}(arr, names)
 ```
 
 You can see the reshaped parameter `z` here
 
 ```@example fromarray
-chn[:z, iter=1, chain=1]
+chn[@vn(z), iter=1, chain=1]
 ```
 
 is derived from
@@ -63,11 +63,14 @@ using FlexiChains: DimArray
 
 # Create a chain from an array, much like above.
 arr = randn(10, 4, 6)   # 10 iterations, 4 chains, 6 parameters
-chn = FlexiChain{Symbol}(arr, (
-    Parameter(:x),            # Scalar
-    Parameter(:y),            # Scalar
-    Parameter(:z) => (2, 2),   # Matrix
-))
+chn = FlexiChain{VarName}(
+    arr,
+    (
+        Parameter(@vn(x)),            # Scalar
+        Parameter(@vn(y)),            # Scalar
+        Parameter(@vn(z)) => (2, 2),  # Matrix
+    ),
+)
 
 # Convert it back to an array.
 da = DimArray(chn)
@@ -88,7 +91,6 @@ Array(chn)
 ## Summaries
 
 `FlexiSummary` objects can also be converted *to* arrays: depending on how many of their dimensions were collapsed, the resulting array will have different dimensions.
-However, there is presently no way to convert an array into a `FlexiSummary`.
 
 ```@example fromarray
 using FlexiChains: summarystats
@@ -97,12 +99,20 @@ fs = summarystats(chn)
 da = DimArray(fs)
 ```
 
+However, there is presently no (exported) way to convert an array into a `FlexiSummary`.
+
+!!! note
+
+    If you really need to, you can use the `FlexiSummary` constructor to do so.
+    This is not public API so should not be relied on.
+    If you do use this, [please do let us know about your use case](https://github.com/JuliaBayes/FlexiChains.jl/issues) as it helps us decide whether to make this functionality public!
+
 ## Docstrings
 
 ```@docs
 FlexiChains.FlexiChain(::AbstractArray{T,3}, key_spec) where {T}
 DimensionalData.DimArray(::FlexiChains.FlexiChain)
+DimensionalData.DimArray
 Base.Array(::FlexiChains.FlexiChain)
-DimensionalData.DimArray(::FlexiChains.FlexiSummary)
-Base.Array(::FlexiChains.FlexiSummary)
+Base.Array
 ```

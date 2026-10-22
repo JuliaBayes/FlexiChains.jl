@@ -11,3 +11,5 @@ docs/package-lock.json
 
 test/plots/images/*_rec.png
 test/plots/images/*_diff.png
+
+test/ext/unid_model.so

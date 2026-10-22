@@ -8,15 +8,28 @@ This works with any model that Pigeons supports, including DynamicPPL models and
 
 ## Turing.jl models
 
-!!! warning "Compatibility"
+!!! warning "Versions and compatibility"
 
-    The current version of FlexiChains only works with DynamicPPL 0.41, whereas the current release of Pigeons only works with DynamicPPL 0.40.
-    To work around this, you can check out the code from [this PR](https://github.com/Julia-Tempering/Pigeons.jl/pull/442), which allows you to use DynamicPPL 0.41 (but **not** 0.42 yet).
+    There are a few tricky things to be aware of here.
+    **Firstly, if you are using Turing with FlexiChains, it's very likely that you are using FlexiChains v0.6.**
+    You should check this by inspecting your Project.toml or Manifest.toml: if this is indeed the case, please refer to [the v0.6 documentation](https://juliabayes.org/FlexiChains.jl/v0.6/pigeons).
+
+    Secondly, although Pigeons has had a compatibility patch for DynamicPPL 0.41/0.42 merged, this has not yet been released.
+    The current release of Pigeons.jl is not compatible with DynamicPPL v0.41 or v0.42, which are the versions currently used by Turing.jl.
+    Although Pigeons has had a compatibility patch for DynamicPPL 0.41/0.42 merged, this has not yet been released.
+
+!!! note "Must load DifferentiationInterface"
+
+    Note that Pigeons' DynamicPPL extension requires DifferentiationInterface as one of its triggers.
+    DI used to be a hard dependency of DynamicPPL, so this used to always be loaded, but [since DynamicPPL v0.42 it is no longer a dependency](https://github.com/TuringLang/DynamicPPL.jl/pull/1363).
+    This means that you must explicitly load DI to use the Pigeons extension, even though we don't call any of its functions directly.
 
 The following example uses a Turing model as the log-density function (the exact model is modified slightly from the [Pigeons docs](https://pigeons.run/stable/input-turing/)):
 
 ```@example pigeons
-using Pigeons, FlexiChains, Turing
+using Pigeons, FlexiChains, Distributions
+import DifferentiationInterface
+using DynamicPPL: @model, @varname, filldist
 
 @model function my_turing_model(n_trials, n_successes)
     p ~ filldist(Uniform(0, 1), 1, 2)
@@ -26,9 +39,7 @@ end
 ```
 
 When sampling, you have to specify `record=[traces]` so that the actual samples are stored in the returned `Pigeons.PT` struct.
-This object can then be converted to a `FlexiChain`.
-Specifically, with an underlying Turing model, a `VNChain` will be returned.
-This has all the usual benefits of a `FlexiChain`: for example, `p` is stored as a 1 × 2 matrix.
+This object can then be converted to a `FlexiChain{AbstractPPL.VarName}`.
 
 ```@example pigeons
 my_turing_target = TuringLogPotential(my_turing_model(100, 50))
@@ -48,8 +59,8 @@ chn = FlexiChains.from_pigeons(pt)
 
 ## Other models
 
-Sampling with other models also works, but will return a `SymChain` (i.e., `FlexiChain{Symbol}`) instead of `VNChain`.
-Here is another example lifted from the [Pigeons docs](https://pigeons.run/stable/input-julia), where a custom log-density function is used:
+Sampling with other models also works, and will return a `VNChain` (i.e., `FlexiChain{VarNames.VarName}`).
+Here is another example lifted from the [Pigeons docs](https://pigeons.run/stable/input-julia), where a custom log-density function is used.
 
 ```@example pigeons
 using Random
@@ -69,7 +80,11 @@ pt = pigeons(;
     reference=MyLogPotential(0, 0),
     record=[traces],
 )
+```
 
+By default, `from_pigeons` will return a `VNChain` with a single vector-valued parameter, `@vn(param)`:
+
+```@example pigeons
 chn = FlexiChains.from_pigeons(pt)
 ```
 

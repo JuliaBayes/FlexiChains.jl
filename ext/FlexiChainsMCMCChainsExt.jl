@@ -1,6 +1,6 @@
 module FlexiChainsMCMCChainsExt
 
-using FlexiChains: FlexiChains, FlexiChain, VarName, AbstractPPL, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, VarName, VarNames, Parameter, Extra
 using MCMCChains: MCMCChains
 using OrderedCollections: OrderedDict, OrderedSet
 
@@ -20,7 +20,7 @@ const MCSamplerStateKey = :samplerstate
 Convert an `MCMCChains.Chains` object to a `FlexiChain`.
 
 If `key_spec` is not provided, parameters in the `:parameters` section are stored as
-`Parameter{Symbol}` keys and all other sections (e.g. `:internals`) as `Extra{Symbol}` keys,
+`Parameter{Symbol}` keys and all other sections (e.g. `:internals`) as `Extra` keys,
 giving a `FlexiChain{Symbol}`.
 
 If `key_spec` is provided, it is passed directly to the `FlexiChain` from-array constructor.
@@ -97,7 +97,7 @@ function FlexiChains.from_mcmcchains(
         fill(missing, nc)
     end
 
-    TKey = _infer_key_type(key_spec)
+    TKey = FlexiChains._infer_key_type(key_spec)
     return FlexiChain{TKey}(
         arr,
         key_spec;
@@ -106,32 +106,6 @@ function FlexiChains.from_mcmcchains(
         sampling_time=sampling_time,
         last_sampler_state=last_sampler_state,
     )
-end
-
-function _infer_key_type(key_spec::Tuple)
-    T = Union{}
-    for k in key_spec
-        key = k isa Pair ? first(k) : k
-        if key isa Parameter
-            # Special-case VarName parameters to avoid overly narrow key types like
-            # `VarName{sym,Iden} where {sym}`, which can happen if you have [@varname(x),
-            # @varname(y)]. This causes issues when parameters like e.g. @varname(x[1]) are
-            # used later on, e.g. in _split_varnames.
-            Tnew = typeof(key).parameters[1]
-            Tnew = Tnew <: VarName ? VarName : Tnew
-            T = typejoin(T, Tnew)
-        end
-    end
-    return T
-end
-
-# I can't seem to get Base.@deprecate to work
-function FlexiChains.FlexiChain{Symbol}(chains::MCMCChains.Chains)
-    Base.depwarn(
-        "`FlexiChain{Symbol}(chains::MCMCChains.Chains)` is deprecated, use `FlexiChains.from_mcmcchains(chains)` instead.",
-        :FlexiChain,
-    )
-    return FlexiChains.from_mcmcchains(chains)
 end
 
 ############################
@@ -161,8 +135,8 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         else
             # Force conversion of keys to VarNames, so that we can split them up with
             # varname_and_value_leaves.
-            keys_as_vns = map(_to_varname, collect(Base.keys(d)))
-            iters = map(AbstractPPL.varname_and_value_leaves, keys_as_vns, Base.values(d))
+            keys_as_vns = map(FlexiChains._as_varname, collect(Base.keys(d)))
+            iters = map(VarNames.varname_and_value_leaves, keys_as_vns, Base.values(d))
             mapreduce(collect, vcat, iters)
         end
         nms = map(first, nms_and_vs)
@@ -233,8 +207,5 @@ function MCMCChains.Chains(fchain::FlexiChain{T}) where {T}
         iterations=parent(FlexiChains.iter_indices(fchain)),
     )
 end
-
-_to_varname(vn::VarName) = vn
-_to_varname(t) = VarName{Symbol(t)}()
 
 end # module

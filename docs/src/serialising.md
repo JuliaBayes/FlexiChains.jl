@@ -19,8 +19,7 @@ Here is an example with the standard library:
 ```@example serialization
 using FlexiChains, Serialization
 
-data = Dict(FlexiChains.Parameter(:x) => randn(100, 3))
-chn = FlexiChains.FlexiChain{Symbol}(100, 3, data)
+chn = FlexiChains.EXAMPLE_CHAIN
 ```
 
 ```@example serialization

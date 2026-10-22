@@ -2,6 +2,7 @@ module FCFlattenTests
 
 using FlexiChains:
     FlexiChains,
+    CollapseFunctionVec,
     FlexiChain,
     FlexiSummary,
     Parameter,
@@ -20,6 +21,8 @@ using OrderedCollections: OrderedDict
 using Statistics: mean, std
 using Test
 using FlexiChains: Tables
+
+const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
 
 @testset verbose = true "flatten.jl" begin
     @info "Testing flatten.jl"
@@ -158,7 +161,7 @@ using FlexiChains: Tables
         chain = FlexiChain{Symbol}(N_iters, N_chains, d)
 
         @testset "basic interface" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:both)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:both)
             da = DD.DimArray(fs; warn=false)
             @test da isa DD.DimMatrix
             @test collect(val(DD.dims(da, :param))) == [:a, :b]
@@ -210,7 +213,7 @@ using FlexiChains: Tables
         end
 
         @testset "dims=:both" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:both)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:both)
             da = DD.DimArray(fs; warn=false)
             @test size(da) == (2, 2)  # (stat, param)
             @test val(DD.dims(da, :stat)) == [:mean, :std]
@@ -235,7 +238,7 @@ using FlexiChains: Tables
         end
 
         @testset ":chain, :stat, :param" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:iter)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:iter)
             da = DD.DimArray(fs)
             @test DD.name(DD.dims(da)) == (
                 FlexiChains.CHAIN_DIM_NAME,
@@ -249,7 +252,7 @@ using FlexiChains: Tables
         end
 
         @testset ":iter, :stat, :param" begin
-            fs = FlexiChains.collapse(chain, [mean, std]; dims=:chain)
+            fs = FlexiChains.collapse(chain, MEAN_STD; dims=:chain)
             da = DD.DimArray(fs)
             @test DD.name(DD.dims(da)) == (
                 FlexiChains.ITER_DIM_NAME,
@@ -385,6 +388,25 @@ using FlexiChains: Tables
             @test nrow(df) == 5 * 1 * 2
         end
 
+        @testset "reserved column names error" begin
+            # Parameter names clashing with iter/chain columns
+            for name in (:iter, :chain)
+                d = OrderedDict(Parameter(name) => 1.0)
+                chn = FlexiChain{Symbol}(5, 1, fill(d, 5))
+                @test_throws ArgumentError Wide(chn)
+            end
+            # Stat names clashing with param/iter/chain columns
+            chn = FlexiChain{Symbol}(5, 2, OrderedDict(Parameter(:a) => rand(5, 2)))
+            for (name, dims) in ((:param, :both), (:iter, :chain), (:chain, :iter))
+                fs = FlexiChains.collapse(
+                    chn,
+                    [FlexiChains.CollapseFunctionVec(name, mean)];
+                    dims=dims,
+                )
+                @test_throws ArgumentError Wide(fs)
+            end
+        end
+
         @testset "Wide summary" begin
             N_iters, N_chains = 10, 2
             as = rand(N_iters, N_chains)
@@ -400,10 +422,10 @@ using FlexiChains: Tables
                 fs = mean(sc)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2
-                @test names(df) == ["param", "stat"]
+                @test names(df) == ["param", "mean"]
                 @test df.param == [:a, :b]
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param]
+                    @test row.mean ≈ fs[row.param]
                 end
             end
 
@@ -411,11 +433,11 @@ using FlexiChains: Tables
                 fs = mean(sc; dims=:iter)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_chains
-                @test names(df) == ["param", "chain", "stat"]
+                @test names(df) == ["param", "chain", "mean"]
                 @test df.param == repeat([:a, :b]; inner=N_chains)
                 @test df.chain == repeat(1:N_chains; outer=2)
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param, chain=At(row.chain)]
+                    @test row.mean ≈ fs[row.param, chain=At(row.chain)]
                 end
             end
 
@@ -423,16 +445,30 @@ using FlexiChains: Tables
                 fs = mean(sc; dims=:chain)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_iters
-                @test names(df) == ["param", "iter", "stat"]
+                @test names(df) == ["param", "iter", "mean"]
                 @test df.param == repeat([:a, :b]; inner=N_iters)
                 @test df.iter == repeat(1:N_iters; outer=2)
                 for row in eachrow(df)
-                    @test row.stat ≈ fs[row.param, iter=At(row.iter)]
+                    @test row.mean ≈ fs[row.param, iter=At(row.iter)]
+                end
+            end
+
+            @testset "single named stat with drop_stat_dim=true" begin
+                fs = FlexiChains.collapse(
+                    sc,
+                    [FlexiChains.CollapseFunctionVec(:mymean, mean)];
+                    dims=:both,
+                    drop_stat_dim=true,
+                )
+                df = DataFrame(Wide(fs))
+                @test names(df) == ["param", "mymean"]
+                for row in eachrow(df)
+                    @test row.mymean ≈ fs[row.param]
                 end
             end
 
             @testset "collapse(chain, [mean, std]; dims=:both) — named stat cols" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:both)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:both)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2
                 @test names(df) == ["param", "mean", "std"]
@@ -445,7 +481,7 @@ using FlexiChains: Tables
             end
 
             @testset "collapse(chain, [mean, std]; dims=:iter) — chain + named stats" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:iter)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:iter)
                 df = DataFrame(Wide(fs))
                 @test nrow(df) == 2 * N_chains
                 @test names(df) == ["param", "chain", "mean", "std"]
@@ -460,7 +496,7 @@ using FlexiChains: Tables
             end
 
             @testset "FlexiSummary directly as table source" begin
-                fs = FlexiChains.collapse(sc, [mean, std]; dims=:both)
+                fs = FlexiChains.collapse(sc, MEAN_STD; dims=:both)
                 df = DataFrame(fs)
                 df_wide = DataFrame(Wide(fs))
                 @test names(df) == names(df_wide)
@@ -489,17 +525,17 @@ using FlexiChains: Tables
                 @testset "split_varnames=true" begin
                     df = DataFrame(Wide(fs; split_varnames=true))
                     @test nrow(df) == 3
-                    @test names(df) == ["param", "stat"]
+                    @test names(df) == ["param", "mean"]
                     for row in eachrow(df)
-                        @test row.stat ≈ fs[row.param]
+                        @test row.mean ≈ fs[row.param]
                     end
                 end
                 @testset "split_varnames=false" begin
                     df = DataFrame(Wide(fs; split_varnames=false))
                     @test nrow(df) == 2
-                    @test names(df) == ["param", "stat"]
+                    @test names(df) == ["param", "mean"]
                     for row in eachrow(df)
-                        @test row.stat ≈ fs[row.param]
+                        @test row.mean ≈ fs[row.param]
                     end
                 end
             end

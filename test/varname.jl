@@ -2,7 +2,7 @@ module FCVarNameTests
 
 using FlexiChains:
     FlexiChains, FlexiChain, FlexiSummary, Parameter, Extra, VarName, @varname, Prefixed
-using AbstractPPL: Iden, @opticof
+using VarNames: Iden, @opticof
 using DimensionalData: DimensionalData as DD
 using OrderedCollections: OrderedDict
 using Statistics: mean
@@ -86,7 +86,7 @@ using Test
                 Parameter(@varname(a)) => 1.0,
                 Parameter(@varname(c)) => (x=4.0, y=5.0),
                 Parameter(@varname(b)) => [2.0, 3.0],
-                Extra("hello") => 3.0,
+                Extra(:hello) => 3.0,
             )
             chain = FlexiChain{VarName}(N_iters, 1, fill(d, N_iters))
             chain2, _ = FlexiChains._split_varnames(chain)
@@ -96,7 +96,7 @@ using Test
                 Parameter(@varname(c.y)),
                 Parameter(@varname(b[1])),
                 Parameter(@varname(b[2])),
-                Extra("hello"),
+                Extra(:hello),
             ])
         end
 
@@ -107,7 +107,7 @@ using Test
                 Parameter(:a) => 1.0,
                 Parameter(:c) => (x=4.0, y=5.0),
                 Parameter(:b) => [2.0, 3.0],
-                Extra("hello") => 3.0,
+                Extra(:hello) => 3.0,
             )
             chain = FlexiChain{Symbol}(N_iters, 1, fill(d, N_iters))
             chain2, _ = FlexiChains._split_varnames(chain)
@@ -117,7 +117,7 @@ using Test
                 Parameter(Symbol("c.y")),
                 Parameter(Symbol("b[1]")),
                 Parameter(Symbol("b[2]")),
-                Extra("hello"),
+                Extra(:hello),
             ])
         end
 
@@ -128,7 +128,7 @@ using Test
                 Parameter("a") => 1.0,
                 Parameter("c") => (x=4.0, y=5.0),
                 Parameter("b") => [2.0, 3.0],
-                Extra("hello") => 3.0,
+                Extra(:hello) => 3.0,
             )
             chain = FlexiChain{String}(N_iters, 1, fill(d, N_iters))
             chain2, _ = FlexiChains._split_varnames(chain)
@@ -138,7 +138,7 @@ using Test
                 Parameter("c.y"),
                 Parameter("b[1]"),
                 Parameter("b[2]"),
-                Extra("hello"),
+                Extra(:hello),
             ])
         end
 
@@ -154,7 +154,7 @@ using Test
                 d = OrderedDict(
                     Parameter(K(:a)) => 1.0,
                     Parameter(K(:b)) => 2.0,
-                    Extra("hello") => 3.0,
+                    Extra(:hello) => 3.0,
                 )
                 chain = FlexiChain{K}(N_iters, 1, fill(d, N_iters))
                 split_chain, _ = FlexiChains._split_varnames(chain)
