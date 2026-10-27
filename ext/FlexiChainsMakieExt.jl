@@ -125,7 +125,7 @@ _band_alpha(i, n_bands) = 0.2 + 0.7 * i / n_bands
 include("FlexiChainsMakieExt/pushforward_continuous.jl")
 include("FlexiChainsMakieExt/pushforward_discrete.jl")
 include("FlexiChainsMakieExt/pushforward_hist.jl")
-include("FlexiChainsMakieExt/ppc_density.jl")
+include("FlexiChainsMakieExt/ppc_plot.jl")
 include("FlexiChainsMakieExt/density.jl")
 include("FlexiChainsMakieExt/hist.jl")
 include("FlexiChainsMakieExt/mixeddensity.jl")

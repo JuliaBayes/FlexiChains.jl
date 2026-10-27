@@ -1,6 +1,6 @@
 # Unreleased
 
-Added `FlexiChains.Makie.ppc_density` (and its mutating version `ppc_density!`), which plots one kernel density curve per predictive draw and optionally overlays the density of the observations.
+Added `FlexiChains.Makie.ppc_plot` (and its mutating version `ppc_plot!`) for posterior predictive checks. For real-valued draws it plots one kernel density curve per predictive draw and optionally overlays the density of the observations; for integer-valued draws it plots a rootogram of the mean predicted frequency of each count value with a quantile interval, optionally overlaying the observed frequencies.
 
 # 0.6.42
 

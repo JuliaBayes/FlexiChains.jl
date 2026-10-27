@@ -400,7 +400,7 @@ We'll continue with the penguin example from above and reuse the predictive draw
 [`ppc_density`](@ref FlexiChains.Makie.ppc_density) plots a density per predictive draw (i.e., a hypothetical sample of penguins' `bill_length`s, based on the parameters in that draw), and overlays the `bill_length`s of the "real" penguins.
 
 ```@example pushforward
-FM.ppc_density(
+FM.ppc_plot(
     ppd,
     @varname(bill_length_mm);
     observed=observed,
@@ -409,8 +409,8 @@ FM.ppc_density(
 ```
 
 ```@docs
-FlexiChains.Makie.ppc_density
-FlexiChains.Makie.ppc_density!
+FlexiChains.Makie.ppc_plot
+FlexiChains.Makie.ppc_plot!
 ```
 
 ## [Customisation](@id makie-customisation)

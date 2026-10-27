@@ -147,6 +147,15 @@ function make_small_predictive_chain(rng)
 end
 small_predictive_chn = make_small_predictive_chain(StableRNG(404))
 
+binomial_counts(rng, dims...) =
+    [count(<(0.3), rand(rng, 10)) for _ in CartesianIndices(dims)]
+function make_count_chain(rng)
+    N_iters, N_chains, N_params = 150, 2, 40
+    return FlexiChain{Symbol}(binomial_counts(rng, N_iters, N_chains, N_params), :y_pred)
+end
+const COUNT_OBSERVED = binomial_counts(StableRNG(8), 40)
+count_chn = make_count_chain(StableRNG(505))
+
 const REFTEST_SPECS = [
     # MakieExt
     RefTestSpec(MakieBE(), "mtraceplot", () -> FC.Makie.traceplot(chn)),
@@ -280,16 +289,21 @@ const REFTEST_SPECS = [
     ),
 
     # Predictive checks
-    RefTestSpec(MakieBE(), "ppc_density", () -> FC.Makie.ppc_density(hist_chn, :y_pred)),
+    RefTestSpec(MakieBE(), "ppc_plot", () -> FC.Makie.ppc_plot(hist_chn, :y_pred)),
     RefTestSpec(
         MakieBE(),
-        "ppc_density_observed",
-        () -> FC.Makie.ppc_density(hist_chn, :y_pred; observed=HIST_OBSERVED),
+        "ppc_plot_observed",
+        () -> FC.Makie.ppc_plot(hist_chn, :y_pred; observed=HIST_OBSERVED),
     ),
     RefTestSpec(
         MakieBE(),
-        "ppc_density_all_draws",
-        () -> FC.Makie.ppc_density(small_predictive_chn, :y_pred; n_draws=nothing),
+        "ppc_plot_all_draws",
+        () -> FC.Makie.ppc_plot(small_predictive_chn, :y_pred; n_draws=nothing),
+    ),
+    RefTestSpec(
+        MakieBE(),
+        "ppc_plot_rootogram",
+        () -> FC.Makie.ppc_plot(count_chn, :y_pred; observed=COUNT_OBSERVED),
     ),
 ]
 

@@ -186,7 +186,7 @@ function bin_count_matrices(
     return counts
 end
 
-# Return draws to be plotted with `ppc_density`
+# Return draws to be plotted with `ppc_plot`
 function pooled_predictive_draws(chn::FlexiChain, param)
     sub, _ = subset_and_split_chain(chn, param)
     component_keys = collect(keys(sub))
@@ -209,7 +209,7 @@ function check_observed_length(observed, ncomponents::Integer)
     end
 end
 
-# Return indices of draws to be plotted with `ppc_density`
+# Return indices of draws to be plotted with `ppc_plot`
 function evenly_spaced_draw_indices(npooled::Integer, ndraws::Integer)
     ndraws >= 1 || throw(ArgumentError("`ndraws` must be at least 1; got $ndraws"))
     ndraws <= npooled || throw(
