@@ -24,6 +24,9 @@ If/when Turing migrates to using VarNames.jl, the two aliases can be unified.
 
 ## Pushforward plot functions
 
+Forest and pushforward plots now share default coverage levels of 66% and 89%.
+An informational message is shown when coverage is omitted; pass `levels` explicitly to choose it.
+
 The keyword arguments of the plotting functions to create pushforward visualisations (`pushforward_hist`, `pushforward_continuous`, `pushforward_discrete`) have been changed:
 
   - the `baseline` keyword argument has been deleted from `pushforward_continuous` and `pushforward_discrete`. As an alternative, we recommend using `lines!` or `scatter!` to overlay baseline values on the pushforward plot.

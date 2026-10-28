@@ -24,10 +24,13 @@ const DEFAULT_WIDTH = 400
 const DEFAULT_HEIGHT = 250
 
 function get_hdi_intervals end  # Overloaded in PosteriorStatsExt
-const DEFAULT_INTERVALS = (0.66, 0.95) # for forestplot
+const _DEFAULT_LEVELS = (0.66, 0.89)
 
-# for the pushforward plots
-const DEFAULT_LEVELS = [0.2, 0.4, 0.6, 0.8]
+# Keyword defaults call this only when the caller omits coverage.
+function _default_coverage(funcname, keyword, value)
+    @info "$funcname: `$keyword` keyword argument not provided. Consider explicitly specifying `$keyword` to control the interval width: the default value is $value."
+    return value
+end
 
 using ..FlexiChains:
     FlexiChain,
@@ -118,8 +121,8 @@ Sort `levels` (interval masses) so that index 1 is the widest, and return the so
 together with the vector of quantile probabilities needed to compute every band boundary
 plus the median. That vector is sorted ascending and always contains `0.5`.
 """
-function levels_to_quantile_probs(levels::AbstractVector{<:Real})
-    sorted_levels = sort(levels; rev=true)
+function levels_to_quantile_probs(levels)
+    sorted_levels = sort!(collect(levels); rev=true)
     bounds = level_to_quantile_bounds.(sorted_levels)
     probs = sort(vcat(0.5, first.(bounds), last.(bounds)))
     return sorted_levels, probs
@@ -345,7 +348,7 @@ struct FlexiChainForest{TKey}
         point=:median,
         interval=:quantile,
         hdi_method=:unimodal,
-        levels=DEFAULT_INTERVALS,
+        levels=_DEFAULT_LEVELS,
     ) where {TKey}
         point in (:mean, :median) ||
             throw(ArgumentError("point must be :mean or :median, got :$point"))

@@ -240,6 +240,23 @@ const REFTEST_SPECS = [
     ),
 ]
 
+@testset "explicit interval levels suppress the default notice" begin
+    for plot in (
+        (; kwargs...) -> FC.Makie.forestplot(chn; kwargs...),
+        (; kwargs...) -> FC.Makie.pushforward_continuous(
+            conn_chn,
+            :f_grid;
+            x_grid=CONN_XGRID,
+            kwargs...,
+        ),
+        (; kwargs...) -> FC.Makie.pushforward_discrete(disc_chn, :beta; kwargs...),
+        (; kwargs...) -> FC.Makie.pushforward_hist(hist_chn, :y_pred; nbins=20, kwargs...),
+    )
+        @test_logs (:info, r"default value is .*0\.66.*0\.89") plot()
+        @test_logs plot(; levels=[0.5])
+    end
+end
+
 @testset verbose = true "Reference tests" begin
     for spec in REFTEST_SPECS
         reftest(spec; update=UPDATE_REFIMAGES)

@@ -28,7 +28,7 @@ end
         point::Symbol=:median,
         interval::Symbol=:quantile,
         hdi_method::Symbol=:unimodal,
-        levels::Tuple=$(FC.PlotUtils.DEFAULT_INTERVALS),
+        levels=$(FC.PlotUtils._DEFAULT_LEVELS),
         pool_chains::Bool=false,
         kwargs...,
     )
@@ -51,8 +51,9 @@ $(FC.PlotUtils._PARAM_DOCSTRING("FlexiChains.Makie.forestplot"))
   `:unimodal`; please see [the PosteriorStats.jl documentation](@extref PosteriorStats.hdi)
   for details.
 
-- `levels`: a tuple of credible interval widths, e.g. `(0.5, 0.94)` for 50% and 94%
-  intervals. Wider intervals are drawn with thinner lines.
+- `levels`: a collection of interval masses in `(0, 1)`, e.g. `(0.5, 0.94)` for 50% and 94%
+  intervals. Defaults to `$(FC.PlotUtils._DEFAULT_LEVELS)`, matching the pushforward plots.
+  Wider intervals are drawn with thinner lines.
 
 - `pool_chains::Bool`: whether to pool data from all chains or plot each chain separately. Defaults to `false`.
 $(MAKIE_KWARGS_DOCSTRING)
@@ -63,7 +64,7 @@ function FC.Makie.forestplot(
     point::Symbol=:median,
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
-    levels=FC.PlotUtils.DEFAULT_INTERVALS,
+    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
     pool_chains::Bool=false,
     legend_position::Symbol=:bottom,
     figure=(;),
@@ -113,7 +114,7 @@ function FC.Makie.forestplot(
     chn::FC.FlexiChain,
     param_or_params;
     point::Symbol=:median,
-    levels=FC.PlotUtils.DEFAULT_INTERVALS,
+    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
     pool_chains::Bool=false,
@@ -144,7 +145,7 @@ function FC.Makie.forestplot!(
     chn::FC.FlexiChain,
     param_or_params;
     point::Symbol=:median,
-    levels=FC.PlotUtils.DEFAULT_INTERVALS,
+    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
     pool_chains::Bool=false,
