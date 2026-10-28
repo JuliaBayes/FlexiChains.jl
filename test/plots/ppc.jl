@@ -51,14 +51,14 @@ using StableRNGs: StableRNG
         @test fap isa Makie.FigureAxisPlot
         @test fap.plot isa Makie.Scatter
         @test nplots(fap, Makie.Scatter) == 2
-        @test nplots(fap, Makie.BarPlot) == 1
+        @test nplots(fap, Makie.Rangebars) == 1
         @test nplots(fap, Makie.Lines) == 0
         @test fap.axis.ylabel[] == "count"
 
-        interval_bars = only(filter(p -> p isa Makie.BarPlot, fap.axis.scene.plots))
+        interval_bars = only(filter(p -> p isa Makie.Rangebars, fap.axis.scene.plots))
         mean_dots = first(filter(p -> p isa Makie.Scatter, fap.axis.scene.plots))
-        upper_frequencies = last.(interval_bars[1][])
-        lower_frequencies = interval_bars.fillto[]
+        lower_frequencies = getindex.(interval_bars[1][], 2)
+        upper_frequencies = getindex.(interval_bars[1][], 3)
         mean_frequencies = last.(mean_dots[1][])
         @test all(lower_frequencies .<= mean_frequencies .<= upper_frequencies)
 
@@ -69,7 +69,7 @@ using StableRNGs: StableRNG
 
         fap_no_observed = FC.Makie.ppc_plot(int_chn, :y_pred)
         @test nplots(fap_no_observed, Makie.Scatter) == 1
-        @test nplots(fap_no_observed, Makie.BarPlot) == 1
+        @test nplots(fap_no_observed, Makie.Rangebars) == 1
 
         @test_throws "`observed` must contain integers when the draws of `param` are integers; got element type Float64" FC.Makie.ppc_plot(
             int_chn,

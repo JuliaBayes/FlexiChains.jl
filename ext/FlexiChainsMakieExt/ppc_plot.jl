@@ -8,14 +8,8 @@ Plots predictive draws of `param` against the `observed` values.
 
 This check is useful to detect if the model misrepresents (part of) the data-generating process.
 
-Chains are pooled before plotting. The type of plot depends on the element type of the draws:
-
-- Real-valued draws: one kernel density curve for each of `n_draws` deterministically selected draws.
-  If `observed` is given, its kernel density is overlaid in black.
-- Integer-valued draws: a rootogram. For each count value, a dot marks the mean predicted frequency
-  across all draws, and a narrow bar spans the central `level` quantile interval of the
-  predicted frequency in the same colour. If `observed` is given, its frequencies are drawn as black squares.
-  `observed` must then have an integer element type.
+Chains are pooled before plotting. The plot depends on the type of the samples: if you pass
+real-valued draws, the plot is a density curve and for integer-valued it is a rootogram.
 
 # Keyword arguments
 
@@ -25,8 +19,8 @@ Chains are pooled before plotting. The type of plot depends on the element type 
 - `level`: width of the predicted frequency interval (integer-valued draws only, default `0.95`)
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 
-Further keyword arguments are forwarded to `Makie.lines!` (real-valued draws) or `Makie.barplot!`
-(integer-valued draws).
+Further keyword arguments are forwarded to `Makie.lines!` or, for integer-valued draws, to
+`Makie.scatter!` and `Makie.rangebars!`.
 """
 function FC.Makie.ppc_plot(
     chn::FC.FlexiChain,
@@ -105,8 +99,8 @@ function plot_ppc!(
     observed;
     level=maximum(FC.PlotUtils.DEFAULT_INTERVALS),
     color=first(Makie.wong_colors()),
-    width=0.1,
-    markersize=14,
+    linewidth=4,
+    markersize=8,
     kwargs...,
 )
     if !isnothing(observed)
@@ -125,35 +119,32 @@ function plot_ppc!(
     lower_frequencies = map(f -> FC.quantile(f, lower_prob), frequencies_per_value)
     upper_frequencies = map(f -> FC.quantile(f, 1 - lower_prob), frequencies_per_value)
 
-    Makie.barplot!(
-        ax,
-        count_values,
-        upper_frequencies;
-        fillto=lower_frequencies,
-        width=width,
-        color=color,
-        kwargs...,
-    )
     p = Makie.scatter!(
         ax,
         count_values,
         mean_frequencies;
-        color=:white,
-        strokecolor=color,
-        strokewidth=3,
+        color=color,
+        marker=:diamond,
         markersize=markersize,
         label="predicted",
+    )
+    Makie.rangebars!(
+        ax,
+        count_values,
+        lower_frequencies,
+        upper_frequencies;
+        color=(color, 0.3),
+        linewidth=linewidth,
+        whiskerwidth=0,
+        kwargs...,
     )
     if !isnothing(observed)
         p = Makie.scatter!(
             ax,
             count_values,
             StatsBase.counts(observed, count_values);
-            color=:white,
-            strokecolor=:black,
-            strokewidth=2.5,
-            marker=:rect,
-            markersize=markersize - 1,
+            color=:black,
+            markersize=2 * markersize / 3,
             label="observed",
         )
         axislegend(ax, merge=true, unique=true)
