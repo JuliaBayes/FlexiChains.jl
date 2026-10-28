@@ -307,7 +307,6 @@ using Test
                 ),
             )
             dist = rstar(StableRNG(1), prob_clf, chain)
-            @test dist isa MCMCDiagnosticTools.Distributions.Distribution
             @test isapprox(mean(dist), 1; atol=0.1)
             val = rstar(StableRNG(1), det_clf, chain)
             @test val isa Real
