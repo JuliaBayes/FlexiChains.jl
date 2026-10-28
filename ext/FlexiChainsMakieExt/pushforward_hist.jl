@@ -5,7 +5,11 @@ function _plot_pushforward_hist!(
     stacked_data;  # niters x nchains x nparams
     observed=nothing,
     nbins::Integer=25,
-    levels=FC.PlotUtils._default_coverage("pushforward_hist", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "pushforward_hist",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     color=Makie.Cycled(1),
     alpha_limits=(0.15, 0.85),
     kwargs...,

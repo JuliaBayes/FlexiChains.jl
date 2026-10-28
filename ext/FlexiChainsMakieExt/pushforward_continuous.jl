@@ -39,7 +39,11 @@ function FC.Makie.pushforward_continuous!(
     chn::FC.FlexiChain,
     param;
     x_grid,
-    levels=FC.PlotUtils._default_coverage("pushforward_continuous", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "pushforward_continuous",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     color=Makie.Cycled(1),
     alpha_limits=(0.15, 0.85),
     kwargs...,

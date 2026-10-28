@@ -64,7 +64,11 @@ function FC.Makie.forestplot(
     point::Symbol=:median,
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
-    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "forestplot",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     pool_chains::Bool=false,
     legend_position::Symbol=:bottom,
     figure=(;),
@@ -114,7 +118,11 @@ function FC.Makie.forestplot(
     chn::FC.FlexiChain,
     param_or_params;
     point::Symbol=:median,
-    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "forestplot",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
     pool_chains::Bool=false,
@@ -145,7 +153,11 @@ function FC.Makie.forestplot!(
     chn::FC.FlexiChain,
     param_or_params;
     point::Symbol=:median,
-    levels=FC.PlotUtils._default_coverage("forestplot", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "forestplot",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     interval::Symbol=:quantile,
     hdi_method::Symbol=:unimodal,
     pool_chains::Bool=false,

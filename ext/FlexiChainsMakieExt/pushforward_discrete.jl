@@ -9,7 +9,11 @@ end
 function _plot_pushforward_discrete!(
     ax::Makie.Axis,
     sub::FC.FlexiChain;
-    levels=FC.PlotUtils._default_coverage("pushforward_discrete", :levels, FC.PlotUtils._DEFAULT_LEVELS),
+    levels=FC.PlotUtils._default_coverage(
+        "pushforward_discrete",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     color=Makie.Cycled(1),
     vertical::Bool=true,
     alpha_limits=(0.15, 0.85),
