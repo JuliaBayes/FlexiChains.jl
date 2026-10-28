@@ -159,6 +159,7 @@ function MCMCDiagnosticTools.discretediag(
     warn::Bool=true,
     kwargs...,
 ) where {TKey}
+    nchains(chain) >= 2 || throw(ArgumentError("discretediag requires at least 2 chains"))
     dimarr = DD.DimArray(chain; warn=warn, eltype_filter=Integer, parameters_only=true)
     between_vals, within_vals = MCMCDiagnosticTools.discretediag(parent(dimarr); kwargs...)
     kept_keys = DD.lookup(dimarr, :param)
