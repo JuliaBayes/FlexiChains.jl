@@ -45,9 +45,6 @@ VarNames = "09a315b2-63fc-4165-8d7f-d59368e770cc"
 [sources]
 FlexiChains = {path = ".."}
 
-[sources]
-FlexiChains = {path = ".."}
-
 [compat]
 AbstractMCMC = "5.14"
 AdvancedHMC = "0.8.3"
