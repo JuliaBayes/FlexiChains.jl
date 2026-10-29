@@ -54,7 +54,7 @@ function FC.Makie.pushforward_continuous!(
     if length(x_grid) != n
         throw(
             ArgumentError(
-                "length of `x_grid` $(length(x_grid)) must match number of `params` ($n)",
+                "length of `x_grid` ($(length(x_grid))) must match number of plotted components ($n)",
             ),
         )
     end
