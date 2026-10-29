@@ -269,17 +269,21 @@ FlexiChains.Makie.pushforward_hist!
 
 The plots in this section follow the same idea as the `pushforward` plots above, namely that if our model fits the data well, we should be able to use it to predict new data that look reasonably similarly to those we first observed.
 
-We'll continue with the penguin example from above and reuse the predictive draws in `ppd`.
+For this example, we simulate predictive draws and observed values from a standard normal distribution.
+Each predictive draw contains 30 values.
 
-[`ppc_density`](@ref FlexiChains.Makie.ppc_density) plots a density per predictive draw (i.e., a hypothetical sample of penguins' `bill_length`s, based on the parameters in that draw), and overlays the `bill_length`s of the "real" penguins.
+[`ppc_plot`](@ref FlexiChains.Makie.ppc_plot) plots a density per predictive draw and overlays the density of the observed values.
 
-```@example pushforward
-FM.ppc_plot(
-    ppd,
-    @varname(bill_length_mm);
-    observed=observed,
-    axis=(; xlabel="bill length (mm)"),
-)
+```@example ppc
+using FlexiChains, CairoMakie
+using FlexiChains: FlexiChain
+using Random: Xoshiro
+import FlexiChains.Makie as FM
+
+rng = Xoshiro(1)
+ppd = FlexiChain{VarName}(randn(rng, 100, 2, 30), @vn(y))
+observed = randn(rng, 30)
+FM.ppc_plot(ppd, @vn(y); observed=observed)
 ```
 
 ```@docs
