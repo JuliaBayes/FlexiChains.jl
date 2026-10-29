@@ -1,8 +1,7 @@
-# No title: pushforward_continuous plots an array variable as a whole, not a single leaf.
 _default_pushforward_continuous_axis() = (xlabel="index", ylabel="value")
 
 """
-    FlexiChains.Makie.pushforward_continuous(chn, param_or_params; x_grid=nothing; kwargs...)
+    FlexiChains.Makie.pushforward_continuous(chn, param_or_params; x_grid, kwargs...)
 
 Plot the marginal posterior of each component of an array parameter as a quantile ribbon,
 forming a "function envelope" over `x_grid`. Useful for visualising how a functional
@@ -12,8 +11,7 @@ This is a port of [Michael Betancourt's
 `plot_conn_pushforward_quantiles`](https://github.com/betanalpha/mcmc_visualization_tools).
 
 # Keyword arguments
-- `x_grid`: the x-values to plot against. Defaults to `1:N`, where `N` is the number of
-  components being plotted.
+- `x_grid`: the x-values to plot against.
 - `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
 - `alpha_limits`: a tuple of two values specifying the lower and upper limit of
@@ -56,7 +54,7 @@ function FC.Makie.pushforward_continuous!(
     if length(x_grid) != n
         throw(
             ArgumentError(
-                "connquantile: length of `x_grid` ($(length(x_grid))) must match number of components ($n)",
+                "length of `x_grid` $(length(x_grid)) must match number of `params` ($n)",
             ),
         )
     end
