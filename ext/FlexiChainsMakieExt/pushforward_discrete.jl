@@ -60,6 +60,7 @@ This function is a port of [Michael Betancourt's
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
 - `alpha_limits`: a tuple of two values specifying the lower and upper limit of
   alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
+  Defaults to `(0.15, 0.85)`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_discrete(
@@ -68,7 +69,6 @@ function FC.Makie.pushforward_discrete(
     figure=(;),
     axis=(;),
     vertical::Bool=true,
-    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     fig = isempty(figure) ? Figure() : Figure(; figure...)
@@ -82,7 +82,6 @@ function FC.Makie.pushforward_discrete!(
     chn::FC.FlexiChain,
     param;
     vertical::Bool=true,
-    alpha_limits=(0.15, 0.85),
     kwargs...,
 )
     sub, plot_names = FC.PlotUtils.subset_and_split_chain(chn, param)
