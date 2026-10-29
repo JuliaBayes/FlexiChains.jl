@@ -1,6 +1,6 @@
 # 0.8
 
-## Plotting coverage defaults
+## Breaking changes
 
 Forest and pushforward plots now share default coverage levels of 66% and 89%.
 An informational message is shown when coverage is omitted; pass `levels` explicitly to choose it.
