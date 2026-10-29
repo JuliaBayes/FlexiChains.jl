@@ -9,7 +9,11 @@ end
 function _plot_pushforward_discrete!(
     ax::Makie.Axis,
     sub::FC.FlexiChain;
-    levels=FC.PlotUtils.DEFAULT_LEVELS,
+    levels=FC.PlotUtils._default_coverage(
+        "pushforward_discrete",
+        :levels,
+        FC.PlotUtils._DEFAULT_LEVELS,
+    ),
     color=Makie.Cycled(1),
     vertical::Bool=true,
     alpha_limits=(0.15, 0.85),
@@ -56,8 +60,9 @@ This function is a port of [Michael Betancourt's
 
 # Keyword arguments
 - `vertical`: if `true`, bars are vertical; otherwise horizontal. Defaults to `true`.
-- `levels`: vector of interval masses in `(0, 1)`, e.g. `[0.95]` for the central 95% interval.
-  One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
+- `levels`: a collection of interval masses in `(0, 1)`, e.g. `[0.95]` for the central
+  95% interval.
+  One nested band is drawn per level. Defaults to `$(FC.PlotUtils._DEFAULT_LEVELS)`.
 - `alpha_limits`: a tuple of two values specifying the lower and upper limit of
   alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.

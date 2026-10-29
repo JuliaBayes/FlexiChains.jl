@@ -1,3 +1,10 @@
+# 0.8
+
+## Breaking changes
+
+Forest and pushforward plots now share default coverage levels of 66% and 89%.
+An informational message is shown when coverage is omitted; pass `levels` explicitly to choose it.
+
 # 0.7
 
 v0.7 is a fairly large release of FlexiChains containing breaking changes.

@@ -63,11 +63,8 @@ function PosteriorStats.hdi(
     split_interval::Bool=true,
     kwargs...,
 ) where {TKey}
-    # Emit a message if `prob` is not passed since PosteriorStats intentionally chooses an
-    # 'unconventional' default value for `prob` to force users to be explicit about the
-    # interval width.
     if !haskey(kwargs, :prob)
-        @info "PosteriorStats.hdi: `prob` keyword argument not provided. Consider explicitly specifying `prob` to control the interval width: the default value is 0.89."
+        FlexiChains.PlotUtils._default_coverage("PosteriorStats.hdi", :prob, 0.89)
     end
     fs = FlexiChains.collapse(
         chn,
@@ -99,11 +96,8 @@ function PosteriorStats.eti(
     split_interval::Bool=true,
     kwargs...,
 ) where {TKey}
-    # Emit a message if `prob` is not passed since PosteriorStats intentionally chooses an
-    # 'unconventional' default value for `prob` to force users to be explicit about the
-    # interval width.
     if !haskey(kwargs, :prob)
-        @info "PosteriorStats.eti: `prob` keyword argument not provided. Consider explicitly specifying `prob` to control the interval width: the default value is 0.89."
+        FlexiChains.PlotUtils._default_coverage("PosteriorStats.eti", :prob, 0.89)
     end
     fs = FlexiChains.collapse(
         chn,
