@@ -5,8 +5,8 @@ using Pkg: Pkg
 Pkg.develop(Pkg.PackageSpec(; path=dirname(@__DIR__)))
 
 using Documenter
+using DocumenterCodeBlocks
 using DocumenterInterLinks
-using DocumenterVitepress
 
 using FlexiChains
 
@@ -25,10 +25,11 @@ using Pigeons: Pigeons
 using Plots: Plots
 using PosteriorDB: PosteriorDB
 using PosteriorStats: PosteriorStats
+using StanSample: StanSample
 using Statistics: Statistics
 using StatsBase: StatsBase
 using StatsPlots: StatsPlots
-using Turing: Turing
+using VarNames: VarNames
 
 links = InterLinks(
     "AdvancedHMC" => "https://turinglang.org/AdvancedHMC.jl/stable/",
@@ -40,6 +41,7 @@ links = InterLinks(
     "Plots" => "https://docs.juliaplots.org/stable/",
     "StatsBase" => "https://juliastats.org/StatsBase.jl/stable/",
     "Julia" => "https://docs.julialang.org/en/v1/",
+    "VarNames" => "https://juliabayes.org/VarNames.jl/stable/",
 )
 
 modules = [
@@ -55,6 +57,7 @@ modules = [
     Base.get_extension(FlexiChains, :FlexiChainsPosteriorStatsDynamicPPLExt),
     Base.get_extension(FlexiChains, :FlexiChainsPosteriorStatsExt),
     Base.get_extension(FlexiChains, :FlexiChainsRecipesBaseExt),
+    Base.get_extension(FlexiChains, :FlexiChainsStanSampleExt),
     Base.get_extension(FlexiChains, :FlexiChainsStatsPlotsExt),
 ]
 
@@ -62,26 +65,18 @@ modules = [
 old_GKSwstype = get(ENV, "GKSwstype", nothing)
 ENV["GKSwstype"] = "100"
 
-GITHUB_REPO = "github.com/JuliaBayes/FlexiChains.jl"
-PAGES_BRANCH = "gh-pages"
-DEV_BRANCH = "main"
-
 makedocs(;
     sitename="FlexiChains.jl",
-    format=DocumenterVitepress.MarkdownVitepress(
-        repo=GITHUB_REPO,
-        devbranch=DEV_BRANCH,
-        devurl="dev",
-    ),
+    format=Documenter.HTML(; assets=["assets/custom.css"]),
     modules=modules,
     pages=[
         "index.md",
         "Usage" => [
             "datastructure.md",
             "indexing.md",
-            "samples.md",
             "summarising.md",
             "arrays.md",
+            "samples.md",
             "modifying.md",
             "serialising.md",
             "Plotting" => ["plotting.md", "makie.md", "plots.md", "aog.md"],
@@ -90,7 +85,7 @@ makedocs(;
             "advancedhmc.md",
             "arviz.md",
             "custom_sampler.md",
-            "MCMCChains.jl" => ["mcmcchains.md", "migration.md"],
+            "mcmcchains.md",
             "montecarlomeasurements.md",
             "pairplots.md",
             "parallelmcmc.md",
@@ -101,21 +96,26 @@ makedocs(;
             "tables.md",
             "turing.md",
         ],
-        "About" => ["contributing.md", "why.md", "whynot.md"],
+        "About" => ["contributing.md", "library_authors.md"],
         "api.md",
     ],
     checkdocs=:exports,
     warnonly=false,
     doctest=false,
-    plugins=[links],
+    plugins=[CodeBlocks(), links],
 )
 
-DocumenterVitepress.deploydocs(;
-    repo=GITHUB_REPO,
-    target=joinpath(@__DIR__, "build"),
-    branch=PAGES_BRANCH,
-    devbranch=DEV_BRANCH,
+# For PR previews, pass `versions=nothing` so that Documenter only writes to
+# previews/PR###/ and doesn't regenerate versions.js, index.html, or the version
+# symlinks at the root of gh-pages. Otherwise a preview deploy replaces the
+# VitePress-built `stable/` folder (v0.6 and earlier) with a symlink to `v0.6`,
+# which VitePress can't serve because its base path is baked into the build.
+is_preview = get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
+Documenter.deploydocs(;
+    repo="github.com/JuliaBayes/FlexiChains.jl",
+    target="build",
     push_preview=true,
+    (is_preview ? (; versions=nothing) : (;))...,
 )
 
 # Restore original environment variable

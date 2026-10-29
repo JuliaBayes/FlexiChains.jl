@@ -1,7 +1,7 @@
 module FlexiChainsPigeonsExt
 
 using Pigeons: Pigeons
-using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, VarName, @vn, Parameter, Extra
 
 """
     FlexiChains.from_pigeons(pt::Pigeons.PT)
@@ -13,8 +13,21 @@ samples can be obtained. If this was not included, then this function will error
 
 The output type depends on the kind of model sampled from:
 
-- DynamicPPL models will produce `VNChain`, i.e., `FlexiChain{VarName}`.
-- Other models will produce `SymChain`, i.e., `FlexiChain{Symbol}`
+- DynamicPPL models will produce `FlexiChain{AbstractPPL.VarName}`.
+- Other models will produce `VNChain`, i.e., `FlexiChain{VarNames.VarName}`.
+
+## Other models
+
+For non-DynamicPPL models, the parameter names are taken from Pigeons:
+
+- If the target does not provide parameter names, Pigeons generates the names `param_1`,
+  `param_2`, etc. In this case, all the parameters are combined into a single
+  vector-valued parameter, `@vn(param)`.
+- Otherwise (e.g. for Stan models), each name that Pigeons returns becomes its own
+  parameter. For example, a Stan model with parameters `p1` and `p2` will give a chain with
+  `@vn(p1)` and `@vn(p2)`.
+
+In both cases, the log-density is stored as `Extra(:log_density)`.
 
 ## DynamicPPL models
 
@@ -62,11 +75,11 @@ function FlexiChains._internal_from_pigeons(pt::Pigeons.PT, ::Any)
     # a hack because we are essentially reverse-engineering Pigeons's default, but there
     # isn't really any other way to do it.
     ks = if all(i -> param_names[i] == Symbol("param_$i"), 1:nparams)
-        (Parameter(:param) => (nparams,), Extra(:log_density))
+        (Parameter(@vn(param)) => (nparams,), Extra(:log_density))
     else
-        (Parameter.(param_names)..., Extra(:log_density))
+        (map(n -> Parameter(VarName{n}()), param_names)..., Extra(:log_density))
     end
-    return FlexiChain{Symbol}(sarr, ks)
+    return FlexiChain{VarName}(sarr, ks)
 end
 
 end # module

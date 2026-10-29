@@ -8,19 +8,13 @@ FlexiChains implements a Tables.jl interface which allows you to easily convert 
 
 In fact, FlexiChains implements *two* different Tables.jl interfaces for chains which produce wide-format and long-format tables respectively.
 
-This is best demonstrated with an example.
-First let's sample a chain as usual:
+This is best demonstrated with our example chain.
+However, we'll cut down the eight schools to just two:
 
 ```@example tables
-using FlexiChains, DynamicPPL, LinearAlgebra, Distributions
+using FlexiChains
 
-@model function f()
-    x ~ Normal(10.0)
-    y ~ Bernoulli()
-    z ~ MvNormal(zeros(2), I)
-end
-
-chn = FlexiChains._make_prior_chain(f(), 4, 2)
+chn = FlexiChains.transform_values(FlexiChains.EXAMPLE_CHAIN, @vn(theta) => (x -> x[1:2]))
 ```
 
 ### Wide format
@@ -47,7 +41,7 @@ To get a long-format `DataFrame`, you can wrap the chain in [`Long`](@ref):
 DataFrame(Long(chn))
 ```
 
-Notice, though, that this promotes `y` to `Float64`, because all parameter values are stored in a single column.
+Although this isn't on display here, you should be aware that this will promote parameters to a common type (most often `Float64`), because all parameter values must be stored in a single column.
 
 Both the [`Wide`](@ref) and [`Long`](@ref) wrapper structs accept keyword arguments which determine whether array-valued parameters (like `z`) are split up, and whether or not to include the `Extra` keys in the chain as well.
 
@@ -75,7 +69,7 @@ Like for `FlexiChain`, the `Wide` wrapper is the default Tables.jl implementatio
     DataFrame(w)
     ```
 
-    Notice how `z[1]` and `z[2]` are already split up despite the `split_varnames=false` argument.
+    Notice how `theta[1]` and `theta[2]` are already split up despite the `split_varnames=false` argument.
     If you want to prevent this, you need to specify `split_varnames=false` at the summary step as well:
 
     ```@example tables

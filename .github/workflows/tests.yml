@@ -37,9 +37,6 @@ jobs:
           # Minimum supported version
           - version: 'min'
             os: ubuntu-latest
-          # Prerelease
-          - version: 'pre'
-            os: ubuntu-latest
           # 1.11
           - version: '1.11'
             os: ubuntu-latest

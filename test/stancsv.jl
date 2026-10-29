@@ -1,6 +1,6 @@
 module FlexiChainsStanCSVTests
 
-using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra
+using FlexiChains: FlexiChains, FlexiChain, Parameter, Extra, VarName, @vn
 using DimensionalData: DimensionalData as DD
 using Test
 
@@ -56,6 +56,42 @@ const STAN_CSV_PATHS = ["$(STAN_BASE)_$(i).csv" for i in 1:4]
     @testset "with subset of chains" begin
         chn = FlexiChains.from_stan_csv(STAN_CSV_PATHS[1:2])
         @test size(chn) == (10, 2)
+    end
+
+    @testset "with key_spec" begin
+        ks = (
+            Extra(:lp),
+            Extra(:accept_stat),
+            Extra(:stepsize),
+            Extra(:treedepth),
+            Extra(:n_leapfrog),
+            Extra(:divergent),
+            Extra(:energy),
+            Parameter(@vn(theta)) => (8,),
+            Parameter(@vn(mu)),
+            Parameter(@vn(tau)),
+            Parameter(@vn(muplus1)),
+        )
+        chn_sym = FlexiChains.from_stan_csv(STAN_CSV_PATHS)
+        chn = FlexiChains.from_stan_csv(STAN_CSV_PATHS, ks)
+        @test chn isa FlexiChain{VarName}
+        @test size(chn) == (10, 4)
+        @test collect(FlexiChains.parameters(chn)) ==
+              [@vn(theta), @vn(mu), @vn(tau), @vn(muplus1)]
+        for i in 1:8
+            @test chn[@vn(theta[i])] == chn_sym[Symbol("theta.$i")]
+        end
+        @test chn[@vn(mu)] == chn_sym[:mu]
+        @test chn[Extra(:lp)] == chn_sym[Extra(:lp)]
+        # Metadata is preserved
+        @test FlexiChains.iter_indices(chn) == FlexiChains.iter_indices(chn_sym)
+        @test isequal(FlexiChains.sampling_time(chn), FlexiChains.sampling_time(chn_sym))
+
+        # Also works with base_path
+        @test isequal(FlexiChains.from_stan_csv(STAN_BASE, 4, ks), chn)
+
+        # Wrong number of columns
+        @test_throws ArgumentError FlexiChains.from_stan_csv(STAN_CSV_PATHS, ks[1:(end-1)])
     end
 
     @testset "error handling" begin

@@ -39,6 +39,7 @@ include("interface/samples.jl")
 include("interface/rand.jl")
 include("interface/transform.jl")
 include("varname.jl")
+include("example_chain.jl")
 include("flatten.jl")
 include("conversions.jl")
 include("stancsv.jl")
@@ -49,16 +50,20 @@ const _LOGPRIOR_KEY = Extra(:logprior)
 const _LOGLIKELIHOOD_KEY = Extra(:loglikelihood)
 
 # Extended in PosteriorDB extension (but not exported)
-function from_posteriordb_ref end
-@public from_posteriordb_ref
+function from_posteriordb end
+@public from_posteriordb
 include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
-include("plots/shims.jl")
 
 # Extended in MCMCChains extension
 function from_mcmcchains end
 @public from_mcmcchains
+
+# Extended in DynamicPPL extension
+function upgrade end
+function downgrade end
+@public upgrade, downgrade
 
 # Extended in Pigeons extension
 function from_pigeons end
@@ -66,17 +71,24 @@ function from_pigeons end
 function _internal_from_pigeons end
 function _faithful_sample_array end
 
+# Extended in StanSample extension
+function from_stansample end
+@public from_stansample
+
 # Convenience re-exports.
 export Wide, Long
+using VarNames: parameters, extras
+export parameters, extras
 using DimensionalData: At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
 export At, Near, Contains, (..), Touches, Where, Not, DimArray, Begin, End
-using Statistics: mean, median, std, var, quantile
-export mean, median, std, var, quantile
-using StatsBase: summarystats, mad
-export summarystats, mad
+using Statistics: mean, median, std, var, quantile, cor
+export mean, median, std, var, quantile, cor
+using StatsBase: summarystats, mad, autocor
+export summarystats, mad, autocor
 using MCMCDiagnosticTools:
-    ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
-export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi
+    ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
+export ess, rhat, mcse, gelmandiag, gelmandiag_multivariate, discretediag, bfmi, rstar
+export changerate
 
 """
     VNChain
@@ -92,7 +104,8 @@ Alias for `FlexiChain{Symbol}`.
 """
 const SymChain = FlexiChain{Symbol}
 
-export VarName, @varname, VNChain, SymChain
+# Don't export @varname to avoid clashes with Turing
+export VarName, @vn, VNChain, SymChain
 
 # Test utils, overloaded in DynamicPPLExt.
 function _make_prior_chain end
