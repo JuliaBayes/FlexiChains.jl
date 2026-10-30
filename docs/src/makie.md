@@ -265,6 +265,32 @@ FlexiChains.Makie.pushforward_hist
 FlexiChains.Makie.pushforward_hist!
 ```
 
+## [Predictive checks](@id ppc-plots)
+
+The plots in this section follow the same idea as the `pushforward` plots above, namely that if our model fits the data well, we should be able to use it to predict new data that look reasonably similarly to those we first observed.
+
+For this example, we simulate predictive draws and observed values from a standard normal distribution.
+Each predictive draw contains 30 values.
+
+[`ppc_plot`](@ref FlexiChains.Makie.ppc_plot) plots a density per predictive draw and overlays the density of the observed values.
+
+```@example ppc
+using FlexiChains, CairoMakie
+using FlexiChains: FlexiChain
+using Random: Xoshiro
+import FlexiChains.Makie as FM
+
+rng = Xoshiro(1)
+ppd = FlexiChain{VarName}(randn(rng, 100, 2, 30), @vn(y))
+observed = randn(rng, 30)
+FM.ppc_plot(ppd, @vn(y); observed=observed)
+```
+
+```@docs
+FlexiChains.Makie.ppc_plot
+FlexiChains.Makie.ppc_plot!
+```
+
 ## [Customisation](@id makie-customisation)
 
 As described in the [general interface section above](@ref makie-interface), all of the above functions accept keyword arguments to control the appearance of the plot.
