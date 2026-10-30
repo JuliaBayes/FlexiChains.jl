@@ -60,6 +60,10 @@ include("plots/makie.jl")
 function from_mcmcchains end
 @public from_mcmcchains
 
+# Extended in EnsembleMCMC extension
+function from_ensemblemcmc end
+@public from_ensemblemcmc
+
 # Extended in DynamicPPL extension
 function upgrade end
 function downgrade end
