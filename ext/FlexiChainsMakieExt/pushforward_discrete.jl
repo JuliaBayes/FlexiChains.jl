@@ -12,7 +12,7 @@ function _plot_pushforward_discrete!(
     levels=FC.PlotUtils.DEFAULT_LEVELS,
     color=Makie.Cycled(1),
     vertical::Bool=true,
-    alpha_limits=(0.15, 0.85),
+    alpha_limits=DEFAULT_ALPHA_LIMS,
     kwargs...,
 )
     sorted_levels, probs = FC.PlotUtils.levels_to_quantile_probs(levels)
@@ -60,7 +60,7 @@ This function is a port of [Michael Betancourt's
   One nested band is drawn per level. Defaults to `$(FC.PlotUtils.DEFAULT_LEVELS)`.
 - `alpha_limits`: a tuple of two values specifying the lower and upper limit of
   alpha values that the quantile ribbons should span. Values must be sorted and in `[0, 1]`.
-  Defaults to `(0.15, 0.85)`.
+  Defaults to `$DEFAULT_ALPHA_LIMS`.
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 """
 function FC.Makie.pushforward_discrete(
