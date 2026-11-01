@@ -123,6 +123,7 @@ end
 include("FlexiChainsMakieExt/pushforward_continuous.jl")
 include("FlexiChainsMakieExt/pushforward_discrete.jl")
 include("FlexiChainsMakieExt/pushforward_hist.jl")
+include("FlexiChainsMakieExt/ppc_plot.jl")
 include("FlexiChainsMakieExt/density.jl")
 include("FlexiChainsMakieExt/hist.jl")
 include("FlexiChainsMakieExt/mixeddensity.jl")
