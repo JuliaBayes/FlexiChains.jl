@@ -55,12 +55,22 @@ using StableRNGs: StableRNG
         @test nplots(fap, Makie.Lines) == 0
         @test fap.axis.ylabel[] == "count"
 
-        interval_bars = only(filter(p -> p isa Makie.Rangebars, fap.axis.scene.plots))
-        mean_dots = first(filter(p -> p isa Makie.Scatter, fap.axis.scene.plots))
-        lower_frequencies = getindex.(interval_bars[1][], 2)
-        upper_frequencies = getindex.(interval_bars[1][], 3)
-        mean_frequencies = last.(mean_dots[1][])
-        @test all(lower_frequencies .<= mean_frequencies .<= upper_frequencies)
+        @testset "predicted frequencies" begin
+            # Per-draw counts of the values 0, 1, 2: [2,0,0], [2,0,0], [1,1,0], [0,0,2]
+            small_draws = reshape([0 0; 0 0; 0 1; 2 2], 4, 1, 2)
+            small_chn = FlexiChain{Symbol}(small_draws, :y_pred)
+            small_fap = FC.Makie.ppc_plot(small_chn, :y_pred; level=0.5)
+            interval_bars =
+                only(filter(p -> p isa Makie.Rangebars, small_fap.axis.scene.plots))
+            mean_dots = only(filter(p -> p isa Makie.Scatter, small_fap.axis.scene.plots))
+            @test first.(mean_dots[1][]) == [0, 1, 2]
+            @test last.(mean_dots[1][]) ≈ [1.25, 0.25, 0.5]
+            @test getindex.(interval_bars[1][], 1) == [0, 1, 2]
+            @test getindex.(interval_bars[1][], 2) ≈ [0.75, 0.0, 0.0]
+            @test getindex.(interval_bars[1][], 3) ≈ [2.0, 0.25, 0.5]
+        end
+
+        @test FC.Makie.ppc_plot(int_chn, :y_pred; marker=:circle).plot.marker[] == :circle
 
         legend = only(filter(c -> c isa Makie.Legend, fap.figure.content))
         legend_entries = only(legend.entrygroups[])[2]

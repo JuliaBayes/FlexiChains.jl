@@ -17,10 +17,12 @@ real-valued draws, the plot is a density curve and for integer-valued it is a ro
 - `n_draws`: number of predictive draws to plot (real-valued draws only, default `50`); `nothing`
   plots all draws
 - `level`: width of the predicted frequency interval (integer-valued draws only, default `0.95`)
+- `marker`, `markersize`: marker of the predicted mean frequencies (integer-valued draws only,
+  defaults `:diamond` and `8`)
 - `figure`, `axis`: `NamedTuple`s forwarded to `Makie.Figure` / `Makie.Axis`.
 
 Further keyword arguments are forwarded to `Makie.lines!` or, for integer-valued draws, to
-`Makie.scatter!` and `Makie.rangebars!`.
+`Makie.rangebars!`.
 """
 function FC.Makie.ppc_plot(
     chn::FC.FlexiChain,
@@ -100,6 +102,7 @@ function plot_ppc!(
     level=maximum(FC.PlotUtils.DEFAULT_INTERVALS),
     color=first(Makie.wong_colors()),
     linewidth=4,
+    marker=:diamond,
     markersize=8,
     kwargs...,
 )
@@ -124,7 +127,7 @@ function plot_ppc!(
         count_values,
         mean_frequencies;
         color=color,
-        marker=:diamond,
+        marker=marker,
         markersize=markersize,
         label="predicted",
     )
