@@ -70,7 +70,8 @@ using StableRNGs: StableRNG
             @test getindex.(interval_bars[1][], 3) ≈ [2.0, 0.25, 0.5]
         end
 
-        @test FC.Makie.ppc_plot(int_chn, :y_pred; marker=:circle).plot.marker[] == :circle
+        @test FC.Makie.ppc_plot(int_chn, :y_pred; marker=:circle).plot.marker[] ==
+              Makie.to_spritemarker(:circle)
 
         legend = only(filter(c -> c isa Makie.Legend, fap.figure.content))
         legend_entries = only(legend.entrygroups[])[2]
