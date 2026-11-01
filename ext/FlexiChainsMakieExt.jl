@@ -8,7 +8,6 @@ using KernelDensity: KernelDensity
 
 const FC = FlexiChains
 const MakieGrids = Union{Makie.GridPosition,Makie.GridSubposition}
-const DEFAULT_ALPHA_LIMS = (0.15, 0.85)
 
 const MAKIE_KWARGS_DOCSTRING = """
 - `figure::NamedTuple`: Additional keyword arguments passed to the `Makie.Figure` constructor.

@@ -1,4 +1,5 @@
-# No title: pushforward_continuous plots an array variable as a whole, not a single leaf.
+const DEFAULT_ALPHA_LIMS = (0.15, 0.85)
+
 _default_pushforward_continuous_axis() = (xlabel="index", ylabel="value")
 
 """
