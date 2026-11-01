@@ -1,3 +1,8 @@
+# 0.7.1
+
+Fixes a bug in `pushforward_discrete` so that this function now applies custom settings for `alpha_limits` instead of always using the default.
+The default setting for `alpha_limits` is now listed in the docstrings of all three `pushforward_` functions.
+
 # 0.7
 
 v0.7 is a fairly large release of FlexiChains containing breaking changes.
