@@ -1,3 +1,7 @@
+# 0.7.2
+
+Add compatibility with DocStringExtensions@0.10.
+
 # 0.7.1
 
 Fixes a bug in `pushforward_discrete` so that this function now applies custom settings for `alpha_limits` instead of always using the default.
