@@ -1,0 +1,7 @@
+/* Limit height of images immediately after code blocks */
+div.language-julia + p>img {
+    max-height: 800px;
+    height: 100%;
+    width: auto;
+    margin: 0 auto;
+}
