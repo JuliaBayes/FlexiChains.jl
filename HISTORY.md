@@ -1,6 +1,6 @@
 # Unreleased
 
-- DynamicPPL 0.43 is now supported.
+  - DynamicPPL 0.43 is now supported.
 
 # 0.7.2
 
