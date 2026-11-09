@@ -10,6 +10,12 @@ using OrderedCollections: OrderedDict
 using Random: Random
 using VarNames: VarNames
 
+const AccumulatorVarInfo = if isdefined(DynamicPPL, :OnlyAccsVarInfo)
+    DynamicPPL.OnlyAccsVarInfo
+else
+    DynamicPPL.VarInfo
+end
+
 const OldVNChain = FlexiChain{AbstractPPL.VarName}
 
 ### Converting between OldVNChain (what Turing samples into) and VNChain
@@ -491,7 +497,7 @@ function reevaluate(
 )::DD.DimMatrix{<:Tuple{<:Any,<:DynamicPPL.AbstractVarInfo}} where {N}
     niters, nchains = size(chain)
     tuples = Iterators.product(1:niters, 1:nchains)
-    vi = DynamicPPL.OnlyAccsVarInfo(DynamicPPL.AccumulatorTuple(accs))
+    vi = AccumulatorVarInfo(DynamicPPL.AccumulatorTuple(accs))
     retvals_and_varinfos = map(tuples) do (i, j)
         DynamicPPL.init!!(
             rng,
@@ -773,7 +779,7 @@ function FlexiChains._make_prior_chain(
     n_chains::Int;
     make_chain=true,
 )
-    vi = DynamicPPL.OnlyAccsVarInfo((
+    vi = AccumulatorVarInfo((
         DynamicPPL.default_accumulators()...,
         DynamicPPL.RawValueAccumulator(true),
     ))

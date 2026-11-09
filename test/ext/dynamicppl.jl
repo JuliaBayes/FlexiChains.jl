@@ -29,7 +29,7 @@ _LOGJOINT_KEY = Extra(:logjoint)
         chn = _make_prior_chain(model, 50, 1)
 
         for i in 1:50
-            accs = OnlyAccsVarInfo(DynamicPPL.RawValueAccumulator(false))
+            accs = DynamicPPL.setacc!!(VarInfo(), DynamicPPL.RawValueAccumulator(false))
             _, accs = DynamicPPL.init!!(model, accs, InitFromParams(chn, i, 1), UnlinkAll())
             raw_values = get_raw_values(accs)
             for vn in (@varname(x), @varname(y))
