@@ -152,7 +152,7 @@ end
     AbstractMCMC.from_samples(
         ::Type{<:VNChain},
         draws::AbstractMatrix{<:VarNames.Draw}
-    )::OldVNChain
+    )::VNChain
 
 Convert a matrix of [`VarNames.Draw`](@extref) to a `VNChain`.
 """
