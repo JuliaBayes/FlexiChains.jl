@@ -1,3 +1,7 @@
+# Unreleased
+
+  - DynamicPPL 0.43 is now supported.
+
 # 0.7.2
 
 Add compatibility with DocStringExtensions@0.10.
