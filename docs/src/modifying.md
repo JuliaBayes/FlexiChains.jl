@@ -72,7 +72,7 @@ using FlexiChains: transform_values
 chain2 = transform_values(
     chain,
     @vn(mu) => (i -> i + 1),
-    @vn(tau) => (i -> i * 2) => @vn(new_tau)
+    @vn(tau) => (i -> i * 2) => @vn(new_tau),
 )
 ```
 
