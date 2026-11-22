@@ -2,24 +2,20 @@
 
 [Documentation for PosteriorDB.jl ↗](@extref PosteriorDB :doc:`index`)
 
-If you have loaded a `PosteriorDB.ReferencePosterior`, you can transform it into a `FlexiChain{VarName}` using [`FlexiChains.from_posteriordb`](@ref):
+FlexiChains allows you to load reference posteriors (i.e., chains sampled in Stan) from PosteriorDB.
+
+To see a list of all available reference posteriors, use [`FlexiChains.available_posteriordb_references`](@ref):
 
 ```@example posteriordb
 using PosteriorDB, FlexiChains
 
-# This is the long way.
-
-pdb = PosteriorDB.database()
-post = PosteriorDB.posterior(pdb, "eight_schools-eight_schools_centered")
-ref = PosteriorDB.reference_posterior(post)
-
-chn = FlexiChains.from_posteriordb(ref)
+FlexiChains.available_posteriordb_references()
 ```
 
-As shorthand for the above, you can pass the database and model name directly:
+To load a reference posterior, use [`FlexiChains.from_posteriordb`](@ref):
 
 ```@example posteriordb
-chn = FlexiChains.from_posteriordb(pdb, "eight_schools-eight_schools_centered")
+chn = FlexiChains.from_posteriordb("eight_schools-eight_schools_centered")
 ```
 
 Vector-valued parameters, which PosteriorDB stores as separate scalar entries (e.g. `theta[1]`, ..., `theta[8]`), are recombined into a single parameter:
@@ -44,4 +40,5 @@ summarystats(chn)
 
 ```@docs
 FlexiChains.from_posteriordb
+FlexiChains.available_posteriordb_references
 ```
