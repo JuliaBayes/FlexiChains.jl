@@ -34,6 +34,31 @@ using Test
         end
     end
 
+    @testset "from_posteriordb(model_name)" begin
+        n = "eight_schools-eight_schools_centered"
+        chn = FlexiChains.from_posteriordb(n)
+        @test FlexiChains.has_same_data(chn, FlexiChains.from_posteriordb(pdb, n))
+        # a posterior without a reference posterior
+        for n in PosteriorDB.posterior_names(pdb)
+            if isnothing(PosteriorDB.reference_posterior(PosteriorDB.posterior(pdb, n)))
+                @test_throws ArgumentError FlexiChains.from_posteriordb(n)
+                break
+            end
+        end
+    end
+
+    @testset "available_posteriordb_references" begin
+        names = FlexiChains.available_posteriordb_references()
+        @test names == FlexiChains.available_posteriordb_references(pdb)
+        @test names isa Vector{String}
+        @test "eight_schools-eight_schools_centered" in names
+        for n in PosteriorDB.posterior_names(pdb)
+            post = PosteriorDB.posterior(pdb, n)
+            has_ref = !isnothing(PosteriorDB.reference_posterior(post))
+            @test (n in names) == has_ref
+        end
+    end
+
     @testset "check that the data are correct" begin
         post = PosteriorDB.posterior(pdb, "eight_schools-eight_schools_centered")
         ref = PosteriorDB.reference_posterior(post)

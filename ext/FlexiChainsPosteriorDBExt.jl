@@ -5,15 +5,23 @@ using OrderedCollections: OrderedDict
 using FlexiChains: FlexiChains, FlexiChain, Parameter, VarName
 
 """
+    FlexiChains.from_posteriordb(model_name::String)
     FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
     FlexiChains.from_posteriordb(db::PosteriorDB.PosteriorDatabase, model_name::String)
 
 Load a reference posterior from PosteriorDB.jl into a `FlexiChain{VarName}`.
 
+The most convenient method to use is the first, which just takes a `String`. The others
+technically allow for more flexibility but should be very rarely needed.
+
 PosteriorDB stores vector-valued parameters as separate scalar entries, using Stan's naming
 convention (e.g. `theta[1]`, ..., `theta[8]`). When loaded into FlexiChains, these are
 recombined into a single vector-valued parameter (e.g. `@vn(theta)`, where each draw is a
 `Vector{Float64}`).
+
+For models that do not have a reference posterior, an `ArgumentError` is thrown. You can use
+[`FlexiChains.available_posteriordb_references`](@ref) to see which models have reference
+posteriors.
 """
 function FlexiChains.from_posteriordb(ref::PosteriorDB.ReferencePosterior)
     raw, niters, nchains, iter_indices = _load_posteriordb_ref(ref)
@@ -47,6 +55,24 @@ function FlexiChains.from_posteriordb(db::PosteriorDB.PosteriorDatabase, model_n
     ref === nothing &&
         throw(ArgumentError("Posterior `$model_name` has no reference posterior."))
     return FlexiChains.from_posteriordb(ref)
+end
+function FlexiChains.from_posteriordb(model_name::String)
+    return FlexiChains.from_posteriordb(PosteriorDB.database(), model_name)
+end
+
+"""
+    FlexiChains.available_posteriordb_references()
+    FlexiChains.available_posteriordb_references(db::PosteriorDB.PosteriorDatabase)
+
+Return a `Vector{String}` of the names of all posteriors in `db` (by default,
+`PosteriorDB.database()`) that have a reference posterior.
+"""
+function FlexiChains.available_posteriordb_references(
+    db::PosteriorDB.PosteriorDatabase=PosteriorDB.database(),
+)
+    return filter(PosteriorDB.posterior_names(db)) do n
+        PosteriorDB.reference_posterior(PosteriorDB.posterior(db, n)) !== nothing
+    end
 end
 
 """
