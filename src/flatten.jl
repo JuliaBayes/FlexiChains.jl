@@ -178,10 +178,10 @@ end
 
 function _parameter_array_components(
     cs::ChainOrSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
+    warn::Bool,
+    eltype_filter::Type{T},
+    parameters_only::Bool,
+    split_varnames::Bool,
 ) where {TKey,T}
     kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
     kept_eltypes = Type[]
