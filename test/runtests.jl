@@ -15,6 +15,7 @@ else
         include("varname.jl")
         include("flatten.jl")
         include("ext/advancedhmc.jl")
+        include("ext/ensemblemcmc.jl")
         include("ext/mcmcchains.jl")
         include("ext/dynamicppl.jl")
         include("serialise.jl")

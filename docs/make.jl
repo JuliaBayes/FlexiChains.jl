@@ -9,6 +9,7 @@ using DocumenterCodeBlocks
 using DocumenterInterLinks
 
 using FlexiChains
+using EnsembleMCMC
 
 using AbstractMCMC: AbstractMCMC
 using CairoMakie: CairoMakie, Makie
@@ -46,6 +47,7 @@ links = InterLinks(
 
 modules = [
     FlexiChains,
+    Base.get_extension(FlexiChains, :FlexiChainsEnsembleMCMCExt),
     Base.get_extension(FlexiChains, :FlexiChainsDynamicPPLExt),
     Base.get_extension(FlexiChains, :FlexiChainsInferenceObjectsExt),
     Base.get_extension(FlexiChains, :FlexiChainsMCMCChainsExt),
@@ -85,6 +87,7 @@ makedocs(;
             "advancedhmc.md",
             "arviz.md",
             "custom_sampler.md",
+            "ensemblemcmc.md",
             "mcmcchains.md",
             "montecarlomeasurements.md",
             "pairplots.md",
