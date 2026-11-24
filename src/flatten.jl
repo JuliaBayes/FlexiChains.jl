@@ -323,97 +323,6 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
     return cs, Dict{T,String}() # No plot names to return
 end
 
-function _parameter_array_components(
-    cs::ChainOrSummary{TKey};
-    warn::Bool,
-    eltype_filter::Type{T},
-    parameters_only::Bool,
-    split_varnames::Bool,
-) where {TKey,T}
-    kept_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
-    kept_eltypes = Type[]
-    skipped_keys = ParameterOrExtra{<:TKey}[]
-
-    # Loop through data without copying to figure out eltype and size
-    for (k, v) in cs._data
-        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:eltype_filter}
-            vn = _as_varname(FlexiChains.get_name(k))
-            d1 = first(v)
-            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
-                # No need to look more at data if all have fixed leaves
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
-                    leaf_name = _varname_as(TKey, vn_leaf)
-                    push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
-                    push!(kept_eltypes, eltype(d1))
-                end
-            else
-                # Fall back to materializing leaves
-                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
-                    leaf_name = _varname_as(TKey, vn_leaf)
-                    if eltype(leaf_data) <: eltype_filter
-                        push!(kept_keys, parameters_only ? leaf_name : Parameter(leaf_name))
-                        push!(kept_eltypes, eltype(leaf_data))
-                    else
-                        push!(skipped_keys, Parameter(leaf_name))
-                    end
-                end
-            end
-        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa Parameter)
-            push!(kept_keys, parameters_only ? FlexiChains.get_name(k) : k)
-            push!(kept_eltypes, eltype(v))
-        elseif !(parameters_only && k isa Extra)
-            push!(skipped_keys, k)
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
-    end
-
-    s = map(length, DD.dims(cs))
-    if isempty(kept_keys)
-        @warn "no keys with values subtyping $eltype_filter found"
-        return Array{T}(undef, (s..., 0)), kept_keys
-    end
-
-    # Allocate output and loop again to copy data
-    Tout = reduce(typejoin, kept_eltypes)
-    output = Array{Tout}(undef, (s..., length(kept_keys)))
-    _write_parameters_to_array!(output, cs; split_varnames, parameters_only)
-    return output, kept_keys
-end
-# function barrier for a small performance improvement
-function _write_parameters_to_array!(
-    output::Array{T,N},
-    cs;
-    split_varnames,
-    parameters_only,
-) where {T,N}
-    col = 0
-    for (k, v) in cs._data
-        if split_varnames && k isa Parameter && eltype(v) <: AbstractArray{<:T}
-            vn = _as_varname(FlexiChains.get_name(k))
-            d1 = first(v)
-            if _elems_have_fixed_vn_leaves(v) && d1 isa AbstractArray{<:Union{Real,Missing}}
-                for i in eachindex(d1)
-                    col += 1
-                    selectdim(output, N, col) .= getindex.(v, i)
-                end
-            else
-                for (vn_leaf, leaf_data) in _split_parameter_leaves(vn, v)
-                    if eltype(leaf_data) <: T
-                        col += 1
-                        copyto!(selectdim(output, N, col), leaf_data)
-                    end
-                end
-            end
-        elseif eltype(v) <: T && (!parameters_only || k isa Parameter)
-            col += 1
-            copyto!(selectdim(output, N, col), v)
-        end
-    end
-end
-
 """
     DimensionalData.DimArray(
         chain::FlexiChain{TKey};
@@ -515,7 +424,9 @@ function DD.DimArray(
     s = map(length, DD.dims(cs))
     if n_cols == 0
         @warn "no keys with values subtyping $eltype_filter found"
-        return Array{T}(undef, (s..., 0))
+        empty_keys = parameters_only ? TKey[] : ParameterOrExtra{<:TKey}[]
+        empty_dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(empty_keys))
+        return DD.DimArray(Array{T}(undef, (s..., 0)), empty_dims)
     end
 
     # Allocate output and copy data into it.
@@ -577,14 +488,7 @@ function Base.Array(
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    data, _ = _parameter_array_components(
-        chain;
-        warn,
-        eltype_filter,
-        parameters_only,
-        split_varnames,
-    )
-    return data
+    return parent(DD.DimArray(chain; warn, eltype_filter, parameters_only, split_varnames))
 end
 
 """
