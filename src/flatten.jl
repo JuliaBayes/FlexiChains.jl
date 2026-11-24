@@ -2,6 +2,176 @@
 import Tables
 using LinearAlgebra: Cholesky
 
+# This helper function identifies cases where we don't need to check every single Niters x
+# Nchains elements, because they all have the same structure.
+_elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Real} = !isempty(data)
+_elems_have_fixed_vn_leaves(data::Array{T}) where {T<:AbstractString} = !isempty(data)
+_elems_have_fixed_vn_leaves(data::Array{Symbol}) = !isempty(data)
+function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:AbstractArray}
+    # If `T` is not even a concrete type, e.g. it's a Union of two different
+    # AbstractArray types, then we have no hope.
+    (isconcretetype(T) && !isempty(data)) || return false
+    # Checking axes is no less expensive than checking size, and axes works better because
+    # it catches things like OffsetArrays which have the same size but different offsets.
+    a = axes(first(data))
+    return all(x -> axes(x) == a, data)
+end
+function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
+    (isconcretetype(T) && !isempty(data)) || return false
+    f = first(data)
+    a = axes(f)
+    ul = f.uplo
+    return all(x -> axes(x) == a && x.uplo == ul, data)
+end
+_elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
+
+# Traverse the chain and collect all the scalar leaves of parameters.
+abstract type ReducedKeyValuePair end
+# An irreducible part of a parameter. Usually a scalar parameter, but can also be
+# a struct or other type that we don't know how to reduce further.
+struct Leaf{V<:VarName,A<:AbstractArray} <: ReducedKeyValuePair
+    vn::V
+    data::A
+end
+Base.show(io::IO, l::Leaf) = print(io, "Leaf(@varname(", l.vn, ") => ", typeof(l.data), ")")
+# Arrays that have a constant size across all iterations can have a fast path where
+# we don't eagerly split them up.
+struct FixedSizeArrayOfLeaves{
+    V<:VarName,
+    VV<:AbstractArray{<:VarName},
+    A<:AbstractArray{<:AbstractArray},
+} <: ReducedKeyValuePair
+    vn::V
+    # precompute since it's convenient to.
+    vn_leaves::VV
+    # Invariants that we don't check:
+    #  - all elements of data must have the same axes.
+    #  - all elements of data must not have any further reducible structure, i.e.
+    #    data[i][j] must be a leaf for all (i, j)
+    data::A
+end
+Base.show(io::IO, l::FixedSizeArrayOfLeaves) = print(
+    io,
+    "FixedSizeArrayOfLeaves(@varname(",
+    l.vn,
+    ") => ",
+    typeof(l.data),
+    " (",
+    size(first(l.data)),
+    "))",
+)
+struct MaybeStillReducible{V<:VarName,A<:AbstractArray} <: ReducedKeyValuePair
+    vn::V
+    # Some elements of data still have reducible structure.
+    data::A
+end
+is_reducible(::Type{<:AbstractArray}) = true
+is_reducible(::Type{<:NamedTuple}) = true
+is_reducible(::Type{T}) where {T} = AbstractArray <: T || NamedTuple <: T
+# TODO(penelopeysm): ^^ Handle Tuples and _possibly_ AbstractDicts.
+function _reduced_parameters(cs::ChainOrSummary)
+    reduced = ReducedKeyValuePair[]
+    for (k, data) in cs._data
+        if k isa Parameter
+            vn = _as_varname(FlexiChains.get_name(k))
+            # Is everything in `data` a leaf? NOTE: we are assuming that `data` has been
+            # concretised as far as possible. This will often be the case but is not really
+            # guaranteed afaik.
+            sample_type = eltype(data)
+            if is_reducible(sample_type)
+                push!(reduced, MaybeStillReducible(vn, data))
+            else
+                push!(reduced, Leaf(vn, data))
+            end
+        end
+    end
+    return _reduce_further(reduced)
+end
+function _reduce_further(reduced::Vector{<:ReducedKeyValuePair})
+    new_reduced = ReducedKeyValuePair[]
+    for r in reduced
+        if r isa Leaf || r isa FixedSizeArrayOfLeaves
+            # nothing left to do
+            push!(new_reduced, r)
+        else
+            # r isa MaybeStillReducible
+            vn, data = r.vn, r.data
+            et = eltype(data)
+            if !is_reducible(et)
+                # OK, turns out that everything is a leaf already
+                push!(new_reduced, Leaf(vn, data))
+            elseif et <: AbstractArray
+                # check if anything inside is potentially still reducible
+                inner_eltype = eltype(eltype(data))
+                if !is_reducible(inner_eltype) && _elems_have_fixed_vn_leaves(data)
+                    # fast path: e.g. each element in `data` is an array of leaves of the
+                    # same size.
+                    vn_leaves = collect(AbstractPPL.varname_leaves(vn, first(data)))
+                    push!(new_reduced, FixedSizeArrayOfLeaves(vn, vn_leaves, data))
+                    # TODO(penelopeysm): We could do better with e.g. arrays of collections.
+                    # That would be the case where _elems_have_fixed_vn_leaves(data) is
+                    # true, but the inner_eltype is still reducible. This is left as an
+                    # extension.
+                else
+                    # slow path: just collect `varname_leaves` for the entire thing.
+                    vn_leaves = OrderedSet{VarName}()
+                    for d_i in data
+                        # This is recursive, so we don't need to worry about processing this
+                        # again -- we know that anything that comes out of it is a `Leaf`
+                        for vn_leaf in AbstractPPL.varname_leaves(vn, d_i)
+                            push!(vn_leaves, vn_leaf)
+                        end
+                    end
+                    for vn_leaf in vn_leaves
+                        push!(new_reduced, Leaf(vn_leaf, _get_leaf_data(vn, data, vn_leaf)))
+                    end
+                end
+            elseif et <: NamedTuple
+                # collect the set of all keys.
+                nt_keys = if isconcretetype(et)
+                    fieldnames(et)
+                else
+                    ks = OrderedSet{Symbol}()
+                    for d_i in data
+                        for k in keys(d_i)
+                            push!(ks, k)
+                        end
+                    end
+                    ks
+                end
+                # then recurse
+                for k in nt_keys
+                    optic = AbstractPPL.Property{k}() ∘ AbstractPPL.getoptic(vn)
+                    vn_leaf = VarName{AbstractPPL.getsym(vn)}(optic)
+                    p = MaybeStillReducible(vn_leaf, _get_leaf_data(vn, data, vn_leaf))
+                    push!(new_reduced, p)
+                end
+            else
+                # Some horrible abstract type that could contain a mixture of NamedTuples,
+                # Arrays, and other stuff. In practice, this is most likely `Any`.
+                #
+                # TODO(penelopeysm): This code is duplicated from the `AbstractArray` case
+                # above. We should refactor.
+                vn_leaves = OrderedSet{VarName}()
+                for d_i in data
+                    for vn_leaf in AbstractPPL.varname_leaves(vn, d_i)
+                        push!(vn_leaves, vn_leaf)
+                    end
+                end
+                for vn_leaf in vn_leaves
+                    push!(new_reduced, Leaf(vn_leaf, _get_leaf_data(vn, data, vn_leaf)))
+                end
+            end
+        end
+    end
+    return if any(r -> r isa MaybeStillReducible, new_reduced)
+        _reduce_further(new_reduced)
+    else
+        new_reduced
+    end
+end
+
+
 """
     FlexiChains._split_varnames(
         cs::ChainOrSummary{<:VarName};
@@ -53,29 +223,6 @@ function _split_varnames(cs::ChainOrSummary{<:VarName}; collect_plot_names::Bool
     return _replace_data(cs, VarName, new_data), plot_names
 end
 
-
-# This helper function identifies cases where we don't need to check every single Niters x
-# Nchains elements, because they all have the same structure.
-_elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Real} = !isempty(data)
-_elems_have_fixed_vn_leaves(data::Array{T}) where {T<:AbstractString} = !isempty(data)
-_elems_have_fixed_vn_leaves(data::Array{Symbol}) = !isempty(data)
-function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:AbstractArray}
-    # If `T` is not even a concrete type, e.g. it's a Union of two different
-    # AbstractArray types, then we have no hope.
-    (isconcretetype(T) && !isempty(data)) || return false
-    # Checking axes is no less expensive than checking size, and axes works better because
-    # it catches things like OffsetArrays which have the same size but different offsets.
-    a = axes(first(data))
-    return all(x -> axes(x) == a, data)
-end
-function _elems_have_fixed_vn_leaves(data::Array{T}) where {T<:Cholesky}
-    (isconcretetype(T) && !isempty(data)) || return false
-    f = first(data)
-    a = axes(f)
-    ul = f.uplo
-    return all(x -> axes(x) == a && x.uplo == ul, data)
-end
-_elems_have_fixed_vn_leaves(::Array) = false  # Fallback.
 
 # TODO(penelopeysm): Upstream these things.
 # convert symbol/string to VarName
@@ -302,16 +449,112 @@ function DD.DimArray(
     parameters_only::Bool=true,
     split_varnames::Bool=true,
 ) where {TKey,T}
-    data, kept_keys = _parameter_array_components(
-        cs;
-        warn,
-        eltype_filter,
-        parameters_only,
-        split_varnames,
-    )
-    dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
+    reduced_parameters = ReducedKeyValuePair[]
+    skipped_keys = ParameterOrExtra{<:TKey}[]
+    kept_leaf_eltypes = Type[]
 
-    return DD.DimArray(data, dims)
+    if split_varnames
+        # Split up the parameters first as much as possible.
+        unfiltered_reduced_parameters = _reduced_parameters(cs)
+        # Filter the parameters according to eltype.
+        for r in unfiltered_reduced_parameters
+            leaf_eltype = if r isa Leaf
+                eltype(r.data)
+            elseif r isa FixedSizeArrayOfLeaves
+                eltype(first(r.data))
+            end
+            if leaf_eltype <: eltype_filter
+                push!(reduced_parameters, r)
+                push!(kept_leaf_eltypes, leaf_eltype)
+            else
+                push!(skipped_keys, Parameter(_varname_as(TKey, r.vn)))
+            end
+        end
+    else
+        for (k, v) in cs._data
+            leaf_eltype = eltype(v)
+            if k isa Parameter
+                if leaf_eltype <: eltype_filter
+                    push!(reduced_parameters, Leaf(_as_varname(FlexiChains.get_name(k)), v))
+                else
+                    push!(skipped_keys, k)
+                end
+            end
+        end
+    end
+
+    # Tack on extras if necessary. (Note that extras are never split)
+    extras_to_add = Extra[]
+    if !parameters_only
+        for (k, v) in cs._data
+            leaf_eltype = eltype(v)
+            if k isa Extra && leaf_eltype <: eltype_filter
+                push!(extras_to_add, k)
+                push!(kept_leaf_eltypes, leaf_eltype)
+            end
+        end
+    end
+
+    if warn && !isempty(skipped_keys)
+        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
+        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
+    end
+
+    # Construct output array. First we need to decide how many columns we're going to have
+    # (i.e. how many 'parameters' there are after splitting).
+    n_cols = 0
+    for r in reduced_parameters
+        if r isa Leaf
+            n_cols += 1
+        elseif r isa FixedSizeArrayOfLeaves
+            n_cols += length(first(r.data))
+        end
+    end
+    n_cols += length(extras_to_add)
+
+    s = map(length, DD.dims(cs))
+    if n_cols == 0
+        @warn "no keys with values subtyping $eltype_filter found"
+        return Array{T}(undef, (s..., 0))
+    end
+
+    # Allocate output and copy data into it.
+    Tout = reduce(typejoin, kept_leaf_eltypes)
+    output = Array{Tout}(undef, (s..., n_cols))
+    N = ndims(output)
+    parameter_names = VarName[]
+    col = 1
+    for r in reduced_parameters
+        if r isa Leaf
+            copyto!(selectdim(output, N, col), r.data)
+            push!(parameter_names, r.vn)
+            col += 1
+        elseif r isa FixedSizeArrayOfLeaves
+            ncols = length(first(r.data))
+            # N1 * N2 * ... * niters * nchains -> ncols * niters * nchains
+            # (for summaries, `r.data` has a third `stat` dimension, which is handled the
+            # same way)
+            data = reshape(stack(r.data), ncols, size(r.data)...)
+            # niters x nchains x ncols
+            flattened_data = permutedims(data, (2:ndims(data)..., 1))
+            copyto!(selectdim(output, N, col:(col+ncols-1)), flattened_data)
+            append!(parameter_names, vec(r.vn_leaves))
+            col += ncols
+        end
+    end
+    for e in extras_to_add
+        copyto!(selectdim(output, N, col), _get_raw_data(cs, e))
+        col += 1
+    end
+
+    kept_keys = if parameters_only
+        map(vn -> _varname_as(TKey, vn), parameter_names)
+    else
+        params = map(vn -> Parameter(_varname_as(TKey, vn)), parameter_names)
+        vcat(params, extras_to_add)
+    end
+    dims = (DD.dims(cs)..., DD.Dim{PARAM_DIM_NAME}(kept_keys))
+    return DD.DimArray(output, dims)
 end
 
 """
