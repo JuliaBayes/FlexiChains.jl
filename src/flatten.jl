@@ -385,6 +385,7 @@ function DD.DimArray(
             if k isa Parameter
                 if leaf_eltype <: eltype_filter
                     push!(reduced_parameters, Leaf(_as_varname(FlexiChains.get_name(k)), v))
+                    push!(kept_leaf_eltypes, leaf_eltype)
                 else
                     push!(skipped_keys, k)
                 end
