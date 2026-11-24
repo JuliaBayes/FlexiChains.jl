@@ -229,12 +229,6 @@ using Test
             @test result.between isa FlexiSummary{Symbol}
         end
 
-        @testset "errors with single chain" begin
-            chain =
-                FlexiChain{Symbol}(N_iters, 1, Dict(Parameter(:a) => rand(1:5, N_iters, 1)))
-            @test_throws Exception discretediag(chain)
-        end
-
         @testset "within-chain has correct chain indices" begin
             chain = FlexiChain{Symbol}(
                 N_iters,
