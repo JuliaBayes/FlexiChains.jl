@@ -323,6 +323,29 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
     return cs, Dict{T,String}() # No plot names to return
 end
 
+# This function is a performance optimisation, It copies the data of a
+# `FixedSizeArrayOfLeaves` into `output`, starting at column `col` of the last (`param`)
+# dimension, while avoiding intermediate arrays as far as possible, and reading `data` in
+# memory order.
+#
+# `data` has dimensions (niters x nchains), or for summaries (niters x nchains x nstats),
+# and each element is an array with `ncols` elements.
+#
+# The `k`-th element of `x` (in column-major order) goes into column `col + k - 1`, which
+# matches the order of `vec(vn_leaves)`.
+#
+# This is a separate function so that the loop is compiled for the concrete types of
+# `output` and `data`.
+function _copy_fixed_size_leaves!(output::Array, data::AbstractArray, col::Int)
+    out_matrix = reshape(output, :, size(output, ndims(output)))
+    for (j, x) in enumerate(data)
+        for (k, v) in enumerate(x)
+            out_matrix[j, col+k-1] = v
+        end
+    end
+    return output
+end
+
 """
     DimensionalData.DimArray(
         chain::FlexiChain{TKey};
@@ -443,13 +466,7 @@ function DD.DimArray(
             col += 1
         elseif r isa FixedSizeArrayOfLeaves
             ncols = length(first(r.data))
-            # N1 * N2 * ... * niters * nchains -> ncols * niters * nchains
-            # (for summaries, `r.data` has a third `stat` dimension, which is handled the
-            # same way)
-            data = reshape(stack(r.data), ncols, size(r.data)...)
-            # niters x nchains x ncols
-            flattened_data = permutedims(data, (2:ndims(data)..., 1))
-            copyto!(selectdim(output, N, col:(col+ncols-1)), flattened_data)
+            _copy_fixed_size_leaves!(output, r.data, col)
             append!(parameter_names, vec(r.vn_leaves))
             col += ncols
         end
