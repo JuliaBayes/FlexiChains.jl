@@ -1,3 +1,7 @@
+# 0.6.45
+
+Fix `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (and the `Array` versions too) not working for containers of variables that weren't just plain Arrays.
+
 # 0.6.44
 
 Documentation updates only.
