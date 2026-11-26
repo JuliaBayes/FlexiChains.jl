@@ -1,3 +1,9 @@
+# 0.7.3
+
+Added a convenience method `FlexiChains.from_posteriordb(model_name::String)`, which loads the reference posterior for `model_name` from the default PosteriorDB database.
+
+Added `FlexiChains.available_posteriordb_references([db])`, which returns the names of all posteriors in the database that have a reference posterior.
+
 # 0.7.2
 
 Add compatibility with DocStringExtensions@0.10.

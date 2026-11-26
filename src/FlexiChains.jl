@@ -51,7 +51,8 @@ const _LOGLIKELIHOOD_KEY = Extra(:loglikelihood)
 
 # Extended in PosteriorDB extension (but not exported)
 function from_posteriordb end
-@public from_posteriordb
+function available_posteriordb_references end
+@public from_posteriordb, available_posteriordb_references
 include("plots/utils.jl")
 include("plots/plots.jl")
 include("plots/makie.jl")
