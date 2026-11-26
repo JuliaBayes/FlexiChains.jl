@@ -1,3 +1,8 @@
+# 0.7.4
+
+Fix `DimArray(::FlexiChain)` and `DimArray(::FlexiSummary)` (and the `Array` versions too) not working for containers of variables that weren't just plain Arrays.
+(This is a forward port of #418 / v0.6.45.)
+
 # 0.7.3
 
 Added a convenience method `FlexiChains.from_posteriordb(model_name::String)`, which loads the reference posterior for `model_name` from the default PosteriorDB database.
