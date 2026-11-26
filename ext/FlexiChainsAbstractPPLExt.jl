@@ -295,99 +295,6 @@ function FC._get_leaf_data(vn::VarName, d::AbstractArray, vn_leaf::VarName)
     return FC._map_optic(optic, d, vn_leaf)
 end
 
-function FC._parameter_array_components(
-    cs::FC.ChainOrSummary{TKey};
-    warn::Bool=true,
-    eltype_filter::Type{T}=Any,
-    parameters_only::Bool=true,
-    split_varnames::Bool=true,
-) where {TKey<:VarName,T}
-    kept_keys = parameters_only ? TKey[] : FC.ParameterOrExtra{<:TKey}[]
-    kept_eltypes = Type[]
-    skipped_keys = FC.ParameterOrExtra{<:TKey}[]
-
-    # Loop through data without copying to figure out eltype and size
-    for (k, v) in cs._data
-        if split_varnames &&
-           k isa FC.Parameter &&
-           eltype(v) <: AbstractArray{<:eltype_filter}
-            vn = FC.get_name(k)
-            d1 = first(v)
-            if FC._elems_have_fixed_vn_leaves(v) &&
-               d1 isa AbstractArray{<:Union{Real,Missing}}
-                # No need to look more at data if all have fixed leaves
-                for vn_leaf in AbstractPPL.varname_leaves(vn, d1)
-                    push!(kept_keys, parameters_only ? vn_leaf : FC.Parameter(vn_leaf))
-                    push!(kept_eltypes, eltype(d1))
-                end
-            else
-                # Fall back to materializing leaves
-                for (vn_leaf, leaf_data) in FC._split_parameter_leaves(vn, v)
-                    if eltype(leaf_data) <: eltype_filter
-                        push!(kept_keys, parameters_only ? vn_leaf : FC.Parameter(vn_leaf))
-                        push!(kept_eltypes, eltype(leaf_data))
-                    else
-                        push!(skipped_keys, FC.Parameter(vn_leaf))
-                    end
-                end
-            end
-        elseif eltype(v) <: eltype_filter && (!parameters_only || k isa FC.Parameter)
-            push!(kept_keys, parameters_only ? FC.get_name(k) : k)
-            push!(kept_eltypes, eltype(v))
-        elseif !(parameters_only && k isa FC.Extra)
-            push!(skipped_keys, k)
-        end
-    end
-    if warn && !isempty(skipped_keys)
-        skipped_str = join(("`$k`" for k in skipped_keys), ", ")
-        @warn "skipping keys $skipped_str as their values do not subtype $eltype_filter"
-    end
-
-    s = map(length, DD.dims(cs))
-    if isempty(kept_keys)
-        @warn "no keys with values subtyping $eltype_filter found"
-        return Array{T}(undef, (s..., 0)), kept_keys
-    end
-
-    # Allocate output and loop again to copy data
-    Tout = reduce(typejoin, kept_eltypes)
-    output = Array{Tout}(undef, (s..., length(kept_keys)))
-    _write_parameters_to_array!(output, cs; split_varnames, parameters_only)
-    return output, kept_keys
-end
-# function barrier for a small performance improvement
-function _write_parameters_to_array!(
-    output::Array{T,N},
-    cs;
-    split_varnames,
-    parameters_only,
-) where {T,N}
-    col = 0
-    for (k, v) in cs._data
-        if split_varnames && k isa FC.Parameter && eltype(v) <: AbstractArray{<:T}
-            vn = FC.get_name(k)
-            d1 = first(v)
-            if FC._elems_have_fixed_vn_leaves(v) &&
-               d1 isa AbstractArray{<:Union{Real,Missing}}
-                for i in eachindex(d1)
-                    col += 1
-                    selectdim(output, N, col) .= getindex.(v, i)
-                end
-            else
-                for (vn_leaf, leaf_data) in FC._split_parameter_leaves(vn, v)
-                    if eltype(leaf_data) <: T
-                        col += 1
-                        copyto!(selectdim(output, N, col), leaf_data)
-                    end
-                end
-            end
-        elseif eltype(v) <: T && (!parameters_only || k isa FC.Parameter)
-            col += 1
-            copyto!(selectdim(output, N, col), v)
-        end
-    end
-end
-
 # convert AbstractPPL optics to VarNames optics
 _internal_to_optic(@nospecialize x) = x
 _internal_to_optic(di::AbstractPPL.DynamicIndex) = VarNames.DynamicIndex(di.expr, di.f)
@@ -402,6 +309,26 @@ end
 # convert AbstractPPL VarNames to FlexiChains VarNames
 function FC._as_varname(vn::AbstractPPL.VarName{sym}) where {sym}
     return FC.VarName{sym}(_internal_to_optic(AbstractPPL.getoptic(vn)))
+end
+
+# convert VarNames optics back to AbstractPPL optics
+_optic_to_internal(@nospecialize x) = x
+_optic_to_internal(di::VarNames.DynamicIndex) = AbstractPPL.DynamicIndex(di.expr, di.f)
+_optic_to_internal(::VarNames.Iden) = AbstractPPL.Iden()
+_optic_to_internal(p::VarNames.Property{sym}) where {sym} =
+    AbstractPPL.Property{sym}(_optic_to_internal(p.child))
+function _optic_to_internal(i::VarNames.Index)
+    ix = map(_optic_to_internal, i.ix)
+    kw = map(_optic_to_internal, i.kw)
+    return AbstractPPL.Index(ix, kw, _optic_to_internal(i.child))
+end
+# convert FlexiChains VarNames back to AbstractPPL VarNames. This is the reverse of
+# `FC._as_varname(::AbstractPPL.VarName)`. It lets `DimArray` work on chains keyed by
+# AbstractPPL VarNames: the splitting is done with FlexiChains VarNames, and the keys are
+# converted back at the end. It is also used by `FlexiChains.downgrade` in
+# FlexiChainsDynamicPPLExt.
+function FC._varname_as(::Type{<:AbstractPPL.VarName}, vn::FC.VarName{sym}) where {sym}
+    return AbstractPPL.VarName{sym}(_optic_to_internal(VarNames.getoptic(vn)))
 end
 
 FC._maybe_promote_key(::Type{<:AbstractPPL.VarName}) = AbstractPPL.VarName

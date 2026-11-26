@@ -27,22 +27,6 @@ _downgrade_skeleton(vnt::VarNames.VarNamedTuple) =
 _downgrade_skeleton(arr::AbstractArray) = map(_downgrade_skeleton, arr)
 _downgrade_skeleton(x) = x
 
-# Convert a VarNames.VarName to an AbstractPPL.VarName. This is the reverse of
-# `FlexiChains._as_varname(::AbstractPPL.VarName)`.
-_downgrade_optic(@nospecialize x) = x
-_downgrade_optic(di::VarNames.DynamicIndex) = AbstractPPL.DynamicIndex(di.expr, di.f)
-_downgrade_optic(::VarNames.Iden) = AbstractPPL.Iden()
-_downgrade_optic(p::VarNames.Property{sym}) where {sym} =
-    AbstractPPL.Property{sym}(_downgrade_optic(p.child))
-function _downgrade_optic(i::VarNames.Index)
-    ix = map(_downgrade_optic, i.ix)
-    kw = map(_downgrade_optic, i.kw)
-    return AbstractPPL.Index(ix, kw, _downgrade_optic(i.child))
-end
-function _downgrade_varname(vn::VarNames.VarName{sym}) where {sym}
-    return AbstractPPL.VarName{sym}(_downgrade_optic(VarNames.getoptic(vn)))
-end
-
 function _convert_chain(
     chain::FlexiChain,
     ::Type{TKey},
@@ -95,7 +79,14 @@ chain that DynamicPPL.jl and Turing.jl functions (such as `predict` or `returned
 This is the reverse of [`FlexiChains.upgrade`](@ref).
 """
 function FlexiChains.downgrade(chain::FlexiChains.VNChain)
-    return _convert_chain(chain, VarName, _downgrade_varname, _downgrade_skeleton)
+    # `FlexiChains._varname_as(AbstractPPL.VarName, vn)` is defined in
+    # FlexiChainsAbstractPPLExt.
+    return _convert_chain(
+        chain,
+        VarName,
+        vn -> FlexiChains._varname_as(VarName, vn),
+        _downgrade_skeleton,
+    )
 end
 
 ##################
