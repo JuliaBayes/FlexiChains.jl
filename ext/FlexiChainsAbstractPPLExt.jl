@@ -322,11 +322,6 @@ function _optic_to_internal(i::VarNames.Index)
     kw = map(_optic_to_internal, i.kw)
     return AbstractPPL.Index(ix, kw, _optic_to_internal(i.child))
 end
-# convert FlexiChains VarNames back to AbstractPPL VarNames. This is the reverse of
-# `FC._as_varname(::AbstractPPL.VarName)`. It lets `DimArray` work on chains keyed by
-# AbstractPPL VarNames: the splitting is done with FlexiChains VarNames, and the keys are
-# converted back at the end. It is also used by `FlexiChains.downgrade` in
-# FlexiChainsDynamicPPLExt.
 function FC._varname_as(::Type{<:AbstractPPL.VarName}, vn::FC.VarName{sym}) where {sym}
     return AbstractPPL.VarName{sym}(_optic_to_internal(VarNames.getoptic(vn)))
 end

@@ -323,7 +323,7 @@ function _split_varnames(cs::ChainOrSummary{T}; collect_plot_names::Bool=false) 
     return cs, Dict{T,String}() # No plot names to return
 end
 
-# This function is a performance optimisation, It copies the data of a
+# This function is a performance optimisation. It copies the data of a
 # `FixedSizeArrayOfLeaves` into `output`, starting at column `col` of the last (`param`)
 # dimension, while avoiding intermediate arrays as far as possible, and reading `data` in
 # memory order.

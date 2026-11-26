@@ -79,8 +79,6 @@ chain that DynamicPPL.jl and Turing.jl functions (such as `predict` or `returned
 This is the reverse of [`FlexiChains.upgrade`](@ref).
 """
 function FlexiChains.downgrade(chain::FlexiChains.VNChain)
-    # `FlexiChains._varname_as(AbstractPPL.VarName, vn)` is defined in
-    # FlexiChainsAbstractPPLExt.
     return _convert_chain(
         chain,
         VarName,
