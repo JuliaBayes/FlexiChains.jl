@@ -25,41 +25,43 @@ Pkg.add("FlexiChains")
 
 ## Obtaining a chain
 
-MCMC sampling with [Turing.jl](https://turinglang.org/) or [ParallelMCMC.jl](https://github.com/rsenne/ParallelMCMC.jl) returns a FlexiChain by default:
+MCMC sampling with [Wren.jl](https://juliabayes.org/Wren.jl) or [ParallelMCMC.jl](https://github.com/rsenne/ParallelMCMC.jl) returns a FlexiChain by default:
 
 ```julia
-using Turing, FlexiChains
-@model function f()
+using Wren, Distributions
+@wren function f()
     x ~ Normal()
     y ~ Poisson(3.0)
     z ~ MvNormal(zeros(2), I)
 end
 model = f()
-chain = sample(model, MH(), MCMCThreads(), 1000, 3)
+chain = prior(model, 1000, 3)
 ```
 
 ```
-╭─FlexiChain (1000 iterations, 3 chains) ───────────────────────────────╮
-│ ↓ iter  = 1:1000                                                      │
-│ → chain = 1:3                                                         │
-│                                                                       │
-│ Parameters (3) ── VarName                                             │
-│  Float64          x                                                   │
-│  Int64            y                                                   │
-│  Vector{Float64}  z (2,)                                              │
-│                                                                       │
-│ Extras (4)                                                            │
-│  Bool     accepted                                                    │
-│  Float64  logprior, loglikelihood, logjoint                           │
-╰───────────────────────────────────────────────────────────────────────╯
+╭─FlexiChain (1000 iterations, 3 chains) ────────────────────────────────────╮
+│ ↓ iter  = 1:1000                                                           │
+│ → chain = 1:3                                                              │
+│                                                                            │
+│ Parameters (3) ── VarName                                                  │
+│  Float64          x                                                        │
+│  Int64            y                                                        │
+│  Vector{Float64}  z (2,)                                                   │
+│                                                                            │
+│ Extras (4)                                                                 │
+│  Vector{Float64}  return_value (2,)                                        │
+│  Float64          logprior, loglikelihood, logjoint                        │
+╰────────────────────────────────────────────────────────────────────────────╯
 ```
 
 You can also construct a FlexiChain from a variety of other sources, including
 [Pigeons.jl](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-pigeons),
 [Stan CSV files](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-stan),
-[PosteriorDB.jl](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-posteriordb),
-an [`MCMCChains.Chains` object](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-mcmcchains),
-or [a matrix of `DynamicPPL.VarNamedTuple`s or `DynamicPPL.ParamsWithStats`](https://juliabayes.org/FlexiChains.jl/stable/api/#AbstractMCMC.from_samples).
+[PosteriorDB.jl](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-posteriordb), or
+an [`MCMCChains.Chains` object](https://juliabayes.org/FlexiChains.jl/stable/integrations/#integrations-mcmcchains).
+
+[Turing.jl](https://turinglang.org) also uses FlexiChains as its default chain type, but is currently using an older version of FlexiChains (v0.6).
+Please see [the documentation for that version](https://juliabayes.org/FlexiChains.jl/v0.6/) if you are using Turing.jl!
 
 ## A quick primer on the data structure
 
@@ -68,25 +70,27 @@ A `FlexiChain{T}` stores data for *parameters* of type `T`, along with *extras* 
 Broadly speaking, a `FlexiChain` can be thought of as a dictionary mapping `Union{Parameter{<:T},Extra}` to `niters x nchains` matrices of samples.
 Each matrix can have a different element type, which allows FlexiChains to store samples as their original types (e.g. Int or Vector) rather than flattening and converting everything to Float64.
 
-The most common types `T` are `Symbol` and [`AbstractPPL.VarName`](https://turinglang.org/AbstractPPL.jl/stable/varname/).
-The respective chain types are aliased to `SymChain` and `VNChain`.
+We strongly recommend using [`VarNames.VarName`](https://juliabayes.org/VarNames.jl/stable/) as the key type for parameters, because it allows for powerful indexing and subsetting of parameters.
+`FlexiChain{VarName}` is aliased to `VNChain`; you will see this type used throughout the documentation.
+When implementing new features we will prioritise making them work for `VarName` keys.
+Although `Symbol` keys also work and can be more familiar, `VarName` is almost strictly better than `Symbol` and should be preferred in most cases.
 
 ## Indexing
 
 Indexing into a `FlexiChain` returns a `DimMatrix` from the [`DimensionalData.jl` package](https://rafaqz.github.io/DimensionalData.jl/), which behaves exactly like an ordinary `Matrix` but additionally carries more information about its dimensions.
 
 ```julia
-chain[@varname(x)]              # -> (niters x nchains)     DimMatrix{Float64}
-chain[@varname(y)]              # -> (niters x nchains)     DimMatrix{Int}
-chain[@varname(z)]              # -> (niters x nchains)     DimMatrix{Vector{Float64}}
-chain[@varname(z); stack=true]  # -> (niters x nchains x 2) DimArray{Float64} 
+chain[@vn(x)]              # -> (niters x nchains)     DimMatrix{Float64}
+chain[@vn(y)]              # -> (niters x nchains)     DimMatrix{Int}
+chain[@vn(z)]              # -> (niters x nchains)     DimMatrix{Vector{Float64}}
+chain[@vn(z), stack=true]  # -> (niters x nchains x 2) DimArray{Float64} 
 ```
 
 If you have a `VNChain`, you can access sub-components of parameters by specifying the appropriate `VarName`.
 Here `z` is a 2-dimensional vector, so accessing either `z[1]` or `z[2]` gives us scalars:
 
 ```julia
-chain[@varname(z[1])] # -> (niters x nchains) DimMatrix{Float64}
+chain[@vn(z[1])]  # -> (niters x nchains) DimMatrix{Float64}
 ```
 
 You can index with `Symbol`s, as long as it can be unambiguously resolved to a parameter or extra:
@@ -99,7 +103,7 @@ chain[:logjoint]  # -> (niters x nchains) DimMatrix{Float64}
 You can additionally subset iterations / chains using `iter` or `chain` keyword arguments:
 
 ```julia
-chain[@varname(x), iter=101:End, chain=2]
+chain[@vn(x), iter=101:End, chain=2]
 ```
 
 (note that with keyword arguments you have to use `End` instead of `end`).
@@ -117,37 +121,38 @@ ss = summarystats(chain)
 This produces a `FlexiSummary` object with mean, standard deviation, Monte Carlo standard error, effective sample size, R-hat, and quantiles for each key:
 
 ```
-╭─FlexiSummary (9 statistics) ──────────────────────────────────────────╮
-│   iter    collapsed                                                   │
-│   chain   collapsed                                                   │
-│ ↓ stat  = [mean, std, mcse, ess_bulk, ess_tail, rhat, q5, q50, q95]   │
-│                                                                       │
-│ Parameters (4) ── VarName                                             │
-│  Float64  x, y, z[1], z[2]                                            │
-│                                                                       │
-│ Extras (4)                                                            │
-│  Float64  accepted, logprior, loglikelihood, logjoint                 │
-│                                                                       │
-│ Summary                                                               │
-│   param     mean     std    mcse   ess_bulk   ess_tail    rhat  …     │
-│       x  -0.0033  1.0190  0.0189  2888.7897  2657.3833  0.9998  …     │
-│       y   2.9520  1.7255  0.0323  2869.7379  2988.1386  1.0002  …     │
-│    z[1]  -0.0345  0.9956  0.0186  2863.4554  2624.3254  1.0000  …     │
-│    z[2]   0.0267  1.0054  0.0181  3071.3115  2977.7340  1.0005  …     │
-╰───────────────────────────────────────────────────────────────────────╯
+╭─FlexiSummary (9 statistics) ────────────────────────────────────────────────────╮
+│   iter    collapsed                                                             │
+│   chain   collapsed                                                             │
+│ ↓ stat  = [mean, std, mcse, ess_bulk, ess_tail, rhat, q5, q50, q95]             │
+│                                                                                 │
+│ Parameters (4) ── VarName                                                       │
+│  Float64  x, y, z[1], z[2]                                                      │
+│                                                                                 │
+│ Extras (4)                                                                      │
+│  Union{Missing, Vector{Float64}}  return_value                                  │
+│  Float64                          logprior, loglikelihood, logjoint             │
+│                                                                                 │
+│ Summary                                                                         │
+│  param  mean    std     mcse    …  rhat    q5       q50     q95                 │
+│  x      0.0156  1.0015  0.0181     1.0005  -1.6250  0.0155  1.6776              │
+│  y      2.9550  1.7002  0.0315     0.9997  0.0000   3.0000  6.0000              │
+│  z[1]   0.0058  0.9913  0.0171     1.0004  -1.6178  0.0259  1.5754              │
+│  z[2]   0.0292  1.0125  0.0183     1.0003  -1.6193  0.0162  1.7494              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 You can index into this much like a `FlexiChain`:
 
 ```julia
-ss[@varname(x), stat=:mean]  # mean of `x`
+ss[@vn(x), stat=:mean]  # mean of `x`
 ```
 
 Or you can compute statistics directly with individual functions:
 
 ```julia
 mean(chain)              # just the mean for all variables
-mean(chain)[@varname(x)] # -> Float64
+mean(chain)[@vn(x)]      # -> Float64
 mean(chain; dims=:iter)  # take the mean over iterations only
 ```
 
@@ -162,7 +167,7 @@ Most of the effort has been focused on the Makie backend, and we recommend using
 using CairoMakie
 plot(chain)                    # trace + densities for all parameters
 plot(chain; pool_chains=true)  # combine samples from all chains
-plot(chain, [@varname(z)])     # z[1] and z[2] only
+plot(chain, [@vn(z)])          # z[1] and z[2] only
 ```
 
 <div align="center">

@@ -99,6 +99,45 @@ const MEAN_STD = [CollapseFunctionVec(mean), CollapseFunctionVec(std)]
             end
         end
 
+        @testset "VarName-keyed chain with NamedTuple-valued param" begin
+            # https://github.com/JuliaBayes/FlexiChains.jl/issues/417
+            N_iters, N_chains = 8, 2
+            d = OrderedDict(
+                Parameter(@varname(a)) => 1.0,
+                Parameter(@varname(b)) => (x=2.0, y=[3.0, 4.0]),
+            )
+            chain = FlexiChain{VarName}(N_iters, N_chains, fill(d, N_iters, N_chains))
+            da = DD.DimArray(chain; warn=false)
+            @test da isa DD.DimArray{Float64,3}
+            @test size(da) == (N_iters, N_chains, 4)
+            param_keys = collect(val(DD.dims(da, :param)))
+            @test param_keys ==
+                  [@varname(a), @varname(b.x), @varname(b.y[1]), @varname(b.y[2])]
+            @test all(x -> x == 1.0, da[:, :, At(@varname(a))])
+            @test all(x -> x == 2.0, da[:, :, At(@varname(b.x))])
+            @test all(x -> x == 3.0, da[:, :, At(@varname(b.y[1]))])
+            @test all(x -> x == 4.0, da[:, :, At(@varname(b.y[2]))])
+        end
+
+        @testset "VarName-keyed chain with array-of-arrays param" begin
+            N_iters, N_chains = 8, 2
+            d = OrderedDict(
+                Parameter(@varname(a)) => 1.0,
+                Parameter(@varname(b)) => [[2.0, 3.0], [4.0]],
+            )
+            chain = FlexiChain{VarName}(N_iters, N_chains, fill(d, N_iters, N_chains))
+            da = DD.DimArray(chain; warn=false)
+            @test da isa DD.DimArray{Float64,3}
+            @test size(da) == (N_iters, N_chains, 4)
+            param_keys = collect(val(DD.dims(da, :param)))
+            @test param_keys ==
+                  [@varname(a), @varname(b[1][1]), @varname(b[1][2]), @varname(b[2][1])]
+            @test all(x -> x == 1.0, da[:, :, At(@varname(a))])
+            @test all(x -> x == 2.0, da[:, :, At(@varname(b[1][1]))])
+            @test all(x -> x == 3.0, da[:, :, At(@varname(b[1][2]))])
+            @test all(x -> x == 4.0, da[:, :, At(@varname(b[2][1]))])
+        end
+
         @testset "eltype_filter" begin
             N_iters = 5
             d = OrderedDict(
